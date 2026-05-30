@@ -21,10 +21,15 @@ RUN apk add --no-cache python3 make g++ cairo-dev pango-dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/ecf-engine/node_modules ./packages/ecf-engine/node_modules
 COPY --from=deps /app/packages/database/node_modules ./packages/database/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/packages/api-client/node_modules ./packages/api-client/node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY facturard/ .
 RUN pnpm --filter @facturard/ecf-engine build
 RUN pnpm --filter @facturard/database generate
+RUN pnpm --filter @facturard/database build
+RUN pnpm --filter @facturard/shared build
+RUN pnpm --filter @facturard/api-client build
 RUN pnpm --filter @facturard/api build
 
 FROM node:20-alpine AS runner

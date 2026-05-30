@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "build": "tsc",
     "generate": "openapi-typescript ../../apps/api/openapi.json -o ./src/generated.ts"
   },
   "dependencies": {
