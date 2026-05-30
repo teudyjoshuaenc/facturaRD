@@ -29,8 +29,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm --filter @facturard/database generate
+
       - name: TypeScript check
-        run: pnpm --filter @facturard/api build
+        run: pnpm turbo run build --filter=@facturard/api
 
       - name: Run tests (ecf-engine)
         run: pnpm --filter @facturard/ecf-engine test
