@@ -13,12 +13,14 @@ COPY facturard/packages/api-client/package.json ./packages/api-client/
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
+RUN apk add --no-cache python3 make g++ cairo-dev pango-dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY facturard/ .
 RUN pnpm --filter @facturard/ecf-engine build
 RUN pnpm --filter @facturard/api build
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache cairo pango
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/apps/api/dist ./dist
