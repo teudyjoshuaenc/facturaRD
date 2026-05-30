@@ -27,8 +27,11 @@ import jwtConfig from './config/jwt.config'
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         connection: {
-          host: config.getOrThrow<string>('REDIS_HOST'),
-          port: parseInt(config.getOrThrow<string>('REDIS_PORT'), 10),
+          host: config.getOrThrow<string>('redis.host'),
+          port: config.getOrThrow<number>('redis.port'),
+          password: config.get<string>('redis.password'),
+          tls: config.get<boolean>('redis.tls') ? {} : undefined,
+          maxRetriesPerRequest: null,
         },
       }),
       inject: [ConfigService],

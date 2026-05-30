@@ -45,8 +45,10 @@ import { ReceptorJwtGuard } from './receptor-jwt.guard'
       provide: REDIS_CLIENT,
       useFactory: (config: ConfigService): Redis => {
         return new Redis({
-          host: config.get<string>('REDIS_HOST') ?? 'localhost',
-          port: config.get<number>('REDIS_PORT') ?? 6379,
+          host: config.get<string>('redis.host') ?? 'localhost',
+          port: config.get<number>('redis.port') ?? 6379,
+          password: config.get<string>('redis.password'),
+          tls: config.get<boolean>('redis.tls') ? {} : undefined,
           lazyConnect: true,
           maxRetriesPerRequest: 3,
           connectTimeout: 5000,
