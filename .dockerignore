@@ -1,0 +1,7 @@
+node_modules
+.git
+.env
+*.log
+facturard/apps/web
+facturard/dgii-cert/output
+facturard/certs/
