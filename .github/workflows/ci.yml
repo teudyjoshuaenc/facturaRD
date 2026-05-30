@@ -35,6 +35,9 @@ jobs:
       - name: TypeScript check
         run: pnpm turbo run build --filter=@facturard/api
 
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
+
       - name: Run tests (ecf-engine)
         run: pnpm --filter @facturard/ecf-engine test
         env:
