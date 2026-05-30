@@ -1,0 +1,774 @@
+{
+  "E310000000035": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000036": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000037": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000038": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000039": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000050": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000051": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000052": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000053": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000057": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000077": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000078": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000079": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000080": {
+    "tipo": 31,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000136": {
+    "tipo": 31,
+    "enviado": "2026-05-19T22:37:23.833Z",
+    "estado": "Rechazado",
+    "trackId": "db203810-9520-47a6-bdf2-8fa7bfdb84e0",
+    "mensajes": [
+      "[1209] No se encuentra en una fase válida dentro del proceso de certificación."
+    ]
+  },
+  "E320000000011": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000012": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000013": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000014": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000015": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000016": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000017": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000018": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000019": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000020": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000030": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000031": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000040": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000041": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000042": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000043": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000055": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000056": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000070": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000071": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000072": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000073": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000108": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000109": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000120": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000121": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000122": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E320000000123": {
+    "tipo": 32,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E330000000002": {
+    "tipo": 33,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E330000000010": {
+    "tipo": 33,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E330000000021": {
+    "tipo": 33,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E330000000071": {
+    "tipo": 33,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000019": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000020": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000028": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000029": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000030": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000031": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000038": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E340000000039": {
+    "tipo": 34,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000011": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000012": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000013": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000014": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000015": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000016": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000036": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000037": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000089": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E410000000090": {
+    "tipo": 41,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000013": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000014": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000020": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000021": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000022": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000023": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000043": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000044": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000096": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E430000000097": {
+    "tipo": 43,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000011": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000012": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000020": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000021": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000022": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000023": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000043": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000044": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000096": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E440000000097": {
+    "tipo": 44,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000004": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000005": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000010": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000011": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000012": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000031": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000032": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000084": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E450000000085": {
+    "tipo": 45,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000010": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000011": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000020": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000021": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000029": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000030": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000082": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E460000000083": {
+    "tipo": 46,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000011": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000012": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000020": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000021": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000030": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000031": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000083": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E470000000084": {
+    "tipo": 47,
+    "enviado": "2026-05-01T00:00:00.000Z",
+    "estado": "UsadoPreviamente"
+  },
+  "E310000000156": {
+    "tipo": 31,
+    "enviado": "2026-05-20T04:29:52.456Z",
+    "estado": "Rechazado",
+    "trackId": "2a4a4ade-fd5b-43f9-b7dc-208b912027a9",
+    "mensajes": [
+      "[0] No se encuentra en una fase válida dentro del proceso de certificación."
+    ]
+  },
+  "E310000000176": {
+    "tipo": 31,
+    "enviado": "2026-05-20T14:20:50.534Z",
+    "estado": "Aceptado",
+    "trackId": "53024dd4-e5cf-4611-b754-0647944b8588",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E310000000177": {
+    "tipo": 31,
+    "enviado": "2026-05-20T14:20:56.164Z",
+    "estado": "Aceptado",
+    "trackId": "92571ece-6fcd-46a7-80a9-f81a0c2b0351",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E310000000178": {
+    "tipo": 31,
+    "enviado": "2026-05-20T14:21:01.740Z",
+    "estado": "Aceptado",
+    "trackId": "063ba7aa-fb17-47ad-9950-69da8bbbec34",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E310000000179": {
+    "tipo": 31,
+    "enviado": "2026-05-20T14:21:02.079Z",
+    "estado": "Aceptado",
+    "trackId": "244d445c-f885-4b9d-865c-3c20c4c736f0",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E320000000143": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:21:07.553Z",
+    "estado": "Aceptado",
+    "trackId": "ce6deae3-5279-40bd-b229-3cf17d402f62",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E320000000144": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:21:07.830Z",
+    "estado": "Aceptado",
+    "trackId": "e40684a0-492e-487d-9d2a-be5cfcc0c372",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E410000000110": {
+    "tipo": 41,
+    "enviado": "2026-05-20T14:21:13.263Z",
+    "estado": "Aceptado",
+    "trackId": "1b5f0590-3167-4941-b955-bb55e38130a5",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E410000000111": {
+    "tipo": 41,
+    "enviado": "2026-05-20T14:21:18.771Z",
+    "estado": "Aceptado",
+    "trackId": "070c2765-185d-4d65-a312-eec41e87272b",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E430000000117": {
+    "tipo": 43,
+    "enviado": "2026-05-20T14:21:24.316Z",
+    "estado": "Aceptado",
+    "trackId": "ba51065c-d1bb-43da-9161-113bfeb47cff",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E430000000118": {
+    "tipo": 43,
+    "enviado": "2026-05-20T14:21:29.816Z",
+    "estado": "Aceptado",
+    "trackId": "5b23b5d1-d46e-4acb-aed4-f5c4d8f79082",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E440000000117": {
+    "tipo": 44,
+    "enviado": "2026-05-20T14:21:30.117Z",
+    "estado": "Aceptado",
+    "trackId": "23e18cd8-c4a9-44c7-b71b-3a04acd24c62",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E440000000118": {
+    "tipo": 44,
+    "enviado": "2026-05-20T14:21:35.513Z",
+    "estado": "Aceptado",
+    "trackId": "e4cc8092-8a22-4451-93a7-dd9c69039857",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E450000000105": {
+    "tipo": 45,
+    "enviado": "2026-05-20T14:21:35.779Z",
+    "estado": "Aceptado",
+    "trackId": "ef466086-2780-44e3-bbd2-14701a9c65c0",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E450000000106": {
+    "tipo": 45,
+    "enviado": "2026-05-20T14:21:41.188Z",
+    "estado": "Aceptado",
+    "trackId": "7e76b709-bf29-4b37-ab22-3e842fb53066",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E460000000103": {
+    "tipo": 46,
+    "enviado": "2026-05-20T14:21:41.456Z",
+    "estado": "Aceptado",
+    "trackId": "7d00dfb7-59bd-4ed7-a14e-e5fdd463c82d",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E460000000104": {
+    "tipo": 46,
+    "enviado": "2026-05-20T14:21:46.859Z",
+    "estado": "Aceptado",
+    "trackId": "c9268cdb-497d-435c-b885-64d91667ee5a",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E470000000104": {
+    "tipo": 47,
+    "enviado": "2026-05-20T14:21:52.322Z",
+    "estado": "Aceptado",
+    "trackId": "793f1053-0d49-4c0e-8e70-1dd2b799a8fd",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E470000000105": {
+    "tipo": 47,
+    "enviado": "2026-05-20T14:21:57.853Z",
+    "estado": "Aceptado",
+    "trackId": "4bb6316b-49a8-4a14-9210-20cca31b9631",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E330000000091": {
+    "tipo": 33,
+    "enviado": "2026-05-20T14:24:03.609Z",
+    "estado": "Aceptado",
+    "trackId": "9fe0dbdc-000a-4095-b97b-3dec34f05bf5",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E340000000059": {
+    "tipo": 34,
+    "enviado": "2026-05-20T14:24:09.147Z",
+    "estado": "Aceptado",
+    "trackId": "281e4835-0dbe-4fb1-9e9b-f409cd3aadfb",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E340000000060": {
+    "tipo": 34,
+    "enviado": "2026-05-20T14:24:14.623Z",
+    "estado": "Aceptado",
+    "trackId": "b6d41049-2b44-4e91-b3e1-551c6e0a7042",
+    "mensajes": [
+      "[0] "
+    ]
+  },
+  "E320000000165": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:24:15.220Z",
+    "estado": "Aceptado"
+  },
+  "E320000000166": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:24:15.395Z",
+    "estado": "Aceptado"
+  },
+  "E320000000167": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:24:15.602Z",
+    "estado": "Aceptado"
+  },
+  "E320000000168": {
+    "tipo": 32,
+    "enviado": "2026-05-20T14:24:15.937Z",
+    "estado": "Aceptado"
+  }
+}

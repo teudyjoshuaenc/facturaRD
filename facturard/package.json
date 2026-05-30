@@ -1,0 +1,27 @@
+{
+  "name": "facturard",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "generate:api": "turbo run generate:api",
+    "db:generate": "pnpm --filter @facturard/database generate",
+    "db:migrate": "pnpm --filter @facturard/database migrate:dev",
+    "db:studio": "pnpm --filter @facturard/database studio",
+    "docker:up": "docker compose -f ../docker-compose.yml up -d",
+    "docker:down": "docker compose -f ../docker-compose.yml down",
+    "docker:logs": "docker compose -f ../docker-compose.yml logs -f",
+    "docker:reset": "docker compose -f ../docker-compose.yml down -v && docker compose -f ../docker-compose.yml up -d"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

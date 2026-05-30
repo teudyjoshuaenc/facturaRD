@@ -1,0 +1,61 @@
+# ─── Node.js ──────────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Build output ─────────────────────────────────────────────────────────────
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# ─── Environment — nunca subir secrets ───────────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
+# SÍ subir la plantilla para que otros devs sepan qué variables configurar
+!.env.example
+
+# ─── Certificados y llaves privadas ──────────────────────────────────────────
+*.p12
+*.pfx
+*.key
+# Los certs .crt/.pem públicos (como camaracomercio.crt) SÍ se suben
+# porque son material público y necesarios para verificar firmas DGII
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── Testing & coverage ───────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── OpenAPI generado (se regenera con pnpm generate:api) ────────────────────
+openapi.json
+
+# ─── Prisma — cliente generado (va en node_modules, no en repo) ───────────────
+# Las migraciones SÍ se suben — solo el cliente generado se ignora
+facturard/packages/database/prisma/generated/
+
+# ─── Claude Code — memoria local del dev (no va al repo) ─────────────────────
+.claude/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~

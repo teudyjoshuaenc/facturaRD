@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Schema XSD para e-CF Tipo 31 — Factura de Crédito Fiscal Electrónica
+  Basado en el esquema oficial de la DGII (Dirección General de Impuestos Internos)
+  República Dominicana — v1.0
+-->
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  xmlns:ecf="http://dgii.gov.do/ecf/mapers/v1"
+  targetNamespace="http://dgii.gov.do/ecf/mapers/v1"
+  elementFormDefault="qualified">
+
+  <!-- ════════════════════════════════════════════════════════════════
+       Tipos simples reutilizables
+  ═══════════════════════════════════════════════════════════════════ -->
+
+  <!-- Fecha en formato DD-MM-YYYY -->
+  <xs:simpleType name="TFecha">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d{2}-\d{2}-\d{4}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- RNC / cédula: 9-11 dígitos -->
+  <xs:simpleType name="TRNC">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d{9,11}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- eNCF: E + 2-dígitos tipo + 10-dígitos secuencia -->
+  <xs:simpleType name="TeNCF">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="E\d{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Monto monetario con hasta 2 decimales -->
+  <xs:simpleType name="TMonto">
+    <xs:restriction base="xs:decimal">
+      <xs:fractionDigits value="2"/>
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- TipoCFE: sólo los 8 tipos definidos por la DGII -->
+  <xs:simpleType name="TTipoCFE">
+    <xs:restriction base="xs:integer">
+      <xs:enumeration value="31"/>
+      <xs:enumeration value="32"/>
+      <xs:enumeration value="33"/>
+      <xs:enumeration value="34"/>
+      <xs:enumeration value="41"/>
+      <xs:enumeration value="43"/>
+      <xs:enumeration value="44"/>
+      <xs:enumeration value="45"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- TipoIngresos: categorías de ingresos DGII -->
+  <xs:simpleType name="TTipoIngresos">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="01"/> <!-- Operaciones (No Financieros) -->
+      <xs:enumeration value="02"/> <!-- Financieros -->
+      <xs:enumeration value="03"/> <!-- Extraordinarios -->
+      <xs:enumeration value="04"/> <!-- Arrendamientos -->
+      <xs:enumeration value="05"/> <!-- Venta de Activo Depreciable -->
+      <xs:enumeration value="06"/> <!-- Otros -->
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- TipoPago -->
+  <xs:simpleType name="TTipoPago">
+    <xs:restriction base="xs:integer">
+      <xs:enumeration value="1"/> <!-- Contado -->
+      <xs:enumeration value="2"/> <!-- Crédito -->
+      <xs:enumeration value="3"/> <!-- Gratuito -->
+      <xs:enumeration value="4"/> <!-- En Especie / Permuta -->
+      <xs:enumeration value="5"/> <!-- De Uso o Consumo -->
+      <xs:enumeration value="6"/> <!-- Nota de Crédito -->
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- IndicadorFacturacion -->
+  <xs:simpleType name="TIndicadorFacturacion">
+    <xs:restriction base="xs:integer">
+      <xs:enumeration value="1"/> <!-- Gravado ITBIS 18% -->
+      <xs:enumeration value="2"/> <!-- Gravado ITBIS 16% -->
+      <xs:enumeration value="3"/> <!-- Gravado ITBIS 0% -->
+      <xs:enumeration value="4"/> <!-- Exento -->
+      <xs:enumeration value="5"/> <!-- ISC -->
+      <xs:enumeration value="6"/> <!-- Otro impuesto -->
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- IndicadorBienesOServicios -->
+  <xs:simpleType name="TIndicadorBienesOServicios">
+    <xs:restriction base="xs:integer">
+      <xs:enumeration value="1"/> <!-- Bienes -->
+      <xs:enumeration value="2"/> <!-- Servicios -->
+      <xs:enumeration value="3"/> <!-- Bienes y Servicios -->
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       Tipos complejos
+  ═══════════════════════════════════════════════════════════════════ -->
+
+  <!-- IdDoc -->
+  <xs:complexType name="TIdDoc">
+    <xs:sequence>
+      <xs:element name="TipoCFE"                     type="ecf:TTipoCFE"/>
+      <xs:element name="eNCF"                         type="ecf:TeNCF"/>
+      <xs:element name="FechaVencimientoSecuencia"    type="ecf:TFecha"/>
+      <xs:element name="IndicadorMontoGravado">
+        <xs:simpleType>
+          <xs:restriction base="xs:integer">
+            <xs:enumeration value="0"/>
+            <xs:enumeration value="1"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="TipoIngresos"   type="ecf:TTipoIngresos"/>
+      <xs:element name="TipoPago"       type="ecf:TTipoPago"/>
+      <xs:element name="FechaLimitePago" type="ecf:TFecha" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Emisor -->
+  <xs:complexType name="TEmisor">
+    <xs:sequence>
+      <xs:element name="RNCEmisor"                  type="ecf:TRNC"/>
+      <xs:element name="RazonSocialEmisor"          type="xs:string"/>
+      <xs:element name="NombreComercialEmisor"      type="xs:string" minOccurs="0"/>
+      <xs:element name="DireccionEmisor"            type="xs:string"/>
+      <xs:element name="MunicipioEmisor"            type="xs:string" minOccurs="0"/>
+      <xs:element name="ProvinciaEmisor"            type="xs:string" minOccurs="0"/>
+      <xs:element name="TelefonoEmisor"             type="xs:string" minOccurs="0"/>
+      <xs:element name="CorreoElectronicoEmisor"    type="xs:string" minOccurs="0"/>
+      <xs:element name="ActividadEconomicaEmisor"   type="xs:string" minOccurs="0"/>
+      <xs:element name="FechaEmision"               type="ecf:TFecha"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Comprador -->
+  <xs:complexType name="TComprador">
+    <xs:sequence>
+      <xs:element name="RNCComprador"               type="ecf:TRNC"/>
+      <xs:element name="RazonSocialComprador"       type="xs:string"/>
+      <xs:element name="ContactoComprador"          type="xs:string" minOccurs="0"/>
+      <xs:element name="CorreoElectronicoComprador" type="xs:string" minOccurs="0"/>
+      <xs:element name="DireccionComprador"         type="xs:string" minOccurs="0"/>
+      <xs:element name="MunicipioComprador"         type="xs:string" minOccurs="0"/>
+      <xs:element name="ProvinciaComprador"         type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Totales -->
+  <xs:complexType name="TTotales">
+    <xs:sequence>
+      <xs:element name="MontoGravadoI1"   type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoGravadoI2"   type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoGravadoI3"   type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoExento"      type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalITBIS1"      type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalITBIS2"      type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalITBIS3"      type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalITBIS"       type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalOtrosImpuestos" type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoPropina"     type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="TotalDescuento"   type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoTotal"       type="ecf:TMonto"/>
+      <xs:element name="MontoNoFacturable" type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoPeriodo"     type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="SaldoAnterior"    type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="MontoAvancePago"  type="ecf:TMonto" minOccurs="0"/>
+      <xs:element name="ValorPagar"       type="ecf:TMonto" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Item de detalle -->
+  <xs:complexType name="TItem">
+    <xs:sequence>
+      <xs:element name="NumeroLinea"                type="xs:positiveInteger"/>
+      <xs:element name="IndicadorFacturacion"       type="ecf:TIndicadorFacturacion"/>
+      <xs:element name="NombreItem"                 type="xs:string"/>
+      <xs:element name="IndicadorBienesOServicios"  type="ecf:TIndicadorBienesOServicios"/>
+      <xs:element name="DescripcionItem"            type="xs:string"      minOccurs="0"/>
+      <xs:element name="CantidadItem"               type="xs:decimal"/>
+      <xs:element name="UnidadMedida"               type="xs:string"      minOccurs="0"/>
+      <xs:element name="DescuentoMonto"             type="ecf:TMonto"     minOccurs="0"/>
+      <xs:element name="PrecioUnitarioItem"         type="ecf:TMonto"/>
+      <xs:element name="DescuentoPorcentaje"        type="xs:decimal"     minOccurs="0"/>
+      <xs:element name="MontoItem"                  type="ecf:TMonto"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- DetallesItems -->
+  <xs:complexType name="TDetallesItems">
+    <xs:sequence>
+      <xs:element name="Item" type="ecf:TItem" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Encabezado — Comprador es obligatorio en e-CF 31 -->
+  <xs:complexType name="TEncabezado">
+    <xs:sequence>
+      <xs:element name="Version"    type="xs:string"/>
+      <xs:element name="IdDoc"      type="ecf:TIdDoc"/>
+      <xs:element name="Emisor"     type="ecf:TEmisor"/>
+      <xs:element name="Comprador"  type="ecf:TComprador"/>
+      <xs:element name="Totales"    type="ecf:TTotales"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       Elemento raíz
+  ═══════════════════════════════════════════════════════════════════ -->
+
+  <xs:element name="ECF">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Encabezado"           type="ecf:TEncabezado"/>
+        <xs:element name="DetallesItems"        type="ecf:TDetallesItems" minOccurs="0"/>
+        <xs:element name="SubTotalesImpuestos"  minOccurs="0"/>
+        <xs:element name="Descuentos"           minOccurs="0"/>
+        <xs:element name="OtrosCargos"          minOccurs="0"/>
+        <xs:element name="InformacionReferencia" minOccurs="0"/>
+        <xs:element name="Paginacion"           minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

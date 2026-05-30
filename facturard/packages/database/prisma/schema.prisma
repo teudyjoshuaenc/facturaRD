@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Plan {
+  BASICO
+  PYME
+  PRO
+}
+
+enum TenantEstado {
+  ACTIVO
+  SUSPENDIDO
+  CANCELADO
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USUARIO
+  CONTADOR
+}
+
+enum TipoECF {
+  E31
+  E32
+  E33
+  E34
+  E41
+  E43
+  E44
+  E45
+  E46
+  E47
+}
+
+enum ComprobanteEstado {
+  PENDIENTE
+  EN_COLA
+  ENVIANDO
+  ACEPTADO
+  ACEPTADO_CONDICIONAL
+  RECHAZADO
+  ERROR
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id              String       @id @default(uuid())
+  rnc             String       @unique
+  razonSocial     String
+  nombreComercial String?
+  direccion       String?
+  plan            Plan         @default(BASICO)
+  estado          TenantEstado @default(ACTIVO)
+  planActivo      Boolean      @default(true)
+  trialEndsAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  users                User[]
+  comprobantes         Comprobante[]
+  certificados         Certificado[]
+  apiKeys              ApiKey[]
+  webhooks             Webhook[]
+  auditLogs            AuditLog[]
+  secuencias           Secuencia[]
+  comprobantesRecibidos ComprobanteRecibido[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  tenantId          String
+  email             String
+  passwordHash      String
+  nombre            String
+  role              UserRole @default(USUARIO)
+  activo                Boolean   @default(true)
+  refreshTokenHash      String?
+  resetPasswordToken    String?
+  resetPasswordExpires  DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  auditLogs AuditLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+model Certificado {
+  id                String   @id @default(uuid())
+  tenantId          String
+  // Metadatos del certificado (nunca el P12 en plano)
+  titular           String
+  rnc               String
+  serial            String
+  emitidoPor        String
+  validoDesde       DateTime
+  validoHasta       DateTime
+
+  // P12 cifrado con AES-256-GCM (nunca se devuelve al cliente)
+  p12Encrypted      String    // base64 del buffer cifrado
+  p12Iv             String    // hex del IV
+  p12Tag            String    // hex del auth tag GCM
+
+  // Passphrase cifrada — formato base64(iv):base64(tag):base64(encrypted)
+  passphraseCifrada String
+
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, activo])
+  @@map("certificados")
+}
+
+model Comprobante {
+  id           String            @id @default(uuid())
+  tenantId     String
+  eNCF         String
+  tipoECF      TipoECF
+  estado       ComprobanteEstado @default(PENDIENTE)
+  xmlFirmado   String?
+  trackId      String?
+  mensajeDGII  String?
+  montoTotal   Decimal           @db.Decimal(18, 2)
+  rnc          String            // RNC del comprador
+  razonSocial  String            // Razón social del comprador
+  pdfUrl       String?
+  intentos     Int               @default(0)
+  datos        Json?             // DTO original para el worker
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, eNCF])
+  @@index([tenantId, estado])
+  @@index([tenantId, createdAt])
+  @@map("comprobantes")
+}
+
+model ApiKey {
+  id        String    @id @default(uuid())
+  tenantId  String
+  nombre    String
+  keyHash   String    @unique
+  ultimoUso DateTime?
+  activo    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("api_keys")
+}
+
+model Webhook {
+  id          String   @id @default(uuid())
+  tenantId    String
+  url         String
+  secretoHMAC String
+  eventos     String[]
+  tipo        String   @default("SALIENTE") // "GHL_ENTRADA" | "SALIENTE"
+  nombre      String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("webhooks")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String?
+  accion    String
+  entidad   String
+  entidadId String?
+  detalle   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, accion])
+  @@map("audit_logs")
+}
+
+model ComprobanteRecibido {
+  id             String   @id @default(uuid())
+  tenantId       String   // tenant receptor (nuestro RNC)
+  rncEmisor      String   // RNC del emisor que nos envía el e-CF
+  eNCF           String   // número de e-CF
+  tipoECF        String   // "31", "32", etc.
+  xmlFirmado     String   // XML completo del e-CF recibido
+  estado         String   @default("RECIBIDO") // RECIBIDO | ACEPTADO | RECHAZADO
+  aprobacion     String?  // XML de aprobación comercial (ACECF)
+  fechaRecepcion DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, eNCF, rncEmisor])
+  @@index([tenantId, rncEmisor])
+  @@index([tenantId, fechaRecepcion])
+  @@map("comprobantes_recibidos")
+}
+
+model Secuencia {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tipoECF          TipoECF
+  prefijo          String
+  ultimaSecuencia  Int       @default(0)
+  fechaVencimiento DateTime?
+  activo           Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, tipoECF])
+  @@index([tenantId, activo])
+  @@map("secuencias")
+}
