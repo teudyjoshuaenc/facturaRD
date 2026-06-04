@@ -10,7 +10,8 @@ import { JwtService } from '@nestjs/jwt'
 import type { Redis } from 'ioredis'
 import { randomUUID } from 'crypto'
 import { prisma } from '@facturard/database'
-import { verificarFirmaEcf } from '@facturard/ecf-engine'
+import { verificarFirmaEcf, firmarDocumento } from '@facturard/ecf-engine'
+import { CertificadosService } from '../certificados/certificados.service'
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
 
@@ -101,6 +102,7 @@ export class ReceptorService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly jwtService: JwtService,
+    private readonly certificadosService: CertificadosService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -342,15 +344,26 @@ export class ReceptorService {
       })
       .catch((e) => this.logger.warn(`[Receptor] Audit log error: ${String(e)}`))
 
-    // 7. Generar XML de acuse de recibo (ARECF)
+    // 7. Generar XML de acuse de recibo (ARECF) y firmarlo con el P12 del tenant
     this.logger.log(`[Receptor][Paso7] Generando ARECF para eNCF=${eNCF}`)
     const nuestroRnc = rncComprador || (await this.obtenerNuestroRnc(tenantId))
     const arecfXml = buildArecfXml(rncEmisor, nuestroRnc, eNCF, '0')
 
+    let xmlFinal = arecfXml
+    try {
+      const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
+      xmlFinal = firmarDocumento({ p12: p12Buffer, passphrase, xml: arecfXml })
+      this.logger.log(`[Receptor][Paso7] ARECF firmado con certificado del tenant ${tenantId}`)
+    } catch (err) {
+      this.logger.warn(
+        `[Receptor][Paso7] No se pudo firmar el ARECF (sin certificado activo): ${String(err)} — retornando sin firma`,
+      )
+    }
+
     this.logger.log(
-      `[Receptor][Paso7] ARECF listo — retornando respuesta: eNCF=${eNCF} | rncEmisor=${rncEmisor} | xmlLength=${arecfXml.length}`,
+      `[Receptor][Paso7] ARECF listo — retornando respuesta: eNCF=${eNCF} | rncEmisor=${rncEmisor} | xmlLength=${xmlFinal.length}`,
     )
-    return { xml: arecfXml, rncEmisor, eNCF }
+    return { xml: xmlFinal, rncEmisor, eNCF }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

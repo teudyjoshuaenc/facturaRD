@@ -6,6 +6,7 @@ import { ReceptorService, REDIS_CLIENT } from './receptor.service'
 import { ReceptorAuthController } from './receptor-auth.controller'
 import { ReceptorEcfController } from './receptor-ecf.controller'
 import { ReceptorJwtGuard } from './receptor-jwt.guard'
+import { CertificadosModule } from '../certificados/certificados.module'
 
 /**
  * ReceptorModule
@@ -22,6 +23,7 @@ import { ReceptorJwtGuard } from './receptor-jwt.guard'
 @Module({
   imports: [
     ConfigModule,
+    CertificadosModule,
     // JWT independiente para las sesiones de receptor
     // Usa JWT_SECRET con sufijo ':receptor-ecf' para diferenciarlo del auth normal
     JwtModule.registerAsync({
