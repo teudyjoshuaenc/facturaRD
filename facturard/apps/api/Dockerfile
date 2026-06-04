@@ -62,5 +62,11 @@ RUN rm -rf node_modules/@facturard && \
     ln -sf /app/packages/ecf-engine node_modules/@facturard/ecf-engine
 
 COPY --from=builder /app/apps/api/package.json ./
+
+# Prisma CLI y migrations (requeridos por migrate deploy en startup)
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
+COPY --from=builder /app/packages/database/prisma ./packages/database/prisma
+
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npm run start:prod"]

@@ -6,6 +6,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main",
+    "start:prod": "npx prisma migrate deploy --schema=packages/database/prisma/schema.prisma && node dist/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest"
   },
