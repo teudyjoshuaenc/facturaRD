@@ -352,7 +352,12 @@ export class ReceptorService {
     let xmlFinal = arecfXml
     try {
       const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
-      xmlFinal = firmarDocumento({ p12: p12Buffer, passphrase, xml: arecfXml })
+      xmlFinal = firmarDocumento({
+        p12: p12Buffer,
+        passphrase,
+        xml: arecfXml,
+        signOptions: { referenceXPath: "//*[local-name(.)='ARECF']" },
+      })
       this.logger.log(`[Receptor][Paso7] ARECF firmado con certificado del tenant ${tenantId}`)
     } catch (err) {
       this.logger.warn(
