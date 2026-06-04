@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Req,
   Res,
@@ -46,6 +47,20 @@ export class ReceptorEcfController {
   private readonly logger = new Logger(ReceptorEcfController.name)
 
   constructor(private readonly service: ReceptorService) {}
+
+  @Get('recepcion/api/ecf')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Health check requerido por DGII antes de enviar e-CFs' })
+  checkRecepcion(): { status: string; service: string } {
+    return { status: 'ok', service: 'recepcion' }
+  }
+
+  @Get('aprobacioncomercial/api/ecf')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Health check requerido por DGII antes de enviar aprobaciones' })
+  checkAprobacion(): { status: string; service: string } {
+    return { status: 'ok', service: 'aprobacioncomercial' }
+  }
 
   /**
    * POST /fe/recepcion/api/ecf
