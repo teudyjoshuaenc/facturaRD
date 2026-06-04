@@ -264,6 +264,7 @@ export class ReceptorService {
     }
 
     // 4. Buscar el tenant receptor (por RNC del comprador)
+    this.logger.log(`[Receptor][Paso4] Buscando tenant para rncComprador="${rncComprador}"`)
     let tenantId: string | null = null
     if (rncComprador) {
       const tenant = await prisma.tenant.findFirst({
@@ -272,17 +273,19 @@ export class ReceptorService {
       })
       if (tenant) {
         tenantId = tenant.id
+        this.logger.log(`[Receptor][Paso4] Tenant encontrado por RNC: ${tenantId}`)
       }
     }
 
     // Si no encontramos tenant por RNC, buscamos el primer tenant activo
-    // (válido para instalaciones de un solo tenant)
     if (!tenantId) {
+      this.logger.log(`[Receptor][Paso4] RNC no coincide, buscando tenant fallback`)
       const fallback = await prisma.tenant.findFirst({
         where: { estado: 'ACTIVO' },
         select: { id: true, rnc: true },
       })
       if (!fallback) {
+        this.logger.error(`[Receptor][Paso4] No hay tenants activos — lanzando NotFoundException`)
         throw new NotFoundException('No hay tenants activos para recibir e-CFs')
       }
       tenantId = fallback.id
@@ -294,30 +297,40 @@ export class ReceptorService {
 
     // 5. Guardar el e-CF recibido en DB (upsert por clave única)
     const tipoECF = tipoECFRaw ? tipoECFRaw.replace(/\D/g, '').padStart(2, '0') : '31'
-    await prisma.comprobanteRecibido.upsert({
-      where: {
-        tenantId_eNCF_rncEmisor: { tenantId, eNCF, rncEmisor },
-      },
-      create: {
-        tenantId,
-        rncEmisor,
-        eNCF,
-        tipoECF,
-        xmlFirmado: xmlRaw,
-        estado: 'RECIBIDO',
-      },
-      update: {
-        xmlFirmado: xmlRaw,
-        estado: 'RECIBIDO',
-        fechaRecepcion: new Date(),
-      },
-    })
+    this.logger.log(
+      `[Receptor][Paso5] Guardando en DB: eNCF=${eNCF} | tipoECF=${tipoECF} | tenantId=${tenantId}`,
+    )
+    try {
+      await prisma.comprobanteRecibido.upsert({
+        where: {
+          tenantId_eNCF_rncEmisor: { tenantId, eNCF, rncEmisor },
+        },
+        create: {
+          tenantId,
+          rncEmisor,
+          eNCF,
+          tipoECF,
+          xmlFirmado: xmlRaw,
+          estado: 'RECIBIDO',
+        },
+        update: {
+          xmlFirmado: xmlRaw,
+          estado: 'RECIBIDO',
+          fechaRecepcion: new Date(),
+        },
+      })
+      this.logger.log(`[Receptor][Paso5] DB upsert OK: ${eNCF}`)
+    } catch (dbErr) {
+      this.logger.error(`[Receptor][Paso5] ERROR en DB upsert: ${String(dbErr)}`)
+      throw dbErr
+    }
 
     this.logger.log(
       `[Receptor] e-CF recibido: ${eNCF} de RNC ${rncEmisor} → tenant ${tenantId}`,
     )
 
     // 6. Audit log
+    this.logger.log(`[Receptor][Paso6] Creando audit log`)
     await prisma.auditLog
       .create({
         data: {
@@ -330,10 +343,13 @@ export class ReceptorService {
       .catch((e) => this.logger.warn(`[Receptor] Audit log error: ${String(e)}`))
 
     // 7. Generar XML de acuse de recibo (ARECF)
-    //    Estado 0 = recibido/aceptado, 1 = rechazado
+    this.logger.log(`[Receptor][Paso7] Generando ARECF para eNCF=${eNCF}`)
     const nuestroRnc = rncComprador || (await this.obtenerNuestroRnc(tenantId))
     const arecfXml = buildArecfXml(rncEmisor, nuestroRnc, eNCF, '0')
 
+    this.logger.log(
+      `[Receptor][Paso7] ARECF listo — retornando respuesta: eNCF=${eNCF} | rncEmisor=${rncEmisor} | xmlLength=${arecfXml.length}`,
+    )
     return { xml: arecfXml, rncEmisor, eNCF }
   }
 
