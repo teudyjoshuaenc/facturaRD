@@ -101,7 +101,9 @@ async function bootstrap(): Promise<void> {
     exclude: [
       { path: 'fe/autenticacion/api/semilla',               method: RequestMethod.GET },
       { path: 'fe/autenticacion/api/validacioncertificado', method: RequestMethod.POST },
+      { path: 'fe/recepcion/api/ecf',                       method: RequestMethod.GET },
       { path: 'fe/recepcion/api/ecf',                       method: RequestMethod.POST },
+      { path: 'fe/aprobacioncomercial/api/ecf',             method: RequestMethod.GET },
       { path: 'fe/aprobacioncomercial/api/ecf',             method: RequestMethod.POST },
     ],
   })
