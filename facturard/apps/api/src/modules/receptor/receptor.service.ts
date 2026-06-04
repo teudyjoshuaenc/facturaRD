@@ -258,6 +258,11 @@ export class ReceptorService {
       )
     }
 
+    // Si hay advertencia de CA (VIAFIRMA u otra CA sin PEM embebido), loguear pero continuar
+    if (verificacion.error?.startsWith('ADVERTENCIA:')) {
+      this.logger.warn(`[Receptor][Firma] ${verificacion.error} | eNCF=${eNCF}`)
+    }
+
     // 4. Buscar el tenant receptor (por RNC del comprador)
     let tenantId: string | null = null
     if (rncComprador) {
