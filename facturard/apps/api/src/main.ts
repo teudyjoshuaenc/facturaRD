@@ -130,12 +130,6 @@ async function bootstrap(): Promise<void> {
     writeFileSync('./openapi.json', JSON.stringify(document, null, 2))
   }
 
-  // ── Catch-all 404 — loguea URLs que NestJS no reconoció ──────────────────
-  app.use((req: any, res: any) => {
-    console.log(`[404] ${req.method} ${req.url}`)
-    res.status(404).json({ message: `Cannot ${req.method} ${req.url}`, statusCode: 404 })
-  })
-
   const port = process.env['PORT'] ?? 3000
   await app.listen(port)
   console.log(`FacturaRD API running on port ${port}`)
