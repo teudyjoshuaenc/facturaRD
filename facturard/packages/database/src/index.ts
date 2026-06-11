@@ -19,6 +19,7 @@ export type {
   Webhook,
   AuditLog,
   Secuencia,
+  GhlLocation,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

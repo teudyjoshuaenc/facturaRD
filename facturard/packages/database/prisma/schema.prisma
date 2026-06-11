@@ -74,6 +74,7 @@ model Tenant {
   auditLogs            AuditLog[]
   secuencias           Secuencia[]
   comprobantesRecibidos ComprobanteRecibido[]
+  ghlLocations         GhlLocation[]
 
   @@map("tenants")
 }
@@ -220,6 +221,18 @@ model ComprobanteRecibido {
   @@index([tenantId, rncEmisor])
   @@index([tenantId, fechaRecepcion])
   @@map("comprobantes_recibidos")
+}
+
+model GhlLocation {
+  id         String   @id @default(uuid())
+  locationId String   @unique
+  tenantId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("ghl_locations")
 }
 
 model Secuencia {
