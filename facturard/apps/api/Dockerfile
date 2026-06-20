@@ -37,7 +37,8 @@ RUN pnpm --filter @facturard/api-client build
 RUN pnpm --filter @facturard/api build
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache cairo pango
+# libxml2-utils provee xmllint — usado en runtime por ecf-engine para validar XSD de los e-CF
+RUN apk add --no-cache cairo pango libxml2-utils
 WORKDIR /app
 ENV NODE_ENV=production
 
