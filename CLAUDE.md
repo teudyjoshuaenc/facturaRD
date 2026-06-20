@@ -166,6 +166,45 @@ POST https://{ngrok}.ngrok-free.app/fe/recepcion/api/ecf
 POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 ```
 
+---
+
+## 13. FRONTEND
+
+**Stack:** Next.js 15, TypeScript strict, Tailwind CSS, React Query v5, Sonner (toasts), Axios
+
+**Rutas (App Router, route group `(dashboard)`):**
+```
+/                → entry point: lee ?location_id, decide onboarding o dashboard
+/onboarding      → 3 pasos: RNC → P12 → éxito
+/dashboard       → métricas del mes + facturas recientes
+/facturas        → lista paginada con filtros por estado y búsqueda
+/nueva-factura   → formulario emitir comprobante (E31/E32)
+/configuracion   → empresa, certificado P12, webhook GHL
+```
+
+**Comandos:**
+```bash
+pnpm --filter @facturard/web dev    # puerto 3001
+pnpm --filter @facturard/web build  # build producción
+```
+
+**Variables de entorno (`apps/web/.env.local`):**
+```env
+NEXT_PUBLIC_API_URL=https://better-invoice-production.up.railway.app/api/v1
+```
+
+**Deploy:** Vercel — root directory en Vercel debe ser la raíz del monorepo (`facturard/`).
+El `vercel.json` en `apps/web/` contiene buildCommand con `--filter`.
+
+**Arquitectura clave:**
+- Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)
+- Sin login propio: el entry point `/` siempre arranca desde GHL con `?location_id`
+- Interceptor 401: re-llama GET /ghl/init con el `frd_location_id` guardado para refrescar el token
+- Estado global: AuthContext (token + tenant) + UIContext (sidebar abierto/cerrado)
+- Server state: React Query con queryKey tipados por recurso
+
+---
+
 NOTAS TÉCNICAS DEL RECEPTOR:
 - Los endpoints `/fe/*` están FUERA del prefijo `api/v1` (excluidos en main.ts con setGlobalPrefix)
 - Redis almacena semillas con TTL 5 min (key: `semilla:{UUID}`)
