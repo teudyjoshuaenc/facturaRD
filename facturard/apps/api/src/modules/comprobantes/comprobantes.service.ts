@@ -9,19 +9,24 @@ import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 
-// fechaHasta es solo YYYY-MM-DD — se extiende al final del día para incluirlo completo
-function endOfDay(date: string): Date {
-  const d = new Date(date)
-  d.setHours(23, 59, 59, 999)
-  return d
+// fechaDesde/fechaHasta son fechas calendario en hora de RD (UTC-4 fijo, sin DST).
+// Se anclan explícitamente a ese offset — usar setHours() dependería de la zona
+// horaria del proceso (en Railway corre en UTC, no UTC-4), excluyendo facturas
+// del mismo día creadas por la noche en RD.
+function inicioDia(date: string): Date {
+  return new Date(`${date}T00:00:00.000-04:00`)
+}
+
+function finDia(date: string): Date {
+  return new Date(`${date}T23:59:59.999-04:00`)
 }
 
 function rangoFechas(fechaDesde?: string, fechaHasta?: string): Prisma.ComprobanteWhereInput {
   if (fechaDesde === undefined && fechaHasta === undefined) return {}
   return {
     createdAt: {
-      ...(fechaDesde !== undefined && { gte: new Date(fechaDesde) }),
-      ...(fechaHasta !== undefined && { lte: endOfDay(fechaHasta) }),
+      ...(fechaDesde !== undefined && { gte: inicioDia(fechaDesde) }),
+      ...(fechaHasta !== undefined && { lte: finDia(fechaHasta) }),
     },
   }
 }
