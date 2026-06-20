@@ -26,7 +26,7 @@ interface Props {
 export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const baseId = useId()
 
-  const [tipoECF, setTipoECF] = useState<'E31' | 'E32'>('E32')
+  const [tipoECF, setTipoECF] = useState<'E31' | 'E32'>('E31')
   const [rncComprador, setRncComprador] = useState('')
   const [razonSocialComprador, setRazonSocialComprador] = useState('')
   const [fechaEmision, setFechaEmision] = useState(todayISO())
