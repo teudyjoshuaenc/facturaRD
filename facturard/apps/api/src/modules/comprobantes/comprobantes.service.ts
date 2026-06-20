@@ -1,12 +1,30 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import type { Queue } from 'bullmq'
-import { prisma } from '@facturard/database'
+import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { ListComprobantesDto } from './dto/list-comprobantes.dto'
-import type { PaginatedResponse } from '@facturard/shared'
+import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
+import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
 import { SecuenciasService } from '../secuencias/secuencias.service'
+
+// fechaHasta es solo YYYY-MM-DD — se extiende al final del día para incluirlo completo
+function endOfDay(date: string): Date {
+  const d = new Date(date)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
+function rangoFechas(fechaDesde?: string, fechaHasta?: string): Prisma.ComprobanteWhereInput {
+  if (fechaDesde === undefined && fechaHasta === undefined) return {}
+  return {
+    createdAt: {
+      ...(fechaDesde !== undefined && { gte: new Date(fechaDesde) }),
+      ...(fechaHasta !== undefined && { lte: endOfDay(fechaHasta) }),
+    },
+  }
+}
 
 export interface EcfJobData {
   comprobanteId: string
@@ -89,16 +107,17 @@ export class ComprobantesService {
     const limit = Math.min(query.limit ?? 20, 100)
     const skip = (page - 1) * limit
 
-    const where = {
+    const where: Prisma.ComprobanteWhereInput = {
       tenantId,
       ...(query.estado !== undefined && { estado: query.estado }),
       ...(query.tipoECF !== undefined && { tipoECF: query.tipoECF }),
-      ...(query.fechaDesde !== undefined || query.fechaHasta !== undefined
+      ...rangoFechas(query.fechaDesde, query.fechaHasta),
+      ...(query.search !== undefined && query.search.trim() !== ''
         ? {
-            createdAt: {
-              ...(query.fechaDesde !== undefined && { gte: new Date(query.fechaDesde) }),
-              ...(query.fechaHasta !== undefined && { lte: new Date(query.fechaHasta) }),
-            },
+            OR: [
+              { eNCF: { contains: query.search, mode: 'insensitive' } },
+              { razonSocial: { contains: query.search, mode: 'insensitive' } },
+            ],
           }
         : {}),
     }
@@ -115,5 +134,32 @@ export class ComprobantesService {
     const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId } })
     if (!comprobante) throw new NotFoundException(`Comprobante ${id} no encontrado`)
     return comprobante
+  }
+
+  async resumen(tenantId: string, query: ResumenComprobantesDto): Promise<ResumenComprobantes> {
+    const where: Prisma.ComprobanteWhereInput = {
+      tenantId,
+      ...rangoFechas(query.fechaDesde, query.fechaHasta),
+    }
+
+    const [totalFacturas, montoAgg, pendientes, aceptadas, rechazadas] = await prisma.$transaction([
+      prisma.comprobante.count({ where }),
+      prisma.comprobante.aggregate({ where, _sum: { montoTotal: true } }),
+      prisma.comprobante.count({ where: { ...where, estado: { in: ['PENDIENTE', 'EN_COLA', 'ENVIANDO'] } } }),
+      prisma.comprobante.count({ where: { ...where, estado: { in: ['ACEPTADO', 'ACEPTADO_CONDICIONAL'] } } }),
+      prisma.comprobante.count({ where: { ...where, estado: { in: ['RECHAZADO', 'ERROR'] } } }),
+    ])
+
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const montoTotal = r2(Number(montoAgg._sum.montoTotal ?? 0))
+
+    return {
+      totalFacturas,
+      montoTotal,
+      itbisTotal: r2((montoTotal * 18) / 118),
+      pendientes,
+      rechazadas,
+      aceptadas,
+    }
   }
 }

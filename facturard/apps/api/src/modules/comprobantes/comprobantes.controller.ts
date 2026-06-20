@@ -5,6 +5,7 @@ import { createReadStream, existsSync } from 'fs'
 import { ComprobantesService } from './comprobantes.service'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { ListComprobantesDto } from './dto/list-comprobantes.dto'
+import { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { PlanActivoGuard } from '../../common/guards/plan-activo.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
@@ -30,10 +31,19 @@ export class ComprobantesController {
   @ApiQuery({ name: 'tipoECF', enum: TipoECF, required: false })
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })
+  @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', type: Number, required: false })
   @ApiQuery({ name: 'limit', type: Number, required: false })
   findAll(@CurrentTenant() tenantId: string, @Query() query: ListComprobantesDto) {
     return this.service.findAll(tenantId, query)
+  }
+
+  @Get('resumen')
+  @ApiOperation({ summary: 'Resumen agregado de comprobantes (para el dashboard)' })
+  @ApiQuery({ name: 'fechaDesde', required: false })
+  @ApiQuery({ name: 'fechaHasta', required: false })
+  resumen(@CurrentTenant() tenantId: string, @Query() query: ResumenComprobantesDto) {
+    return this.service.resumen(tenantId, query)
   }
 
   @Get(':id')

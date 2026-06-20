@@ -42,6 +42,15 @@ export type ComprobanteEstado =
   | 'RECHAZADO'
   | 'ERROR'
 
+export interface ResumenComprobantes {
+  totalFacturas: number
+  montoTotal: number
+  itbisTotal: number
+  pendientes: number
+  rechazadas: number
+  aceptadas: number
+}
+
 export type Plan = 'BASICO' | 'PYME' | 'PRO'
 
 export type UserRole = 'ADMIN' | 'USUARIO' | 'CONTADOR'

@@ -1,4 +1,4 @@
-export { PrismaClient } from '@prisma/client'
+export { PrismaClient, Prisma } from '@prisma/client'
 
 // Enums exported as values (needed for class-validator @IsEnum and @ApiQuery enum)
 export {

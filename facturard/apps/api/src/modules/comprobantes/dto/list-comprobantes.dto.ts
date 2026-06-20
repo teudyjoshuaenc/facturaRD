@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsDateString, IsNumber, Min, Max } from 'class-validator'
+import { IsOptional, IsEnum, IsDateString, IsNumber, IsString, Min, Max } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { ComprobanteEstado, TipoECF } from '@facturard/database'
@@ -23,6 +23,11 @@ export class ListComprobantesDto {
   @IsDateString()
   @IsOptional()
   fechaHasta?: string
+
+  @ApiPropertyOptional({ example: 'E310000000001', description: 'Busca por eNCF o razón social del comprador' })
+  @IsString()
+  @IsOptional()
+  search?: string
 
   @ApiPropertyOptional({ default: 1 })
   @Type(() => Number)

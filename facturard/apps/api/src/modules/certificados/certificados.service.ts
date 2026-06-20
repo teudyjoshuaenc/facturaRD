@@ -6,10 +6,16 @@ import { CryptoService } from '../../common/services/crypto.service'
 
 // Campos seguros — excluye material criptográfico del output al cliente
 type SafeCertificado = Omit<Certificado, 'p12Encrypted' | 'p12Iv' | 'p12Tag' | 'passphraseCifrada'>
+type SafeCertificadoConVigencia = SafeCertificado & { diasRestantes: number }
 
 function toSafe(cert: Certificado): SafeCertificado {
   const { p12Encrypted: _a, p12Iv: _b, p12Tag: _c, passphraseCifrada: _d, ...rest } = cert
   return rest
+}
+
+function conDiasRestantes(cert: SafeCertificado): SafeCertificadoConVigencia {
+  const dias = Math.ceil((cert.validoHasta.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  return { ...cert, diasRestantes: dias }
 }
 
 @Injectable()
@@ -73,12 +79,12 @@ export class CertificadosService {
     return certs.map(toSafe)
   }
 
-  async getActive(tenantId: string): Promise<SafeCertificado> {
+  async getActive(tenantId: string): Promise<SafeCertificadoConVigencia> {
     const cert = await prisma.certificado.findFirst({
       where: { tenantId, activo: true },
     })
     if (!cert) throw new NotFoundException('No hay certificado activo para este tenant')
-    return toSafe(cert)
+    return conDiasRestantes(toSafe(cert))
   }
 
   async deactivate(tenantId: string, id: string): Promise<{ message: string }> {
