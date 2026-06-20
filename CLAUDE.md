@@ -130,6 +130,11 @@ APP_URL=http://localhost:3000
   - Recepción: `https://ecf.dgii.gov.do/{env}/recepcion`
   - Consulta:  `https://ecf.dgii.gov.do/{env}/consultaresultado`
   - RFCE:      `https://fc.dgii.gov.do/{env}/recepcionfc`
+- La DGII no tiene API pública oficial para validar RNC/razón social
+- API validación RNC: `https://api-dgii.dominicantechnology.com/api/v1/rnc/{rnc}`
+  - Respuesta: `{ exito, fuente, data: { rnc, razon_social, actividad_economica, fecha_inicio, estado, regimen_pago } }`
+  - 404 con `{ error }` si el RNC no existe
+  - Límite: 100 requests/día por IP en plan gratuito (considerar plan de pago para producción)
 
 ---
 

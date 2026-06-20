@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common'
+import { Injectable, NotFoundException, ServiceUnavailableException, Logger } from '@nestjs/common'
 
 export interface ContribuyenteDGII {
   rnc: string
@@ -8,28 +8,32 @@ export interface ContribuyenteDGII {
   categoria: string | undefined
 }
 
-// Estructura real de respuesta de api.dgii.gov.do
-interface DgiiApiResponse {
-  rnc?: string
-  name?: string
-  comercialName?: string
-  nombreComercial?: string   // alternate casing
-  status?: string
-  categoria?: string
-  razonSocial?: string
-  nombre?: string
+// La DGII no tiene API pública oficial — se usa Dominican Technology como proxy
+// del padrón de contribuyentes (api-dgii.dominicantechnology.com).
+interface DominicanTechnologyResponse {
+  exito: boolean
+  fuente?: string
+  data?: {
+    rnc: string
+    razon_social: string
+    nombre_comercial?: string
+    actividad_economica?: string
+    fecha_inicio?: string
+    estado: string
+    regimen_pago?: string
+  }
 }
 
 @Injectable()
 export class DgiiContribuyentesService {
   private readonly logger = new Logger(DgiiContribuyentesService.name)
-  private readonly baseUrl = 'https://api.dgii.gov.do/api/contribuyentes'
+  private readonly baseUrl = 'https://api-dgii.dominicantechnology.com/api/v1/rnc'
   private readonly timeoutMs = 8000
 
   async buscarPorRNC(rnc: string): Promise<ContribuyenteDGII> {
     const url = `${this.baseUrl}/${encodeURIComponent(rnc)}`
 
-    let data: DgiiApiResponse
+    let body: DominicanTechnologyResponse
     try {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
@@ -38,42 +42,34 @@ export class DgiiContribuyentesService {
       clearTimeout(timeout)
 
       if (res.status === 404) {
-        throw new BadRequestException(`RNC ${rnc} no está registrado en la DGII`)
+        throw new NotFoundException(`RNC ${rnc} no está registrado en la DGII`)
       }
       if (!res.ok) {
-        throw new Error(`DGII respondió ${res.status}`)
+        throw new Error(`API de validación de RNC respondió ${res.status}`)
       }
 
-      data = (await res.json()) as DgiiApiResponse
+      body = (await res.json()) as DominicanTechnologyResponse
     } catch (err) {
-      if (err instanceof BadRequestException) throw err
+      if (err instanceof NotFoundException) throw err
 
-      // Red no disponible — loguear y lanzar error descriptivo
+      // Red no disponible / timeout — no debe tumbar el flujo principal con un 500
       const msg = err instanceof Error ? err.message : String(err)
-      this.logger.warn(`DGII API no disponible (${msg}). RNC: ${rnc}`)
-      throw new BadRequestException(
-        'No se pudo validar el RNC con la DGII. ' +
-        'La API pública no está disponible en este momento. ' +
-        'Intenta nuevamente en unos minutos.',
+      this.logger.warn(`API de validación de RNC no disponible (${msg}). RNC: ${rnc}`)
+      throw new ServiceUnavailableException(
+        'No se pudo validar el RNC en este momento. Intenta nuevamente en unos minutos.',
       )
     }
 
-    const razonSocial =
-      data.razonSocial ??
-      data.name ??
-      data.nombre ??
-      rnc // último fallback
-
-    if (!razonSocial || razonSocial === rnc) {
-      throw new BadRequestException(`RNC ${rnc} no encontrado en la DGII`)
+    if (!body.exito || !body.data) {
+      throw new NotFoundException(`RNC ${rnc} no está registrado en la DGII`)
     }
 
     return {
-      rnc,
-      razonSocial: razonSocial.trim(),
-      nombreComercial: (data.comercialName ?? data.nombreComercial)?.trim(),
-      estado: data.status ?? 'ACTIVO',
-      categoria: data.categoria,
+      rnc: body.data.rnc,
+      razonSocial: body.data.razon_social.trim(),
+      nombreComercial: body.data.nombre_comercial?.trim(),
+      estado: body.data.estado,
+      categoria: body.data.regimen_pago,
     }
   }
 }
