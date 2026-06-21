@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @facturard/web build",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "pnpm install"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter @facturard/web build"
 }

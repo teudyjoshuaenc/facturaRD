@@ -198,8 +198,10 @@ pnpm --filter @facturard/web build  # build producción
 NEXT_PUBLIC_API_URL=https://better-invoice-production.up.railway.app/api/v1
 ```
 
-**Deploy:** Vercel — root directory en Vercel debe ser la raíz del monorepo (`facturard/`).
-El `vercel.json` en `apps/web/` contiene buildCommand con `--filter`.
+**Deploy:** Vercel — root directory en Vercel debe ser `facturard/apps/web` (no la raíz del monorepo).
+El `vercel.json` en `apps/web/` usa `cd ../.. && pnpm install` / `cd ../.. && pnpm --filter @facturard/web build`
+para instalar y construir desde la raíz del workspace, y deja `outputDirectory` sin definir
+(Next.js produce `.next` dentro de `apps/web/`, que coincide con el Root Directory).
 
 **Arquitectura clave:**
 - Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)
