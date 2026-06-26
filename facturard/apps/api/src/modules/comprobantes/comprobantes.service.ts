@@ -96,7 +96,7 @@ export class ComprobantesService {
         estado: 'PENDIENTE',
         montoTotal: totales.montoTotal,
         rnc: dto.rncComprador ?? '',
-        razonSocial: dto.razonSocialComprador,
+        razonSocial: dto.razonSocialComprador ?? '',
         datos: JSON.parse(JSON.stringify(dtoConEncf)) as object,
       },
     })

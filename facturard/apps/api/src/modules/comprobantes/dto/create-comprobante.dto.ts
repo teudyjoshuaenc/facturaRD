@@ -61,33 +61,46 @@ export class CreateComprobanteDto {
   @IsEnum(TipoECF)
   tipoECF!: TipoECF
 
-  @ApiProperty({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito' })
+  @ApiPropertyOptional({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito. Requerido para E31/E32/E33/E34/E41/E44/E45/E46' })
   @IsIn([1, 2, 3])
-  tipoPago!: 1 | 2 | 3
+  @IsOptional()
+  tipoPago?: 1 | 2 | 3
 
-  @ApiProperty({ enum: ['01', '02', '03', '04', '05', '06'], example: '01' })
+  @ApiPropertyOptional({ enum: ['01', '02', '03', '04', '05', '06'], example: '01', description: 'Requerido para E31/E32/E33/E34/E44/E45/E46' })
   @IsIn(['01', '02', '03', '04', '05', '06'])
-  tipoIngresos!: string
+  @IsOptional()
+  tipoIngresos?: string
 
   @ApiProperty({ example: '14-05-2026', description: 'DD-MM-YYYY' })
   @IsString()
   @Matches(/^\d{2}-\d{2}-\d{4}$/, { message: 'fechaEmision debe tener formato DD-MM-YYYY' })
   fechaEmision!: string
 
-  @ApiPropertyOptional({ example: '31-12-2028', description: 'DD-MM-YYYY — requerido para E31 a crédito' })
+  @ApiPropertyOptional({ example: '31-12-2028', description: 'DD-MM-YYYY — requerido para E31/E33/E41/E43/E44/E45/E46/E47' })
   @IsString()
   @Matches(/^\d{2}-\d{2}-\d{4}$/, { message: 'fechaVencimiento debe tener formato DD-MM-YYYY' })
   @IsOptional()
   fechaVencimiento?: string
 
-  @ApiPropertyOptional({ example: '131880681' })
+  @ApiPropertyOptional({ example: '131880681', description: 'RNC del comprador — requerido para E31/E41/E45' })
   @IsString()
   @IsOptional()
   rncComprador?: string
 
-  @ApiProperty({ example: 'EMPRESA TEST SRL' })
+  @ApiPropertyOptional({ example: 'ABC123456', description: 'Identificador extranjero — para E46/E47' })
   @IsString()
-  razonSocialComprador!: string
+  @IsOptional()
+  identificadorExtranjero?: string
+
+  @ApiPropertyOptional({ example: 'EMPRESA TEST SRL', description: 'Razón social del comprador — obligatorio para la mayoría de tipos' })
+  @IsString()
+  @IsOptional()
+  razonSocialComprador?: string
+
+  @ApiPropertyOptional({ description: 'Código ISO del país comprador — condicional para E46, obligatorio para E47' })
+  @IsString()
+  @IsOptional()
+  paisComprador?: string
 
   @ApiPropertyOptional()
   @IsString()
@@ -100,14 +113,31 @@ export class CreateComprobanteDto {
   @Type(() => CreateItemDto)
   items!: CreateItemDto[]
 
-  // E33 / E34
-  @ApiPropertyOptional({ example: 'E310000000001', description: 'e-NCF que se modifica (E33/E34)' })
+  // Información de Referencia (E33/E34 obligatorio, resto condicional)
+  @ApiPropertyOptional({ example: 'E310000000001', description: 'e-NCF que se modifica (obligatorio E33/E34, condicional en otros)' })
   @IsString()
   @IsOptional()
-  eNCFModificado?: string
+  ncfModificado?: string
 
-  @ApiPropertyOptional({ description: 'Código de modificación para E33/E34' })
-  @IsNumber()
+  @ApiPropertyOptional({ example: '01-01-2026', description: 'DD-MM-YYYY — fecha del NCF modificado' })
+  @IsString()
+  @Matches(/^\d{2}-\d{2}-\d{4}$/, { message: 'fechaNCFModificado debe tener formato DD-MM-YYYY' })
   @IsOptional()
-  codigoModificacion?: number
+  fechaNCFModificado?: string
+
+  @ApiPropertyOptional({ description: 'Código de modificación: 1=Anulación, 2=Corrección montos, 3=Corrección texto, 4=Reemplazo contingencia, 5=Ref. consumo' })
+  @IsNumber()
+  @IsIn([1, 2, 3, 4, 5])
+  @IsOptional()
+  codigoModificacion?: 1 | 2 | 3 | 4 | 5
+
+  @ApiPropertyOptional({ description: 'Razón de la modificación (opcional para E33/E34)' })
+  @IsString()
+  @IsOptional()
+  razonModificacion?: string
+
+  @ApiPropertyOptional({ description: 'IndicadorNotaCredito: 1=Anulación total, 2=Corrección (solo E34)' })
+  @IsIn([1, 2])
+  @IsOptional()
+  indicadorNotaCredito?: 1 | 2
 }

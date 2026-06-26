@@ -212,6 +212,38 @@ para instalar y construir desde la raíz del workspace, y fija `outputDirectory:
 
 ---
 
+## 14. TIPOS DE e-CF — FUENTE: PDF DGII v1.0 (octubre 2025)
+
+Obligatoriedad: 0=No aplica, 1=Obligatorio, 2=Condicional, 3=Opcional
+
+| Campo                    | E31 | E32 | E33 | E34 | E41 | E43 | E44 | E45 | E46 | E47 |
+|--------------------------|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
+| FechaVencimientoSecuencia|  1  |  0  |  1  |  0  |  1  |  1  |  1  |  1  |  1  |  1  |
+| IndicadorNotaCredito     |  0  |  0  |  0  |  1  |  0  |  0  |  0  |  0  |  0  |  0  |
+| TipoIngresos             |  1  |  1  |  1  |  1  |  0  |  0  |  1  |  1  |  1  |  0  |
+| TipoPago                 |  1  |  1  |  1  |  1  |  1  |  3  |  1  |  1  |  1  |  3  |
+| RNCComprador             |  1  |  2  |  2  |  2  |  1  |  0  |  2  |  1  |  2  |  0  |
+| IdentificadorExtranjero  |  0  |  3  |  0  |  0  |  0  |  0  |  0  |  0  |  3  |  2  |
+| RazonSocialComprador     |  1  |  2  |  2  |  2  |  1  |  0  |  1  |  1  |  1  |  3  |
+| PaisComprador            |  0  |  0  |  0  |  0  |  0  |  0  |  0  |  0  |  2  |  1  |
+| InformacionReferencia    |  2  |  0  |  1  |  1  |  2  |  2  |  2  |  2  |  2  |  2  |
+
+**Restricciones de IndicadorFacturacion por tipo:**
+- E43: DEBE ser 4 (Exento) — no aplica ITBIS
+- E46: DEBE ser 3 (ITBIS 0% — tasa cero exportaciones)
+- E47: IndicadorBienoServicio DEBE ser 2 (Servicio)
+
+**CodigoModificacion (InformacionReferencia):**
+- 1=Anulación total, 2=Corrección montos, 3=Corrección texto, 4=Reemplazo NCF contingencia, 5=Ref. factura consumo
+
+**Implementación:**
+- Generadores XML: `packages/ecf-engine/src/xml/` (e32/, e33-34/, e41-47/)
+- DTOs API: `apps/api/src/modules/comprobantes/dto/create-comprobante.dto.ts`
+- Processor: `apps/api/src/modules/comprobantes/ecf-emission.processor.ts`
+- Frontend: `apps/web/src/components/nueva-factura/ComprobanteForm.tsx`
+
+---
+
 NOTAS TÉCNICAS DEL RECEPTOR:
 - Los endpoints `/fe/*` están FUERA del prefijo `api/v1` (excluidos en main.ts con setGlobalPrefix)
 - Redis almacena semillas con TTL 5 min (key: `semilla:{UUID}`)
