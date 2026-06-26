@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/comprobantes'
 import type { ItemRow } from '@/hooks/useNuevaFactura'
 
-const ITBIS_RATE = 0.18
+const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
 
 interface Props {
   items: ItemRow[]
@@ -16,8 +16,12 @@ interface Props {
 
 export function ItemsTable({ items, onChange }: Props): JSX.Element {
   const { subtotal, itbis, total } = useMemo(() => {
-    const sub = items.reduce((sum, item) => sum + item.cantidad * item.precioUnitarioItem, 0)
-    const tax = sub * ITBIS_RATE
+    let sub = 0, tax = 0
+    for (const item of items) {
+      const monto = item.cantidad * item.precioUnitarioItem
+      sub += monto
+      tax += monto * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
+    }
     return { subtotal: sub, itbis: tax, total: sub + tax }
   }, [items])
 
@@ -28,14 +32,12 @@ export function ItemsTable({ items, onChange }: Props): JSX.Element {
   function addItem(): void {
     onChange([
       ...items,
-      { key: `item-${Date.now()}`, nombreItem: '', cantidad: 1, precioUnitarioItem: 0 },
+      { key: `item-${Date.now()}`, nombreItem: '', cantidad: 1, precioUnitarioItem: 0, indicadorFacturacion: 'I1', indicadorBienoServicio: 2 },
     ])
   }
 
   function removeItem(key: string): void {
-    if (items.length > 1) {
-      onChange(items.filter((item) => item.key !== key))
-    }
+    if (items.length > 1) onChange(items.filter((item) => item.key !== key))
   }
 
   return (
@@ -47,26 +49,49 @@ export function ItemsTable({ items, onChange }: Props): JSX.Element {
           <thead>
             <tr className="text-ui-sm text-text-secondary">
               <th className="py-2 pr-2 font-medium">Descripción</th>
+              <th className="py-2 pr-2 font-medium">ITBIS</th>
+              <th className="py-2 pr-2 font-medium">Tipo</th>
               <th className="py-2 pr-2 font-medium">Cant.</th>
               <th className="py-2 pr-2 font-medium">Precio Unit.</th>
-              <th className="py-2 pr-2 font-medium">ITBIS</th>
               <th className="py-2 pr-2 font-medium">Total</th>
               <th className="py-2" />
             </tr>
           </thead>
           <tbody>
             {items.map((item) => {
-              const itemSubtotal = item.cantidad * item.precioUnitarioItem
-              const itemItbis = itemSubtotal * ITBIS_RATE
+              const monto = item.cantidad * item.precioUnitarioItem
+              const itemItbis = monto * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
               return (
                 <tr key={item.key} className="border-t border-border-subtle">
                   <td className="py-2 pr-2">
                     <input
                       className="w-full rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                      placeholder="Descripción del item"
+                      placeholder="Descripción"
                       value={item.nombreItem}
                       onChange={(e) => updateItem(item.key, { nombreItem: e.target.value })}
                     />
+                  </td>
+                  <td className="py-2 pr-2">
+                    <select
+                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      value={item.indicadorFacturacion}
+                      onChange={(e) => updateItem(item.key, { indicadorFacturacion: e.target.value as ItemRow['indicadorFacturacion'] })}
+                    >
+                      <option value="I1">18%</option>
+                      <option value="I2">16%</option>
+                      <option value="I3">0%</option>
+                      <option value="I4">Exento</option>
+                    </select>
+                  </td>
+                  <td className="py-2 pr-2">
+                    <select
+                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      value={item.indicadorBienoServicio}
+                      onChange={(e) => updateItem(item.key, { indicadorBienoServicio: Number(e.target.value) as 1 | 2 })}
+                    >
+                      <option value={1}>Bien</option>
+                      <option value={2}>Servicio</option>
+                    </select>
                   </td>
                   <td className="py-2 pr-2">
                     <input
@@ -85,15 +110,10 @@ export function ItemsTable({ items, onChange }: Props): JSX.Element {
                       step="any"
                       className="w-28 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                       value={item.precioUnitarioItem}
-                      onChange={(e) =>
-                        updateItem(item.key, { precioUnitarioItem: Number(e.target.value) })
-                      }
+                      onChange={(e) => updateItem(item.key, { precioUnitarioItem: Number(e.target.value) })}
                     />
                   </td>
-                  <td className="py-2 pr-2 text-text-secondary">{formatCurrency(itemItbis)}</td>
-                  <td className="py-2 pr-2 text-text-primary">
-                    {formatCurrency(itemSubtotal + itemItbis)}
-                  </td>
+                  <td className="py-2 pr-2 text-text-primary">{formatCurrency(monto + itemItbis)}</td>
                   <td className="py-2">
                     <button
                       type="button"
@@ -122,7 +142,7 @@ export function ItemsTable({ items, onChange }: Props): JSX.Element {
           <span>{formatCurrency(subtotal)}</span>
         </div>
         <div className="flex justify-between text-text-secondary">
-          <span>ITBIS (18%)</span>
+          <span>ITBIS</span>
           <span>{formatCurrency(itbis)}</span>
         </div>
         <div className="flex justify-between text-h6 text-text-primary">

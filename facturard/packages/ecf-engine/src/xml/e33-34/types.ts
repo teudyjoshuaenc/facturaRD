@@ -15,10 +15,11 @@ export type { Emisor, Comprador, LineaDetalle, TipoPago, TipoIngresos, Validatio
 
 /** CodigoModificacion según XSD oficial (CodigoModificacionType) */
 export type CodigoModificacion =
-  | 1  // Anula el NCF modificado
-  | 2  // Corrige texto del comprobante fiscal modificado
-  | 3  // Corrige montos del NCF modificado
-  | 4; // Reemplazo NCF emitido en contingencia
+  | 1  // Anulación total del NCF modificado
+  | 2  // Corrección de montos del comprobante fiscal modificado
+  | 3  // Corrección de texto del comprobante fiscal modificado
+  | 4  // Reemplazo de NCF emitido en contingencia
+  | 5; // Referencia a factura de consumo electrónica
 
 export interface InformacionReferencia {
   /** e-NCF del comprobante original que se modifica */
@@ -29,6 +30,8 @@ export interface InformacionReferencia {
   codigoModificacion: CodigoModificacion;
   /** RNC del otro contribuyente (opcional) */
   rncOtroContribuyente?: string;
+  /** Razón de la modificación — opcional para E33/E34 */
+  razonModificacion?: string;
 }
 
 // ── IdDoc E33 (Nota de Débito) ────────────────────────────────────────────────
@@ -36,6 +39,8 @@ export interface InformacionReferencia {
 export interface IdDoc33 {
   /** 13 alfanuméricos. Ej: E330000000001 */
   eNCF: string;
+  /** DD-MM-YYYY — obligatorio=1 para E33 */
+  fechaVencimientoSecuencia: string;
   tipoIngresos?: TipoIngresos;
   tipoPago?: TipoPago;
   /** DD-MM-YYYY — requerido cuando tipoPago = 2 */
@@ -47,13 +52,15 @@ export interface IdDoc33 {
 }
 
 // ── IdDoc E34 (Nota de Crédito) ───────────────────────────────────────────────
+// E34 no tiene FechaVencimientoSecuencia (obligatoriedad=0 según PDF)
 
-export interface IdDoc34 extends IdDoc33 {
-  /**
-   * IndicadorNotaCredito:
-   *   1 = Anulación (devuelve el valor total del original)
-   *   2 = Corrección de texto o montos parciales
-   */
+export interface IdDoc34 {
+  eNCF: string;
+  tipoIngresos?: TipoIngresos;
+  tipoPago?: TipoPago;
+  fechaLimitePago?: string;
+  fechaHoraFirma?: string;
+  indicadorMontoGravado?: 0 | 1;
   indicadorNotaCredito?: 1 | 2;
 }
 

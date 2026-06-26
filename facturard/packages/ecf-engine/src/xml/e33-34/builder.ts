@@ -98,6 +98,9 @@ function buildReferencia(ref: InformacionReferencia): string {
       : '') +
     `    <FechaNCFModificado>${ref.fechaNCFModificado}</FechaNCFModificado>\n` +
     `    <CodigoModificacion>${ref.codigoModificacion}</CodigoModificacion>\n` +
+    (ref.razonModificacion
+      ? `    <RazonModificacion>${ref.razonModificacion}</RazonModificacion>\n`
+      : '') +
     `  </InformacionReferencia>\n`
   );
 }
@@ -109,6 +112,7 @@ function buildIdDoc33(input: ECF33Input): string {
   const lines: string[] = [
     `      <TipoeCF>33</TipoeCF>\n`,
     `      <eNCF>${idDoc.eNCF}</eNCF>\n`,
+    `      <FechaVencimientoSecuencia>${idDoc.fechaVencimientoSecuencia}</FechaVencimientoSecuencia>\n`,
     idDoc.indicadorMontoGravado !== undefined
       ? `      <IndicadorMontoGravado>${idDoc.indicadorMontoGravado}</IndicadorMontoGravado>\n`
       : '',

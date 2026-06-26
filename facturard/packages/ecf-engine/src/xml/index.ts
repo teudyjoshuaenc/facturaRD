@@ -37,6 +37,35 @@ export type {
   GenerarECF33Result,
   GenerarECF34Result,
 } from './e33-34';
+
+// ── e-CF Tipos 41, 43, 44, 45, 46, 47 ────────────────────────────────────────
+export {
+  generarECF41,
+  generarECF43,
+  generarECF44,
+  generarECF45,
+  generarECF46,
+  generarECF47,
+} from './e41-47';
+export type {
+  ECF41Input,
+  ECF43Input,
+  ECF44Input,
+  ECF45Input,
+  ECF46Input,
+  ECF47Input,
+  IdDoc41,
+  IdDoc43,
+  IdDoc44,
+  IdDoc45,
+  IdDoc46,
+  IdDoc47,
+  CompradorExportacion,
+  BeneficiarioExterior,
+  InformacionReferenciaOpcional,
+  GenerarECFResult,
+} from './e41-47';
+
 export {
   INDICADOR_FACTURACION,
   ITBIS_TASA,
