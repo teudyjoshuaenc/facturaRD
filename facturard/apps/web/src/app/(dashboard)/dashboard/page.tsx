@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FileText, Banknote, Receipt } from 'lucide-react'
 import { MetricCard } from '@/components/dashboard/MetricCard'
+import { StatusCardsRow } from '@/components/dashboard/StatusCardsRow'
 import { FacturasTable } from '@/components/dashboard/FacturasTable'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/context/AuthContext'
 import { useDashboardComprobantes, useMonthMetrics } from '@/hooks/useComprobantes'
+import { useCertificadoStatus } from '@/hooks/useCertificado'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
 
 function greeting(): string {
@@ -50,6 +52,8 @@ export default function DashboardPage(): JSX.Element {
   const { totalFacturadas, montoTotal, itbisRecaudado, isLoading: metricsLoading } =
     useMonthMetrics({ fechaDesde, fechaHasta })
 
+  const { diasParaVencer } = useCertificadoStatus()
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -59,6 +63,13 @@ export default function DashboardPage(): JSX.Element {
         </h1>
         <p className="text-body-sm text-text-secondary">{todayFormatted()}</p>
       </div>
+
+      {/* Status cards row */}
+      <StatusCardsRow
+        dgiiConectado={true}
+        certDias={diasParaVencer}
+        secuenciasActivas={['B01', 'B02', 'B14', 'B15']}
+      />
 
       {/* Métricas del mes actual */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

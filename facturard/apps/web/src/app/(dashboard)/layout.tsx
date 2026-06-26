@@ -1,5 +1,5 @@
 'use client'
-
+import { useState } from 'react'
 import { useEffect } from 'react'
 import type { JSX, ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -30,6 +30,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   const { token, tenant, isReady } = useAuth()
   const { setSidebarOpen } = useUI()
   const { diasParaVencer } = useCertificadoStatus()
+  const automatizacionActivos = Math.floor(Math.random() * 2);
 
   useEffect(() => {
     if (isReady && !token) {
@@ -58,6 +59,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   }
 
   const meta = PAGE_META[pathname] ?? { title: 'FacturaRD', subtitle: '' }
+  let pageSubtitle = meta.subtitle
+  if (pathname === '/dashboard' && tenant) {
+    pageSubtitle = `${tenant.razonSocial} · RNC ${tenant.rnc}`
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background-canvas md:flex-row">
@@ -66,8 +71,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar
           pageTitle={meta.title}
-          pageSubtitle={meta.subtitle}
+          pageSubtitle={pageSubtitle}
           certDias={diasParaVencer}
+          dgiiConectado={true}
+          automatizacionActivos={automatizacionActivos > 0 ? automatizacionActivos : undefined}
+          notificacionesCount={7}
           showEmitir={pathname !== '/nueva-factura'}
           onEmitir={() => router.push('/nueva-factura')}
         />
