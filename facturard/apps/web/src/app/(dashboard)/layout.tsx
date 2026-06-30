@@ -20,7 +20,35 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   },
   '/configuracion': {
     title: 'Configuración',
-    subtitle: 'Empresa, certificado digital e integraciones',
+    subtitle: 'Ajustes globales del sistema',
+  },
+  '/reportes': {
+    title: 'Reportes y Métricas',
+    subtitle: 'Estadísticas e informes de facturación electrónica',
+  },
+  '/contacto': {
+    title: 'Directorio de Clientes',
+    subtitle: 'Gestión de contactos y clientes frecuentes',
+  },
+  '/producto': {
+    title: 'Catálogo de Productos',
+    subtitle: 'Gestión de bienes y servicios registrados',
+  },
+  '/cumplimiento': {
+    title: 'Cumplimiento Tributario',
+    subtitle: 'Estado de validaciones con la DGII y reportes fiscales',
+  },
+  '/empresa': {
+    title: 'Datos de la Empresa',
+    subtitle: 'Información comercial y datos del emisor de facturas',
+  },
+  '/usuarios-y-roles': {
+    title: 'Usuarios y Permisos',
+    subtitle: 'Control de accesos y configuración de roles',
+  },
+  '/certificado-digital': {
+    title: 'Certificado Digital',
+    subtitle: 'Estado y configuración de tu firma digital para e-NCF',
   },
 }
 
@@ -74,12 +102,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
           pageSubtitle={pageSubtitle}
           certDias={diasParaVencer}
           dgiiConectado={true}
-          automatizacionActivos={automatizacionActivos > 0 ? automatizacionActivos : undefined}
+          {...(automatizacionActivos > 0 ? { automatizacionActivos } : {})}
           notificacionesCount={7}
           showEmitir={pathname !== '/nueva-factura'}
           onEmitir={() => router.push('/nueva-factura')}
         />
-        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8 flex justify-center items-start">
+          <div className="w-full max-w-[1400px] lg:h-[1012px] flex flex-col text-left mx-auto">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   )

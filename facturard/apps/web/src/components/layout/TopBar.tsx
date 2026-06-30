@@ -1,14 +1,15 @@
 'use client'
 
 import type { JSX } from 'react'
-import { ShieldCheck, Zap, Workflow, Bell, Plus, LayoutGrid } from 'lucide-react'
+import { Plus, FileText, Zap, Search, Bell, Activity, ShieldCheck, ToggleRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useUI } from '@/lib/context/UIContext'
 
 interface Props {
   pageTitle: string
   pageSubtitle: string
-  certDias: number | null
+  certDias?: number | null
   dgiiConectado?: boolean
   automatizacionActivos?: number
   notificacionesCount?: number
@@ -19,129 +20,111 @@ interface Props {
 export function TopBar({
   pageTitle,
   pageSubtitle,
-  certDias,
+  certDias = 12,
   dgiiConectado = true,
-  automatizacionActivos,
-  notificacionesCount,
+  automatizacionActivos = 4,
+  notificacionesCount = 7,
   onEmitir,
   showEmitir,
 }: Props): JSX.Element {
-  const certOk = certDias !== null && certDias > 30
-  const certWarn = certDias !== null && certDias > 0 && certDias <= 30
-  const certExp = certDias !== null && certDias <= 0
+  const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
+
+  const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Emitir Factura'
 
   return (
-    <header className="hidden border-b border-border-subtle bg-white px-6 py-2.5 md:flex md:items-center md:justify-between">
-      {/* Title + subtitle inline */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500">
-          <LayoutGrid size={16} className="text-white" />
-        </div>
-        <h1 className="text-ui-default font-semibold text-text-primary">{pageTitle}</h1>
-        {pageSubtitle && (
-          <span className="text-body-sm text-text-secondary">{pageSubtitle}</span>
-        )}
-      </div>
-
-      {/* Status chips + CTA */}
-      <div className="flex items-center gap-2">
-        {/* DGII status */}
-        <div
-          className={cn(
-            'flex h-8 items-center gap-1.5 rounded-full border px-3',
-            dgiiConectado
-              ? 'border-success-200 bg-success-50'
-              : 'border-danger-200 bg-danger-50',
+    <header className="hidden border-b border-border-subtle bg-white px-6 py-3.5 md:flex md:items-center md:justify-between h-16 shrink-0">
+      {/* Left side: title/subtitle OR global search */}
+      {isDashboardOrEmitir ? (
+        <div className="flex items-baseline gap-2.5 text-left">
+          <h1 className="text-body-base font-bold text-text-primary tracking-tight">{pageTitle}</h1>
+          {pageSubtitle && (
+            <span className="text-ui-sm text-text-secondary font-medium">{pageSubtitle}</span>
           )}
-        >
-          <Zap
-            size={14}
-            className={dgiiConectado ? 'text-success-500' : 'text-danger-500'}
-          />
-          <span className="text-ui-sm text-text-primary">DGII</span>
-          <span
-            className={cn(
-              'text-ui-sm',
-              dgiiConectado ? 'text-success-600' : 'text-danger-600',
-            )}
-          >
-            {dgiiConectado ? 'Conectado' : 'Desconectado'}
-          </span>
         </div>
+      ) : (
+        <div className="relative w-80">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Buscar o ejecutar — e-NCF, RNC, acciones... ⌘K"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50/50 pl-9 pr-3 text-ui-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none"
+          />
+        </div>
+      )}
 
-        {/* Certificate status */}
-        {certDias !== null && (
-          <div
-            className={cn(
-              'flex h-8 items-center gap-1.5 rounded-full border px-3',
-              certExp
-                ? 'border-danger-200 bg-danger-50'
-                : certWarn
-                  ? 'border-warning-200 bg-warning-50'
-                  : 'border-success-200 bg-success-50',
-            )}
-          >
-            {certExp || certWarn ? (
-              <ShieldCheck
-                size={14}
-                className={certExp ? 'text-danger-500' : 'text-warning-500'}
-              />
-            ) : (
-              <ShieldCheck size={14} className="text-success-500" />
-            )}
-            <span className="text-ui-sm text-text-primary">Certificado</span>
-            <span
+      {/* Right side: standard actions vs mode toggle */}
+      <div className="flex items-center gap-3">
+        {pageTitle === 'Emitir Factura' ? (
+          <div className="flex rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 shadow-sm h-9 items-center">
+            <button
+              type="button"
+              onClick={() => setFacturacionMode('estandar')}
               className={cn(
-                'text-ui-sm',
-                certExp
-                  ? 'text-danger-600'
-                  : certWarn
-                    ? 'text-warning-700'
-                    : 'text-success-600',
+                'flex items-center gap-1.5 rounded-md h-8 px-4 text-ui-sm font-semibold transition-all active:scale-[0.97] duration-150',
+                facturacionMode === 'estandar'
+                  ? 'bg-white text-brand-500 shadow-sm border border-neutral-200/50'
+                  : 'text-text-secondary hover:text-text-primary'
               )}
             >
-              {certExp ? 'Vencido' : `${certDias} días`}
-            </span>
+              Estándar
+            </button>
+            <button
+              type="button"
+              onClick={() => setFacturacionMode('rapido')}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md h-8 px-4 text-ui-sm font-semibold transition-all active:scale-[0.97] duration-150',
+                facturacionMode === 'rapido'
+                  ? 'bg-white text-brand-500 shadow-sm border border-neutral-200/50'
+                  : 'text-text-secondary hover:text-text-primary'
+              )}
+            >
+              <Zap size={14} />
+              Rapido
+            </button>
           </div>
-        )}
-
-        {certOk === false && certDias === null && (
-          <div className="flex h-8 items-center gap-1.5 rounded-full border border-border-subtle bg-background-canvas px-3">
-            <ShieldCheck size={14} className="text-text-secondary" />
-            <span className="text-ui-sm text-text-secondary">Sin certificado</span>
-          </div>
-        )}
-
-        {/* Automatización status */}
-        {automatizacionActivos !== undefined && (
-          <div className="flex h-8 items-center gap-1.5 rounded-full border border-info-200 bg-info-50 px-3">
-            <Workflow size={14} className="text-info-500" />
-            <span className="text-ui-sm text-text-primary">Automatización</span>
-            <span className="text-ui-sm text-info-600">
-              {automatizacionActivos} activos
+        ) : (
+          <div className="flex items-center gap-3">
+            {/* DGII Status chip */}
+            <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50/50 px-2.5 py-1 text-ui-xs font-semibold text-green-700">
+              <Activity size={13} className="text-green-600" />
+              DGII <span className="text-green-600 font-bold">Conectado</span>
             </span>
-          </div>
-        )}
 
-        {/* Divider */}
-        <div className="mx-1 h-6 w-px bg-border-subtle" />
-
-        {/* Notifications */}
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-neutral-100 hover:text-text-primary">
-          <Bell size={20} />
-          {notificacionesCount !== undefined && notificacionesCount > 0 && (
-            <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[10px] font-bold text-white ring-2 ring-white">
-              {notificacionesCount}
+            {/* Certificado status chip */}
+            <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50/50 px-2.5 py-1 text-ui-xs font-semibold text-orange-700">
+              <ShieldCheck size={13} className="text-orange-600" />
+              Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
             </span>
-          )}
-        </button>
 
-        {/* Emitir button */}
-        {showEmitir && (
-          <Button variant="primary" size="md" onClick={onEmitir}>
-            <Plus size={18} strokeWidth={2.5} />
-            Emitir Factura
-          </Button>
+            {/* Automatizacion chip */}
+            <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/50 px-2.5 py-1 text-ui-xs font-semibold text-blue-700">
+              <ToggleRight size={13} className="text-blue-600" />
+              Automatización <span className="text-blue-600 font-bold">{automatizacionActivos} activos</span>
+            </span>
+
+            {/* Notification Bell */}
+            <button
+              type="button"
+              className="relative p-2 text-text-secondary hover:text-text-primary hover:bg-neutral-50 rounded-lg transition-colors focus:outline-none"
+            >
+              <Bell size={18} />
+              {notificacionesCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[9px] font-bold text-white leading-none">
+                  {notificacionesCount}
+                </span>
+              )}
+            </button>
+
+            {/* Emitir Factura CTA button */}
+            {showEmitir && (
+              <Button variant="primary" size="md" onClick={onEmitir} className="h-9 px-3.5 font-semibold">
+                <Plus size={16} className="mr-1" />
+                Emitir Factura
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </header>
