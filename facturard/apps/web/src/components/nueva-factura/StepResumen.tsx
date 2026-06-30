@@ -122,7 +122,7 @@ export function StepResumen({
         "flex justify-between items-center py-1.5 text-body-sm font-sans select-none",
         isGrandTotal 
           ? "border-t border-neutral-200 pt-3 mt-1.5 font-bold text-text-primary text-[15px]" 
-          : "font-medium text-text-secondary border-b border-neutral-50 last:border-none"
+          : "font-medium text-text-secondary border-b border-neutral-200/40 last:border-none"
       )}>
         <span className={cn(isGrandTotal ? "text-text-primary" : "text-[#333333]")}>{label}</span>
         <span className={cn(isGrandTotal ? "text-[#0379D5]" : "text-text-secondary")}>{formatted || '-'}</span>
@@ -200,25 +200,18 @@ export function StepResumen({
 
               return (
                 <div key={item.key} className="flex justify-between items-center py-3 border-b border-neutral-200/40 last:border-none text-body-sm">
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-wrap items-baseline gap-x-4">
                     <span className="text-text-primary font-semibold">
                       {item.nombreItem}
                     </span>
-                    <div className="flex items-center gap-2 text-[12px] text-text-secondary font-medium font-sans">
-                      <span>Cant: {item.cantidad}</span>
-                      <span>•</span>
+                    <div className="flex flex-wrap items-baseline gap-x-4 text-[12px] text-text-secondary font-medium font-sans">
+                      <span>Cantidad: {item.cantidad}</span>
                       <span>Tipo: {typeText}</span>
-                      <span>•</span>
                       <span>ITBIS: {itbisPercent}</span>
-                      {desc > 0 && (
-                        <>
-                          <span>•</span>
-                          <span>Desc: {formatCurrency(desc)}</span>
-                        </>
-                      )}
+                      {desc > 0 && <span>Desc: {formatCurrency(desc)}</span>}
                     </div>
                   </div>
-                  <span className="font-semibold text-text-primary">{formatCurrency(totalLinea)}</span>
+                  <span className="font-semibold text-text-primary whitespace-nowrap">{formatCurrency(totalLinea)}</span>
                 </div>
               )
             })}
@@ -226,31 +219,14 @@ export function StepResumen({
         </div>
 
         {/* Totales Section */}
-        <div className="flex flex-col gap-4">
-          <h4 className="text-[13px] font-bold text-[#10B981] uppercase font-sans tracking-wide">TOTALES</h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column Totals */}
-            <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-neutral-200/40 shadow-sm">
-              {renderTotalRow("Monto Gravado 18%", totals.gravado18)}
-              {renderTotalRow("Monto Gravado 16%", totals.gravado16)}
-              {renderTotalRow("Monto Gravado 0%", totals.gravado0)}
-              {renderTotalRow("ITBIS 18%", totals.itbis18)}
-              {renderTotalRow("ITBIS 16%", totals.itbis16)}
-              {renderTotalRow("ITBIS 0%", totals.itbis0)}
-            </div>
-
-            {/* Right Column Totals */}
-            <div className="flex flex-col gap-2 bg-white p-4 rounded-xl border border-neutral-200/40 shadow-sm">
-              {renderTotalRow("SubTotal Gravado", totals.subtotalGravado)}
-              {renderTotalRow("SubTotal ITBIS", totals.subtotalItbis)}
-              {renderTotalRow("SubTotal Exento", totals.subtotalExento)}
-              {renderTotalRow("Propina Legal 10%", 0)}
-              {renderTotalRow("Total ITBIS Retenido", totals.totalItbisRetenido)}
-              {renderTotalRow("Total ISR Retenido", totals.totalIsrRetenido)}
-              {renderTotalRow("Monto Total", totals.montoTotal, true)}
-            </div>
-          </div>
+        <div className="flex flex-col gap-1.5 pt-2 font-sans w-full">
+          {renderTotalRow("SubTotal Gravado", totals.subtotalGravado)}
+          {renderTotalRow("SubTotal ITBIS", totals.subtotalItbis)}
+          {renderTotalRow("SubTotal Exento", totals.subtotalExento)}
+          {renderTotalRow("Propina Legal 10%", 0)}
+          {renderTotalRow("Total ITBIS Retenido", totals.totalItbisRetenido)}
+          {renderTotalRow("Total ISR Retenido", totals.totalIsrRetenido)}
+          {renderTotalRow("Monto Total", totals.montoTotal, true)}
         </div>
 
         {/* Notas Section */}
