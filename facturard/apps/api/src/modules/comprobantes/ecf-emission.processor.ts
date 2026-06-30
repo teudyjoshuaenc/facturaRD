@@ -8,6 +8,9 @@ import type { ComprobanteEstado, Tenant } from '@facturard/database'
 import {
   generarECF31,
   generarECF32,
+  generarECF32ParaRFCE,
+  generarRFCE32,
+  MONTO_LIMITE_RFCE,
   generarECF33,
   generarECF34,
   generarECF41,
@@ -19,6 +22,7 @@ import {
   firmarDocumento,
   autenticar,
   enviarECF,
+  enviarResumenFC,
   consultarEstado,
   generarRepresentacionImpresa,
 } from '@facturard/ecf-engine'
@@ -60,6 +64,16 @@ function mapEstadoDGII(estado: EstadoECF | string | null): ComprobanteEstado {
   if (s === 'aceptadocondicional') return 'ACEPTADO_CONDICIONAL'
   if (s === 'rechazado') return 'RECHAZADO'
   return 'ERROR'
+}
+
+function formatMensajesDGII(mensajes: { valor: string | null; codigo: number | null }[] | null): string | null {
+  return (
+    mensajes
+      ?.filter((m) => m.valor)
+      .map((m) => `[${m.codigo}] ${m.valor}`)
+      .join(' | ')
+      .substring(0, 1000) ?? null
+  )
 }
 
 function r2(n: number): number {
@@ -146,8 +160,18 @@ export class EcfEmissionProcessor extends WorkerHost {
     const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
 
-    const xml = this.generateXml(datos, tenant, comprobante.eNCF)
-    this.logger.log(`[${comprobanteId}] XML generado — tipo ${datos.tipoECF}`)
+    // E32 < RD$250,000 sigue el flujo RFCE (resumen a fc.dgii.gov.do), no el
+    // flujo normal de recepción. El e-CF completo firmado se conserva igual
+    // (almacenamiento, PDF y QR); solo cambia QUÉ se envía a la DGII y a dónde.
+    const montoTotal = Number(comprobante.montoTotal)
+    const esRFCE = datos.tipoECF === 'E32' && montoTotal < MONTO_LIMITE_RFCE
+
+    // Generar y firmar el e-CF completo. Para el flujo RFCE se usa el generador
+    // "plano" (sin InformacionReferencia), idéntico a lo aceptado en certificación.
+    const xml = esRFCE
+      ? generarECF32ParaRFCE(this.buildE32Input(datos, tenant, comprobante.eNCF)).xml
+      : this.generateXml(datos, tenant, comprobante.eNCF)
+    this.logger.log(`[${comprobanteId}] XML generado — tipo ${datos.tipoECF}${esRFCE ? ' (RFCE <250K)' : ''}`)
 
     const xmlFirmado = firmarDocumento({ p12: p12Buffer, passphrase, xml })
     this.logger.log(`[${comprobanteId}] XML firmado`)
@@ -160,30 +184,57 @@ export class EcfEmissionProcessor extends WorkerHost {
     this.logger.log(`[${comprobanteId}] Autenticando con DGII certecf...`)
     const token = await autenticar({ p12Buffer, passphrase, env: 'certecf' })
 
-    this.logger.log(`[${comprobanteId}] Enviando e-CF a DGII...`)
-    const recepcion = await enviarECF(xmlFirmado, token, { env: 'certecf' })
+    let estadoFinal: ComprobanteEstado
+    let mensajeDGII: string | null
+    let trackId: string | null
 
-    if (!recepcion.trackId) {
-      throw new Error(`DGII no retornó trackId. Error: ${recepcion.error ?? recepcion.mensaje ?? 'desconocido'}`)
+    if (esRFCE) {
+      // Flujo RFCE-32: CodigoSeguridadeCF = primeros 6 chars del SignatureValue
+      // del e-CF ya firmado. Con él se construye el resumen, se firma con raíz
+      // <RFCE> y se envía a fc.dgii.gov.do (respuesta SINCRÓNICA, sin trackId).
+      const codigoSeguridad =
+        xmlFirmado.match(/<SignatureValue[^>]*>([A-Za-z0-9+/=]+)/)?.[1]?.slice(0, 6) ?? '000000'
+
+      const rfceXml = generarRFCE32({
+        ...this.buildE32Input(datos, tenant, comprobante.eNCF),
+        codigoSeguridadeCF: codigoSeguridad,
+      }).xml
+      const rfceFirmado = firmarDocumento({
+        p12: p12Buffer,
+        passphrase,
+        xml: rfceXml,
+        signOptions: { referenceXPath: "//*[local-name(.)='RFCE']" },
+      })
+
+      this.logger.log(`[${comprobanteId}] Enviando RFCE a fc.dgii.gov.do...`)
+      const fc = await enviarResumenFC(rfceFirmado, token, { env: 'certecf' })
+
+      estadoFinal = mapEstadoDGII(fc.estado)
+      mensajeDGII = formatMensajesDGII(fc.mensajes)
+      trackId = null
+      this.logger.log(`[${comprobanteId}] RFCE estado: ${fc.estado} (código ${fc.codigo})`)
+    } else {
+      this.logger.log(`[${comprobanteId}] Enviando e-CF a DGII...`)
+      const recepcion = await enviarECF(xmlFirmado, token, { env: 'certecf' })
+
+      if (!recepcion.trackId) {
+        throw new Error(`DGII no retornó trackId. Error: ${recepcion.error ?? recepcion.mensaje ?? 'desconocido'}`)
+      }
+      this.logger.log(`[${comprobanteId}] trackId=${recepcion.trackId}`)
+
+      this.logger.log(`[${comprobanteId}] Consultando estado...`)
+      const resultado = await consultarEstado(recepcion.trackId, token, { env: 'certecf' })
+
+      estadoFinal = mapEstadoDGII(resultado.estado)
+      mensajeDGII = formatMensajesDGII(resultado.mensajes)
+      trackId = recepcion.trackId
     }
-    this.logger.log(`[${comprobanteId}] trackId=${recepcion.trackId}`)
-
-    this.logger.log(`[${comprobanteId}] Consultando estado...`)
-    const resultado = await consultarEstado(recepcion.trackId, token, { env: 'certecf' })
-
-    const estadoFinal = mapEstadoDGII(resultado.estado)
-    const mensajeDGII =
-      resultado.mensajes
-        ?.filter((m) => m.valor)
-        .map((m) => `[${m.codigo}] ${m.valor}`)
-        .join(' | ')
-        .substring(0, 1000) ?? null
 
     this.logger.log(`[${comprobanteId}] Estado final: ${estadoFinal}`)
 
     await prisma.comprobante.update({
       where: { id: comprobanteId },
-      data: { estado: estadoFinal, trackId: recepcion.trackId, mensajeDGII },
+      data: { estado: estadoFinal, trackId, mensajeDGII },
     })
 
     let pdfPath: string | undefined
@@ -202,7 +253,7 @@ export class EcfEmissionProcessor extends WorkerHost {
         accion: 'EMITIR_ECF',
         entidad: 'comprobante',
         entidadId: comprobanteId,
-        detalle: { eNCF: comprobante.eNCF, estado: estadoFinal, trackId: recepcion.trackId },
+        detalle: { eNCF: comprobante.eNCF, estado: estadoFinal, trackId },
       },
     })
 
@@ -212,7 +263,7 @@ export class EcfEmissionProcessor extends WorkerHost {
           eNCF: comprobante.eNCF,
           tipoECF: comprobante.tipoECF,
           montoTotal: comprobante.montoTotal,
-          trackId: recepcion.trackId,
+          trackId,
           pdfUrl: pdfPath ?? null,
           rncComprador: comprobante.rnc,
           razonSocial: comprobante.razonSocial,
@@ -289,8 +340,8 @@ export class EcfEmissionProcessor extends WorkerHost {
     return generarECF31(input).xml
   }
 
-  private generateE32(datos: CreateComprobanteDto, tenant: Tenant, eNCF: string): string {
-    const input: ECF32Input = {
+  private buildE32Input(datos: CreateComprobanteDto, tenant: Tenant, eNCF: string): ECF32Input {
+    return {
       idDoc: {
         eNCF,
         tipoPago: (datos.tipoPago ?? 1) as TipoPago,
@@ -308,7 +359,11 @@ export class EcfEmissionProcessor extends WorkerHost {
         : {}),
       items: mapItems(datos),
     }
-    return generarECF32(input).xml
+  }
+
+  private generateE32(datos: CreateComprobanteDto, tenant: Tenant, eNCF: string): string {
+    // Flujo A (≥ 250 K). El flujo B (< 250 K / RFCE) se maneja aparte en emitir().
+    return generarECF32(this.buildE32Input(datos, tenant, eNCF)).xml
   }
 
   private generateE33(datos: CreateComprobanteDto, tenant: Tenant, eNCF: string): string {

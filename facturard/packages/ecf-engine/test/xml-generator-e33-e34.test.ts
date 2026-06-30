@@ -50,6 +50,7 @@ function baseE33(overrides: Partial<ECF33Input> = {}): ECF33Input {
   return {
     idDoc: {
       eNCF: 'E330000000001',
+      fechaVencimientoSecuencia: '31-12-2028',
       tipoIngresos: '01',
       tipoPago: 1,
       fechaHoraFirma: '02-04-2025 10:00:00',
@@ -111,8 +112,8 @@ describe('e-CF 33 — Nota de Débito: incrementa monto original', () => {
     expect(result.xml).toContain('<TipoeCF>33</TipoeCF>');
   });
 
-  it('no incluye FechaVencimientoSecuencia (no aplica a notas)', () => {
-    expect(result.xml).not.toContain('<FechaVencimientoSecuencia>');
+  it('incluye FechaVencimientoSecuencia (obligatoria en E33 según PDF DGII)', () => {
+    expect(result.xml).toContain('<FechaVencimientoSecuencia>31-12-2028</FechaVencimientoSecuencia>');
   });
 
   it('incluye InformacionReferencia obligatoria', () => {
@@ -342,7 +343,7 @@ describe('Validación XSD — rechaza e-CF 33 inválido', () => {
     expect(() =>
       generarECF33(
         baseE33({
-          idDoc: { eNCF: 'E33001', tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 10:00:00' },
+          idDoc: { eNCF: 'E33001', fechaVencimientoSecuencia: '31-12-2028', tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 10:00:00' },
         }),
       ),
     ).toThrow(/XSD/i);
@@ -369,6 +370,7 @@ describe('set-pruebas DGII — E33 referencia a E32 (E330000000001)', () => {
   const result = generarECF33({
     idDoc: {
       eNCF: 'E330000000001',
+      fechaVencimientoSecuencia: '31-12-2028',
       tipoIngresos: '01',
       tipoPago: 1,
       fechaHoraFirma: '02-04-2025 00:00:00',
