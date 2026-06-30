@@ -9,6 +9,11 @@ export interface Contacto {
   email: string
   telefono: string
   tipo: 'EMPRESA' | 'PERSONA'
+  idExtranjero?: string
+  direccion?: string
+  provincia?: string
+  municipio?: string
+  comentarios?: string
 }
 
 // Mock data — replace with API calls when endpoints are ready
@@ -27,6 +32,11 @@ export interface NuevoContactoData {
   email: string
   telefono: string
   tipo: 'EMPRESA' | 'PERSONA'
+  idExtranjero?: string
+  direccion?: string
+  provincia?: string
+  municipio?: string
+  comentarios?: string
 }
 
 export function useContactos() {

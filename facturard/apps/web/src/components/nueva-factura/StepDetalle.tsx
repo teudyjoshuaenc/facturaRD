@@ -1,6 +1,6 @@
 import { useState, useMemo, useId, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronLeft, Package, Search } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, ChevronLeft, Package, Search, Wrench } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { NuevoProductoModal } from './NuevoProductoModal'
@@ -11,7 +11,22 @@ import type { ItemRow } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
 
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
-const ITBIS_LABELS: Record<string, string> = { I1: '18%', I2: '16%', I3: '0%', I4: '0%', E: '0%' }
+const ITBIS_LABELS: Record<string, string> = { I1: '18%', I2: '16%', I3: '0%', I4: 'Exento', E: 'Exento' }
+
+const UNIDADES_MEDIDA_MAP: Record<number, string> = {
+  1: 'Barril', 2: 'Bolsa', 3: 'Bote', 4: 'Bultos', 5: 'Botella', 6: 'Caja/Cajón',
+  7: 'Cajetilla', 8: 'Centímetro', 9: 'Cilindro', 10: 'Conjunto', 11: 'Contenedor',
+  12: 'Día', 13: 'Docena', 14: 'Fardo', 15: 'Galones', 16: 'Grado', 17: 'Gramo',
+  18: 'Granel', 19: 'Hora', 20: 'Huacal', 21: 'Kilogramo', 22: 'Kilovatio Hora',
+  23: 'Libra', 24: 'Litro', 25: 'Lote', 26: 'Metro', 27: 'Metro Cuadrado',
+  28: 'Metro Cúbico', 29: 'Millones de Unidades Térmicas', 30: 'Minuto',
+  31: 'Paquete', 32: 'Par', 33: 'Pie', 34: 'Pieza', 35: 'Rollo', 36: 'Sobre',
+  37: 'Segundo', 38: 'Tanque', 39: 'Tonelada', 40: 'Tubo', 41: 'Yarda',
+  42: 'Yarda cuadrada', 43: 'Unidad', 44: 'Elemento', 45: 'Millar', 46: 'Saco',
+  47: 'Lata', 48: 'Display', 49: 'Bidón', 50: 'Ración', 51: 'Quintal',
+  52: 'Toneladas de registro bruto', 53: 'Pie Cuadrado', 54: 'Pasajero',
+  55: 'Pulgadas', 56: 'Parqueo Barcos En Muelle', 57: 'Bandeja', 58: 'Servicio'
+}
 
 interface StepDetalleProps {
   items: ItemRow[]
@@ -66,12 +81,27 @@ export function StepDetalle({
       precioUnitarioItem: p.precio,
       indicadorFacturacion: p.indicadorFacturacion,
       indicadorBienoServicio: p.tipo === 'BIEN' ? 1 : 2,
+      ...(p.unidadMedida && { unidadMedida: p.unidadMedida }),
+      ...(p.descuento && { descuento: p.descuento }),
+      ...(p.itbisRetenido && { itbisRetenido: p.itbisRetenido }),
+      ...(p.isrRetenido && { isrRetenido: p.isrRetenido }),
     }
     onItemsChange([...items, newItem])
   }
 
-  function updateItem(key: string, patch: Partial<ItemRow>): void {
-    onItemsChange(items.map((item) => (item.key === key ? { ...item, ...patch } : item)))
+  function updateItem(key: string, patch: any): void {
+    onItemsChange(
+      items.map((item) => {
+        if (item.key === key) {
+          const res = { ...item, ...patch }
+          if (patch.descuento === undefined) {
+            delete res.descuento
+          }
+          return res
+        }
+        return item
+      })
+    )
   }
 
   function removeItem(key: string): void {
@@ -169,7 +199,7 @@ export function StepDetalle({
         </div>
 
         {/* Items table */}
-        <div className="flex flex-col gap-4 border-t border-border-subtle pt-4">
+        <div className="flex flex-col gap-4 pt-4">
           {items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center bg-white rounded-xl border border-neutral-200">
               <Package size={24} className="text-text-secondary" />
@@ -181,11 +211,16 @@ export function StepDetalle({
             <div className="overflow-x-auto bg-white rounded-xl border border-neutral-200/60 shadow-sm animate-in fade-in-50 duration-200">
               <table className="w-full text-left text-body-sm border-collapse">
                 <thead>
-                  <tr className="text-ui-sm text-text-secondary bg-neutral-50 border-b border-neutral-100">
+                  <tr className="text-[11px] uppercase tracking-wider text-text-secondary bg-neutral-50 border-b border-neutral-100 select-none">
                     <th className="py-3 px-4 font-semibold text-text-secondary">Producto</th>
+                    <th className="py-3 px-4 font-semibold text-text-secondary">Unidad de Medida</th>
+                    <th className="py-3 px-4 font-semibold text-text-secondary text-center">Bien o Servicio</th>
                     <th className={cn("py-3 px-4 font-semibold text-text-secondary", isQuickMode ? "w-28 text-center" : "w-24")}>Cant.</th>
-                    <th className="py-3 px-4 font-semibold text-text-secondary text-right w-32">Precio</th>
-                    <th className="py-3 px-4 font-semibold text-text-secondary text-center w-24">ITBIS</th>
+                    <th className="py-3 px-4 font-semibold text-text-secondary text-right w-28">Precio</th>
+                    <th className="py-3 px-4 font-semibold text-text-secondary text-center w-20">ITBIS</th>
+                    {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-center w-24">Descuento</th>}
+                    {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ITBIS Ret.</th>}
+                    {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ISR Ret.</th>}
                     <th className="py-3 px-4 font-semibold text-text-secondary text-right w-32">Total</th>
                     <th className="py-3 px-4 w-12" />
                   </tr>
@@ -194,11 +229,27 @@ export function StepDetalle({
                   {items.map((item) => {
                     const monto = item.cantidad * item.precioUnitarioItem
                     const itbisPercent = ITBIS_LABELS[item.indicadorFacturacion] ?? '0%'
-                    const itemItbis = monto * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
+                    const desc = item.descuento ?? 0
+                    const baseNet = Math.max(0, monto - desc)
+                    const itemItbis = baseNet * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
+                    const retItbis = item.itbisRetenido ?? 0
+                    const retIsr = item.isrRetenido ?? 0
+                    const totalRow = Math.max(0, baseNet + itemItbis - retItbis - retIsr)
+
                     return (
                       <tr key={item.key} className="border-t border-neutral-100 hover:bg-neutral-50/40">
                         <td className="py-3.5 px-4 font-semibold text-text-primary">
                           {item.nombreItem}
+                        </td>
+                        <td className="py-3.5 px-4 text-text-secondary font-medium">
+                          {UNIDADES_MEDIDA_MAP[item.unidadMedida ?? 43] ?? 'Unidad'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          {item.indicadorBienoServicio === 1 ? (
+                            <Package size={16} className="text-[#64748B] mx-auto" />
+                          ) : (
+                            <Wrench size={16} className="text-[#64748B] mx-auto" />
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           {isQuickMode ? (
@@ -226,7 +277,7 @@ export function StepDetalle({
                               type="number"
                               min={1}
                               step="any"
-                              className="w-16 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm text-center font-medium focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              className="w-16 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm text-center font-medium focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
                               value={item.cantidad}
                               onChange={(e) => updateItem(item.key, { cantidad: Number(e.target.value) })}
                             />
@@ -238,15 +289,37 @@ export function StepDetalle({
                         <td className="py-3.5 px-4 text-center font-medium text-text-secondary">
                           {itbisPercent}
                         </td>
+                        {!isQuickMode && (
+                          <td className="py-3.5 px-4 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              placeholder="0.00"
+                              className="w-20 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm text-center font-medium focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                              value={item.descuento !== undefined ? item.descuento : ''}
+                              onChange={(e) => updateItem(item.key, { descuento: e.target.value ? Number(e.target.value) : undefined })}
+                            />
+                          </td>
+                        )}
+                        {!isQuickMode && (
+                          <td className="py-3.5 px-4 text-right font-semibold text-text-secondary">
+                            {formatCurrency(item.itbisRetenido ?? 0)}
+                          </td>
+                        )}
+                        {!isQuickMode && (
+                          <td className="py-3.5 px-4 text-right font-semibold text-text-secondary">
+                            {formatCurrency(item.isrRetenido ?? 0)}
+                          </td>
+                        )}
                         <td className="py-3.5 px-4 text-right font-semibold text-text-primary">
-                          {formatCurrency(monto + itemItbis)}
+                          {formatCurrency(totalRow)}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <button
                             type="button"
                             onClick={() => removeItem(item.key)}
-                            disabled={!isQuickMode && items.length === 1}
-                            className="text-red-500 hover:text-red-700 transition-colors disabled:opacity-30"
+                            className="text-red-500 hover:text-red-700 transition-colors"
                           >
                             <Trash2 size={18} />
                           </button>

@@ -14,9 +14,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={id} className="text-ui-sm font-semibold text-text-secondary">
-            {label}
-          </label>
+          <div className="flex justify-between items-center w-full select-none">
+            <label htmlFor={id} className="text-ui-sm font-semibold text-text-secondary">
+              {label}
+            </label>
+            {error && (
+              <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                {error}
+              </span>
+            )}
+          </div>
         )}
         <div className="relative w-full">
           {leftIcon && (
@@ -39,7 +46,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
         </div>
-        {error ? (
+        {!label && error ? (
           <p className="text-ui-xs text-danger-600">{error}</p>
         ) : helperText ? (
           <p className="text-ui-xs text-text-secondary">{helperText}</p>

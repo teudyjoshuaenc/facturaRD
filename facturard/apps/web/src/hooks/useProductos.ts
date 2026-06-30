@@ -10,6 +10,11 @@ export interface Producto {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  unidadMedida?: number
+  descuento?: number
+  itbisRetenido?: number
+  isrRetenido?: number
+  aplicarPropinaLegal?: boolean
 }
 
 // Mock data — replace with API calls when endpoints are ready
@@ -29,6 +34,11 @@ export interface NuevoProductoData {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  unidadMedida?: number
+  descuento?: number
+  itbisRetenido?: number
+  isrRetenido?: number
+  aplicarPropinaLegal?: boolean
 }
 
 export function useProductos() {

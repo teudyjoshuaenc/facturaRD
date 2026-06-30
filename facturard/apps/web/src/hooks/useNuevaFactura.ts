@@ -11,6 +11,10 @@ export interface ItemRow {
   precioUnitarioItem: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   indicadorBienoServicio: 1 | 2
+  unidadMedida?: number
+  descuento?: number
+  itbisRetenido?: number
+  isrRetenido?: number
 }
 
 export interface ComprobanteFormData {
@@ -20,8 +24,10 @@ export interface ComprobanteFormData {
   razonSocialComprador: string
   paisComprador: string
   fechaEmision: string
-  condicionPago: 'CONTADO' | 'CREDITO'
+  condicionPago: 'CONTADO' | 'CREDITO' | 'GRATUITO'
   tipoIngresos: '01' | '02' | '03' | '04' | '05' | '06'
+  fechaVencimiento?: string
+  terminoPago?: string
   // Información de referencia (E33/E34 obligatorio, resto condicional)
   ncfModificado: string
   fechaNCFModificado: string
@@ -48,11 +54,16 @@ export function useNuevaFactura() {
       const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
       const tiposSinComprador: TipoECF[] = ['E43']
 
+      let backendTipoPago = 1
+      if (data.condicionPago === 'CREDITO') backendTipoPago = 2
+      else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
+
       const res = await api.post<{ eNCF: string }>('/comprobantes', {
         tipoECF: data.tipoECF,
-        tipoPago: data.condicionPago === 'CONTADO' ? 1 : 2,
+        tipoPago: backendTipoPago,
         ...(tiposConTipoIngresos.includes(data.tipoECF) && { tipoIngresos: data.tipoIngresos }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
+        ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
         ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),
         ...(!tiposSinComprador.includes(data.tipoECF) && { razonSocialComprador: data.razonSocialComprador }),
         ...(data.identificadorExtranjero && { identificadorExtranjero: data.identificadorExtranjero }),
@@ -65,6 +76,10 @@ export function useNuevaFactura() {
           indicadorBienoServicio: item.indicadorBienoServicio,
           cantidad: item.cantidad,
           precioUnitarioItem: item.precioUnitarioItem,
+          ...(item.unidadMedida && { unidadMedida: item.unidadMedida }),
+          ...(item.descuento && { descuento: item.descuento }),
+          ...(item.itbisRetenido && { itbisRetenido: item.itbisRetenido }),
+          ...(item.isrRetenido && { isrRetenido: item.isrRetenido }),
         })),
       })
       return res.data.eNCF

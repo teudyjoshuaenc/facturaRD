@@ -3,7 +3,6 @@ import type { JSX } from 'react'
 import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2 } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
-import type { PaymentMethod } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
 import { StepResumen } from './StepResumen'
 import { getErrorMessage } from '@/lib/api'
@@ -26,23 +25,22 @@ const WIZARD_STEPS = [
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
 
 const TIPO_ECF_LABELS: Record<TipoECF, string> = {
-  E31: 'B01 - Factura de Crédito Fiscal',
-  E32: 'B02 - Factura de Consumo',
-  E33: 'B03 - Nota de Débito',
-  E34: 'B04 - Nota de Crédito',
-  E41: 'B11 - Comprobante de Compras',
-  E43: 'B13 - Gastos Menores',
-  E44: 'B14 - Regímenes Especiales',
-  E45: 'B15 - Gubernamental',
-  E46: 'B16 - Exportaciones',
-  E47: 'B17 - Pagos al Exterior',
+  E31: 'B01 - Factura de Crédito Fiscal Electrónica',
+  E32: 'B02 - Factura de Consumo Electrónica',
+  E33: 'B03 - Nota de Débito Electrónica',
+  E34: 'B04 - Nota de Crédito Electrónica',
+  E41: 'B11 - Comprobante de Compras Electrónico',
+  E43: 'B13 - Gastos Menores Electrónico',
+  E44: 'B14 - Regímenes Especiales Electrónico',
+  E45: 'B15 - Gubernamental Electrónico',
+  E46: 'B16 - Exportaciones Electrónico',
+  E47: 'B17 - Pagos al Exterior Electrónico',
 }
 
-const CONDICION_PAGO_OPTIONS = [
-  { value: 'EFECTIVO' as const, label: 'Efectivo', icon: Banknote },
-  { value: 'TARJETA' as const, label: 'Tarjeta', icon: CreditCard },
-  { value: 'TRANSFERENCIA' as const, label: 'Transfer.', icon: ArrowLeftRight },
+const TIPO_PAGO_OPTIONS = [
+  { value: 'CONTADO' as const, label: 'Contado', icon: Banknote },
   { value: 'CREDITO' as const, label: 'Crédito', icon: Clock },
+  { value: 'GRATUITO' as const, label: 'Gratuito', icon: CreditCard },
 ]
 
 function formatDateSpanish(isoDate: string): string {
@@ -82,8 +80,11 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Form state
   const [tipoECF, setTipoECF] = useState<TipoECF>('E31')
   const [selectedCliente, setSelectedCliente] = useState<Contacto | null>(null)
-  const [condicionPago, setCondicionPago] = useState<PaymentMethod>('EFECTIVO')
+  const [tipoPago, setTipoPago] = useState<'CONTADO' | 'CREDITO' | 'GRATUITO'>('CONTADO')
+  const [tipoIngreso, setTipoIngreso] = useState<string>('')
+  const [terminoPago, setTerminoPago] = useState<string>('')
   const [fechaEmision, setFechaEmision] = useState(todayISO())
+  const [fechaLimite, setFechaLimite] = useState<string>('')
   const [items, setItems] = useState<ItemRow[]>([])
   const [notas, setNotas] = useState('')
 
@@ -123,33 +124,35 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const { subtotal, itbis, total } = useMemo(() => {
     let sub = 0
     let tax = 0
+    let retItbis = 0
+    let retIsr = 0
     for (const item of items) {
-      const monto = item.cantidad * item.precioUnitarioItem
-      sub += monto
-      tax += monto * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
+      const base = item.cantidad * item.precioUnitarioItem
+      const desc = item.descuento ?? 0
+      const baseNet = Math.max(0, base - desc)
+      sub += baseNet
+      tax += baseNet * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
+      retItbis += item.itbisRetenido ?? 0
+      retIsr += item.isrRetenido ?? 0
     }
-    return { subtotal: sub, itbis: tax, total: sub + tax }
+    return { subtotal: sub, itbis: tax, total: Math.max(0, sub + tax - retItbis - retIsr) }
   }, [items])
 
   async function handleSubmit(): Promise<void> {
     setSubmitting(true)
     setError('')
     try {
-      const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
-      const tipoIngresos = tiposConTipoIngresos.includes(tipoECF) ? '01' : '01'
-
-      // Map EFECTIVO, TARJETA, TRANSFERENCIA to CONTADO
-      const backendCondicionPago = condicionPago === 'CREDITO' ? 'CREDITO' : 'CONTADO'
-
       await onSubmit({
         tipoECF,
         rncComprador: selectedCliente?.rnc ?? '',
-        identificadorExtranjero: '',
+        identificadorExtranjero: selectedCliente?.idExtranjero ?? '',
         razonSocialComprador: selectedCliente?.nombre ?? '',
         paisComprador: '',
         fechaEmision,
-        condicionPago: backendCondicionPago,
-        tipoIngresos: tipoIngresos as ComprobanteFormData['tipoIngresos'],
+        condicionPago: tipoPago,
+        tipoIngresos: tipoIngreso as ComprobanteFormData['tipoIngresos'],
+        ...(tipoPago === 'CREDITO' && fechaLimite ? { fechaVencimiento: fechaLimite } : {}),
+        ...(terminoPago ? { terminoPago } : {}),
         ncfModificado: '',
         fechaNCFModificado: '',
         codigoModificacion: '',
@@ -164,8 +167,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     }
   }
 
-  // Check if form is valid to proceed/emit
-  const isClienteStepValid = tipoECF === 'E43' || selectedCliente !== null
+  const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
+  const isTipoIngresoRequired = tiposConTipoIngresos.includes(tipoECF)
+  const isTipoIngresoValid = !isTipoIngresoRequired || tipoIngreso !== ''
+
+  const isFechaLimiteRequired = tipoPago === 'CREDITO'
+  const isFechaLimiteValid = !isFechaLimiteRequired || fechaLimite !== ''
+
+  const isClienteStepValid = (tipoECF === 'E43' || selectedCliente !== null) && isTipoIngresoValid && isFechaLimiteValid
   const isDetalleStepValid = items.length > 0 && items.every(
     (i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0,
   )
@@ -184,8 +193,8 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         {/* Left Column */}
         {facturacionMode === 'estandar' ? (
           <Card className={cn(
-            "w-full lg:w-[952px] lg:h-[674.5px] p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
-            currentStep === 2 ? "overflow-y-auto" : "overflow-visible"
+            "w-full lg:w-[952px] p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
+            currentStep === 2 ? "lg:h-[810px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
           )}>
             {/* Stepper Wizard centered at top of the panel */}
             <div className="flex justify-center border-[#F5F5F5] pb-5 pt-0">
@@ -206,8 +215,16 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onSelectCliente={setSelectedCliente}
                   tipoECF={tipoECF}
                   onTipoECFChange={setTipoECF}
-                  condicionPago={condicionPago}
-                  onCondicionPagoChange={setCondicionPago}
+                  tipoPago={tipoPago}
+                  onTipoPagoChange={setTipoPago}
+                  tipoIngreso={tipoIngreso}
+                  onTipoIngresoChange={setTipoIngreso}
+                  terminoPago={terminoPago}
+                  onTerminoPagoChange={setTerminoPago}
+                  fechaEmision={fechaEmision}
+                  onFechaEmisionChange={setFechaEmision}
+                  fechaLimite={fechaLimite}
+                  onFechaLimiteChange={setFechaLimite}
                   onNext={() => goToStep(2)}
                 />
               )}
@@ -227,10 +244,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 <StepResumen
                   cliente={selectedCliente}
                   tipoECF={tipoECF}
-                  condicionPago={condicionPago}
+                  condicionPago={tipoPago}
                   fechaEmision={fechaEmision}
                   items={items}
                   notas={notas}
+                  fechaLimite={fechaLimite}
+                  terminoPago={terminoPago}
                   onBack={() => goToStep(2)}
                 />
               )}
@@ -378,20 +397,20 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 {showNcfDropdown && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowNcfDropdown(false)} />
-                    <div className="absolute left-0 mt-1.5 max-h-[220px] w-[211px] overflow-y-auto rounded-[14px] border border-[#F3F4F6] bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] z-40 py-0 animate-in fade-in-50 duration-150">
+                    <div className="absolute left-0 mt-1.5 max-h-[220px] w-[320px] overflow-y-auto rounded-[14px] border border-[#F3F4F6] bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] z-40 py-0 animate-in fade-in-50 duration-150">
                       {Object.entries(TIPO_ECF_LABELS).map(([key, label]) => {
                         const isSelected = tipoECF === key
                         const displayLabel = label
-                          .replace('Factura de Crédito Fiscal', 'Crédito Fiscal')
-                          .replace('Factura de Consumo', 'Consumidor Final')
-                          .replace('Nota de Débito', 'Nota de Débito')
-                          .replace('Nota de Crédito', 'Nota de Crédito')
-                          .replace('Comprobante de Compras', 'Compras')
-                          .replace('Gastos Menores', 'Gastos Menores')
-                          .replace('Regímenes Especiales', 'Régimen Especial')
-                          .replace('Gubernamental', 'Gubernamental')
-                          .replace('Exportaciones', 'Exportación')
-                          .replace('Pagos al Exterior', 'Pagos al Exterior')
+                          .replace('Factura de Crédito Fiscal Electrónica', 'Crédito Fiscal Electrónica')
+                          .replace('Factura de Consumo Electrónica', 'Consumidor Final Electrónica')
+                          .replace('Nota de Débito Electrónica', 'Nota de Débito Electrónica')
+                          .replace('Nota de Crédito Electrónica', 'Nota de Crédito Electrónica')
+                          .replace('Comprobante de Compras Electrónico', 'Compras Electrónico')
+                          .replace('Gastos Menores Electrónico', 'Gastos Menores Electrónico')
+                          .replace('Regímenes Especiales Electrónico', 'Régimen Especial Electrónico')
+                          .replace('Gubernamental Electrónico', 'Gubernamental Electrónico')
+                          .replace('Exportaciones Electrónico', 'Exportaciones Electrónico')
+                          .replace('Pagos al Exterior Electrónico', 'Pagos al Exterior Electrónico')
                         return (
                           <button
                             key={key}
@@ -496,16 +515,16 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             {/* Payment Method section inside Resumen card in quick mode */}
             {facturacionMode === 'rapido' && (
               <div className="flex flex-col gap-3 pt-2 border-t border-border-subtle text-left">
-                <h3 className="text-ui-xs font-semibold text-text-secondary uppercase">Metodo de Pago</h3>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {CONDICION_PAGO_OPTIONS.map((opt) => {
-                    const isSelected = condicionPago === opt.value
+                <h3 className="text-ui-xs font-semibold text-text-secondary uppercase">Tipo de Pago</h3>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {TIPO_PAGO_OPTIONS.map((opt) => {
+                    const isSelected = tipoPago === opt.value
                     const Icon = opt.icon
                     return (
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => setCondicionPago(opt.value)}
+                        onClick={() => setTipoPago(opt.value)}
                         className={cn(
                           'flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2.5 transition-all duration-200 min-w-[60px] flex-1 hover:scale-[1.02] active:scale-[0.98]',
                           isSelected
@@ -561,7 +580,10 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onClick={() => {
                     setItems([])
                     setSelectedCliente(null)
-                    setCondicionPago('EFECTIVO')
+                    setTipoPago('CONTADO')
+                    setTipoIngreso('')
+                    setTerminoPago('')
+                    setFechaLimite('')
                     setNotas('')
                   }}
                   className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold"
