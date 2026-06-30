@@ -25,6 +25,7 @@ import {
   enviarResumenFC,
   consultarEstado,
   generarRepresentacionImpresa,
+  resolveDgiiEnv,
 } from '@facturard/ecf-engine'
 import type {
   ECF31Input,
@@ -42,6 +43,7 @@ import type {
   TipoPago,
   TipoIngresos,
   EstadoECF,
+  DgiiEnv,
   InformacionReferencia,
   InformacionReferenciaOpcional,
 } from '@facturard/ecf-engine'
@@ -160,6 +162,9 @@ export class EcfEmissionProcessor extends WorkerHost {
     const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
 
+    // Ambiente DGII: 'certecf' (default seguro) o 'ecf' si DGII_ENV=production.
+    const env = resolveDgiiEnv()
+
     // E32 < RD$250,000 sigue el flujo RFCE (resumen a fc.dgii.gov.do), no el
     // flujo normal de recepción. El e-CF completo firmado se conserva igual
     // (almacenamiento, PDF y QR); solo cambia QUÉ se envía a la DGII y a dónde.
@@ -181,8 +186,8 @@ export class EcfEmissionProcessor extends WorkerHost {
       data: { estado: 'ENVIANDO', xmlFirmado },
     })
 
-    this.logger.log(`[${comprobanteId}] Autenticando con DGII certecf...`)
-    const token = await autenticar({ p12Buffer, passphrase, env: 'certecf' })
+    this.logger.log(`[${comprobanteId}] Autenticando con DGII ${env}...`)
+    const token = await autenticar({ p12Buffer, passphrase, env })
 
     let estadoFinal: ComprobanteEstado
     let mensajeDGII: string | null
@@ -207,7 +212,7 @@ export class EcfEmissionProcessor extends WorkerHost {
       })
 
       this.logger.log(`[${comprobanteId}] Enviando RFCE a fc.dgii.gov.do...`)
-      const fc = await enviarResumenFC(rfceFirmado, token, { env: 'certecf' })
+      const fc = await enviarResumenFC(rfceFirmado, token, { env })
 
       estadoFinal = mapEstadoDGII(fc.estado)
       mensajeDGII = formatMensajesDGII(fc.mensajes)
@@ -215,7 +220,7 @@ export class EcfEmissionProcessor extends WorkerHost {
       this.logger.log(`[${comprobanteId}] RFCE estado: ${fc.estado} (código ${fc.codigo})`)
     } else {
       this.logger.log(`[${comprobanteId}] Enviando e-CF a DGII...`)
-      const recepcion = await enviarECF(xmlFirmado, token, { env: 'certecf' })
+      const recepcion = await enviarECF(xmlFirmado, token, { env })
 
       if (!recepcion.trackId) {
         throw new Error(`DGII no retornó trackId. Error: ${recepcion.error ?? recepcion.mensaje ?? 'desconocido'}`)
@@ -223,7 +228,7 @@ export class EcfEmissionProcessor extends WorkerHost {
       this.logger.log(`[${comprobanteId}] trackId=${recepcion.trackId}`)
 
       this.logger.log(`[${comprobanteId}] Consultando estado...`)
-      const resultado = await consultarEstado(recepcion.trackId, token, { env: 'certecf' })
+      const resultado = await consultarEstado(recepcion.trackId, token, { env })
 
       estadoFinal = mapEstadoDGII(resultado.estado)
       mensajeDGII = formatMensajesDGII(resultado.mensajes)
@@ -239,7 +244,7 @@ export class EcfEmissionProcessor extends WorkerHost {
 
     let pdfPath: string | undefined
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
-      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, comprobante.eNCF).catch(
+      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, comprobante.eNCF, env).catch(
         (err) => {
           this.logger.warn(`[${comprobanteId}] PDF no generado: ${(err as Error).message}`)
           return undefined
@@ -531,6 +536,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     datos: CreateComprobanteDto,
     tenant: Tenant,
     eNCF: string,
+    env: DgiiEnv,
   ): Promise<string> {
     const outDir = join('/tmp', 'pdfs', tenantId)
     mkdirSync(outDir, { recursive: true })
@@ -555,6 +561,7 @@ export class EcfEmissionProcessor extends WorkerHost {
       rncEmisor: tenant.rnc,
       nombreEmisor: tenant.razonSocial,
       eNCF,
+      ambiente: env,
       tipoECF: datos.tipoECF,
       fechaEmision: datos.fechaEmision,
       nombreComprador: datos.razonSocialComprador ?? '',
