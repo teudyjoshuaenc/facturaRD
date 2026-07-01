@@ -205,7 +205,7 @@ export class GhlReceiverController {
       return {
         ok: true,
         mensaje: `Comprobante ${comprobante.eNCF} en proceso de emisión`,
-        eNCF: comprobante.eNCF,
+        eNCF: comprobante.eNCF ?? '',
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)

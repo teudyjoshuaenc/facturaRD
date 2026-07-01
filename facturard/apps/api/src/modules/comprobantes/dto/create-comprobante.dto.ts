@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsArray,
+  IsBoolean,
   ValidateNested,
   Min,
   IsIn,
@@ -60,6 +61,15 @@ export class CreateComprobanteDto {
   @ApiProperty({ enum: TipoECF, example: 'E31' })
   @IsEnum(TipoECF)
   tipoECF!: TipoECF
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'true (default) emite de inmediato (asigna e-NCF, encola y firma). false crea un borrador (DRAFT) sin consumir secuencia ni contactar la DGII.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  emitir?: boolean
 
   @ApiPropertyOptional({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito. Requerido para E31/E32/E33/E34/E41/E44/E45/E46' })
   @IsIn([1, 2, 3])

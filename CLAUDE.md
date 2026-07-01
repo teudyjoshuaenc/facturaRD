@@ -93,6 +93,9 @@ APP_URL=http://localhost:3000
 - ✅ Tenants — SUPER_ADMIN ve todos, ADMIN ve solo el suyo
 - ✅ Certificados — P12 cifrado AES-256-GCM, nunca en plano
 - ✅ Comprobantes — crear → BullMQ → worker → DGII → DB
+- ✅ Comprobantes — borradores DRAFT (crear emitir=false), PATCH draft, POST :id/emitir (Sprint 1)
+- ✅ Certificados — firma multi-tenant verificada (cada tenant firma con su P12, sin fallback DMAIA)
+- ✅ Test harness e2e — `pnpm --filter @facturard/api test:e2e` (Postgres efímero 5433, cola BullMQ mockeada)
 - ✅ Secuencias — asignación automática con SELECT FOR UPDATE; eNCF E310000000001 ✓
 - ✅ API Keys — hash SHA-256, prefijo `frd_`
 - ✅ Webhooks — HMAC auto-generado

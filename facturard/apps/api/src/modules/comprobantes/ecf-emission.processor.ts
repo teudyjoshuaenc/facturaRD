@@ -158,6 +158,10 @@ export class EcfEmissionProcessor extends WorkerHost {
     const comprobante = await prisma.comprobante.findUniqueOrThrow({ where: { id: comprobanteId } })
     const datos = comprobante.datos as CreateComprobanteDto | null
     if (!datos) throw new Error('Datos del comprobante no disponibles en DB')
+    // Un DRAFT nunca llega al worker; para cuando lo hace, el e-NCF ya fue
+    // asignado por emitir(). Este guard estrecha el tipo (eNCF es nullable en DB).
+    const eNCF = comprobante.eNCF
+    if (!eNCF) throw new Error('Comprobante sin e-NCF asignado; no puede emitirse')
 
     const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
@@ -174,8 +178,8 @@ export class EcfEmissionProcessor extends WorkerHost {
     // Generar y firmar el e-CF completo. Para el flujo RFCE se usa el generador
     // "plano" (sin InformacionReferencia), idéntico a lo aceptado en certificación.
     const xml = esRFCE
-      ? generarECF32ParaRFCE(this.buildE32Input(datos, tenant, comprobante.eNCF)).xml
-      : this.generateXml(datos, tenant, comprobante.eNCF)
+      ? generarECF32ParaRFCE(this.buildE32Input(datos, tenant, eNCF)).xml
+      : this.generateXml(datos, tenant, eNCF)
     this.logger.log(`[${comprobanteId}] XML generado — tipo ${datos.tipoECF}${esRFCE ? ' (RFCE <250K)' : ''}`)
 
     const xmlFirmado = firmarDocumento({ p12: p12Buffer, passphrase, xml })
@@ -201,7 +205,7 @@ export class EcfEmissionProcessor extends WorkerHost {
         xmlFirmado.match(/<SignatureValue[^>]*>([A-Za-z0-9+/=]+)/)?.[1]?.slice(0, 6) ?? '000000'
 
       const rfceXml = generarRFCE32({
-        ...this.buildE32Input(datos, tenant, comprobante.eNCF),
+        ...this.buildE32Input(datos, tenant, eNCF),
         codigoSeguridadeCF: codigoSeguridad,
       }).xml
       const rfceFirmado = firmarDocumento({
@@ -244,7 +248,7 @@ export class EcfEmissionProcessor extends WorkerHost {
 
     let pdfPath: string | undefined
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
-      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, comprobante.eNCF, env).catch(
+      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, eNCF, env).catch(
         (err) => {
           this.logger.warn(`[${comprobanteId}] PDF no generado: ${(err as Error).message}`)
           return undefined
@@ -258,14 +262,14 @@ export class EcfEmissionProcessor extends WorkerHost {
         accion: 'EMITIR_ECF',
         entidad: 'comprobante',
         entidadId: comprobanteId,
-        detalle: { eNCF: comprobante.eNCF, estado: estadoFinal, trackId },
+        detalle: { eNCF: eNCF, estado: estadoFinal, trackId },
       },
     })
 
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
       this.webhookSenderService
         .enviarWebhook(tenantId, 'comprobante.aceptado', {
-          eNCF: comprobante.eNCF,
+          eNCF: eNCF,
           tipoECF: comprobante.tipoECF,
           montoTotal: comprobante.montoTotal,
           trackId,
@@ -279,7 +283,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     } else if (estadoFinal === 'RECHAZADO') {
       this.webhookSenderService
         .enviarWebhook(tenantId, 'comprobante.rechazado', {
-          eNCF: comprobante.eNCF,
+          eNCF: eNCF,
           tipoECF: comprobante.tipoECF,
           mensajeDGII,
         })
@@ -289,7 +293,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     } else if (estadoFinal === 'ERROR') {
       this.webhookSenderService
         .enviarWebhook(tenantId, 'comprobante.error', {
-          eNCF: comprobante.eNCF,
+          eNCF: eNCF,
           tipoECF: comprobante.tipoECF,
           mensajeDGII,
         })

@@ -4,6 +4,7 @@ import type { Queue } from 'bullmq'
 import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
+import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import type { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
@@ -76,6 +77,25 @@ export class ComprobantesService {
   ) {}
 
   async crear(tenantId: string, dto: CreateComprobanteDto): Promise<Comprobante> {
+    const totales = calcularTotales(dto.items)
+
+    // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
+    if (dto.emitir === false) {
+      return prisma.comprobante.create({
+        data: {
+          tenantId,
+          eNCF: null,
+          tipoECF: dto.tipoECF,
+          estado: 'DRAFT',
+          montoTotal: totales.montoTotal,
+          rnc: dto.rncComprador ?? '',
+          razonSocial: dto.razonSocialComprador ?? '',
+          datos: JSON.parse(JSON.stringify(dto)) as object,
+        },
+      })
+    }
+
+    // emitir=true (default) → comportamiento de producción, sin cambios.
     // 1. Verificar que el tenant tiene certificado activo
     const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
     if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
@@ -83,10 +103,7 @@ export class ComprobantesService {
     // 2. Obtener siguiente eNCF de la secuencia (atómico)
     const eNCF = await this.secuenciasService.siguienteENCF(tenantId, dto.tipoECF)
 
-    // 3. Calcular totales
-    const totales = calcularTotales(dto.items)
-
-    // 4. Crear en DB con estado PENDIENTE + datos originales para el worker
+    // 3. Crear en DB con estado PENDIENTE + datos originales para el worker
     const dtoConEncf = { ...dto, eNCF }
     const comprobante = await prisma.comprobante.create({
       data: {
@@ -101,10 +118,74 @@ export class ComprobantesService {
       },
     })
 
-    // 5. Encolar job
+    // 4. Encolar job
     await this.ecfQueue.add('emit', { comprobanteId: comprobante.id, tenantId })
 
     return comprobante
+  }
+
+  /**
+   * Edita un comprobante en estado DRAFT (borrador). Recalcula totales si se
+   * envían nuevos `items`. Rechaza (409) cualquier comprobante que ya no sea
+   * borrador — un e-CF emitido es inmutable.
+   */
+  async actualizarDraft(
+    tenantId: string,
+    id: string,
+    dto: UpdateComprobanteDto,
+  ): Promise<Comprobante> {
+    const comprobante = await this.findOne(tenantId, id)
+    if (comprobante.estado !== 'DRAFT') {
+      throw new ConflictException('Sólo se pueden editar comprobantes en estado DRAFT')
+    }
+
+    const datosActuales = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
+    const datos = { ...datosActuales, ...dto } as CreateComprobanteDto
+    const totales = calcularTotales(datos.items)
+
+    return prisma.comprobante.update({
+      where: { id },
+      data: {
+        montoTotal: totales.montoTotal,
+        rnc: datos.rncComprador ?? '',
+        razonSocial: datos.razonSocialComprador ?? '',
+        ...(dto.tipoECF !== undefined && { tipoECF: dto.tipoECF }),
+        datos: JSON.parse(JSON.stringify(datos)) as object,
+      },
+    })
+  }
+
+  /**
+   * Transiciona un DRAFT al pipeline de emisión real: asigna e-NCF de la
+   * secuencia (atómico), lo persiste en `datos` y encola el job de BullMQ.
+   * Reutiliza EXACTAMENTE el mismo camino que `crear(emitir=true)`.
+   * Idempotente: si el comprobante ya no es DRAFT devuelve 409.
+   */
+  async emitir(tenantId: string, id: string): Promise<Comprobante> {
+    const comprobante = await this.findOne(tenantId, id)
+    if (comprobante.estado !== 'DRAFT') {
+      throw new ConflictException('El comprobante ya fue emitido o no es un borrador')
+    }
+
+    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
+    if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
+
+    const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
+    const eNCF = await this.secuenciasService.siguienteENCF(tenantId, comprobante.tipoECF)
+    const dtoConEncf = { ...datos, eNCF }
+
+    const actualizado = await prisma.comprobante.update({
+      where: { id },
+      data: {
+        eNCF,
+        estado: 'PENDIENTE',
+        datos: JSON.parse(JSON.stringify(dtoConEncf)) as object,
+      },
+    })
+
+    await this.ecfQueue.add('emit', { comprobanteId: id, tenantId })
+
+    return actualizado
   }
 
   async findAll(tenantId: string, query: ListComprobantesDto): Promise<PaginatedResponse<Comprobante>> {
