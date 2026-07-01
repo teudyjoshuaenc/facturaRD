@@ -5,6 +5,7 @@ import { createReadStream, existsSync } from 'fs'
 import { ComprobantesService } from './comprobantes.service'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
+import { CrearNotaDto } from './dto/crear-nota.dto'
 import { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
@@ -43,6 +44,12 @@ export class ComprobantesController {
   @ApiOperation({ summary: 'Emite un borrador: asigna e-NCF, encola y envía a la DGII. 409 si no es DRAFT.' })
   emitir(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.emitir(tenantId, id)
+  }
+
+  @Post(':id/nota')
+  @ApiOperation({ summary: 'Emite una nota de crédito (E34) o débito (E33) sobre un comprobante ACEPTADO' })
+  crearNota(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: CrearNotaDto) {
+    return this.service.crearNota(tenantId, id, dto)
   }
 
   @Get()

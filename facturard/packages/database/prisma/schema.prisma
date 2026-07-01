@@ -68,6 +68,10 @@ model Tenant {
   // ghlAccessToken cifrado AES-256-GCM (formato iv:tag:data en base64).
   ghlAccessToken  String?
   ghlRncFieldKey  String?
+  // Branding para la representación impresa (Sprint 6).
+  logoUrl         String?
+  colorPrimario   String?
+  colorSecundario String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -116,10 +120,11 @@ model CotizacionItem {
   productoId       String?
   nombre           String
   descripcion      String?
-  cantidad         Decimal  @db.Decimal(18, 3)
-  precioUnitario   Decimal  @db.Decimal(18, 2)
-  tratamientoITBIS String
-  unidadMedida     String?
+  cantidad             Decimal @db.Decimal(18, 3)
+  precioUnitario       Decimal @db.Decimal(18, 2)
+  tratamientoITBIS     String
+  indicadorBienoServicio String @default("2") // "1"=Bien, "2"=Servicio
+  unidadMedida         String?
 
   cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 

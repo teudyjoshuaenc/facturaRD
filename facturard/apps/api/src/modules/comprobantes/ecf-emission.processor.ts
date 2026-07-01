@@ -578,6 +578,11 @@ export class EcfEmissionProcessor extends WorkerHost {
       ...(tenant.nombreComercial !== null ? { nombreComercial: tenant.nombreComercial } : {}),
       ...(datos.fechaVencimiento !== undefined ? { fechaVencimiento: datos.fechaVencimiento } : {}),
       ...(datos.rncComprador !== undefined ? { rncComprador: datos.rncComprador } : {}),
+      ...(datos.ncfModificado !== undefined ? { eNCFReferencia: datos.ncfModificado } : {}),
+      // Branding del tenant (Sprint 6). Si son null, el PDF usa los defaults.
+      ...(tenant.logoUrl !== null ? { logoUrl: tenant.logoUrl } : {}),
+      ...(tenant.colorPrimario !== null ? { colorPrimario: tenant.colorPrimario } : {}),
+      ...(tenant.colorSecundario !== null ? { colorSecundario: tenant.colorSecundario } : {}),
     }
     await generarRepresentacionImpresa(pdfInput, pdfPath)
 

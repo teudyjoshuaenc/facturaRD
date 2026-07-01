@@ -47,6 +47,11 @@ export class CotizacionItemDto {
   @IsIn(['I1', 'I2', 'I3', 'EXENTO'])
   tratamientoITBIS?: string
 
+  @ApiPropertyOptional({ enum: ['1', '2'], description: '1=Bien, 2=Servicio (default por el producto o "2")' })
+  @IsIn(['1', '2'])
+  @IsOptional()
+  indicadorBienoServicio?: string
+
   @ApiPropertyOptional({ description: 'Código de unidad de medida DGII' })
   @IsString()
   @IsOptional()

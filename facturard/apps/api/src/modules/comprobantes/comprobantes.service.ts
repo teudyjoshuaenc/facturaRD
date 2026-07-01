@@ -5,6 +5,7 @@ import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
+import type { CrearNotaDto } from './dto/crear-nota.dto'
 import type { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
@@ -40,6 +41,11 @@ export interface EcfJobData {
 // tratamientoITBIS del catálogo (I1|I2|I3|EXENTO) → indicadorFacturacion del e-CF.
 function mapTratamientoITBIS(t: string): string {
   return t === 'EXENTO' ? 'E' : t
+}
+
+function hoyDDMMYYYY(): string {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
 }
 
 function calcularTotales(items: CreateItemDto[]): {
@@ -277,6 +283,55 @@ export class ComprobantesService {
     await this.ecfQueue.add('emit', { comprobanteId: id, tenantId })
 
     return actualizado
+  }
+
+  /**
+   * Emite una nota de crédito (E34) o débito (E33) sobre un comprobante ACEPTADO.
+   * Reutiliza los generadores E33/E34 del ecf-engine (vía crear → pipeline) y hereda
+   * del fuente: comprador (contacto + snapshot) y referencia fiscal (ncfModificado,
+   * fechaNCFModificado, comprobanteReferenciaId). No reimplementa la emisión.
+   */
+  async crearNota(tenantId: string, sourceId: string, dto: CrearNotaDto): Promise<Comprobante> {
+    const source = await this.findOne(tenantId, sourceId) // 404 tenant-scoped
+    if (source.estado !== 'ACEPTADO') {
+      throw new ConflictException('El comprobante fuente debe estar ACEPTADO para emitir una nota')
+    }
+    const datosFuente = (source.datos ?? {}) as unknown as CreateComprobanteDto
+    if (!source.eNCF || !datosFuente.fechaEmision) {
+      throw new ConflictException('El comprobante fuente no tiene e-NCF o fecha de emisión')
+    }
+
+    const items = dto.items ?? datosFuente.items
+    if (!items || items.length === 0) throw new BadRequestException('La nota no tiene líneas')
+
+    const notaDto: CreateComprobanteDto = {
+      tipoECF: dto.tipo,
+      emitir: dto.emitir ?? true,
+      fechaEmision: hoyDDMMYYYY(),
+      items,
+      // Referencia fiscal heredada del comprobante fuente
+      ncfModificado: source.eNCF,
+      fechaNCFModificado: datosFuente.fechaEmision,
+      codigoModificacion: dto.codigoModificacion,
+      // Comprador heredado (snapshot del fuente)
+      ...(datosFuente.rncComprador !== undefined && { rncComprador: datosFuente.rncComprador }),
+      ...(datosFuente.razonSocialComprador !== undefined && { razonSocialComprador: datosFuente.razonSocialComprador }),
+      ...(datosFuente.direccionComprador !== undefined && { direccionComprador: datosFuente.direccionComprador }),
+      ...(datosFuente.identificadorExtranjero !== undefined && { identificadorExtranjero: datosFuente.identificadorExtranjero }),
+      ...(datosFuente.paisComprador !== undefined && { paisComprador: datosFuente.paisComprador }),
+      ...(datosFuente.fechaVencimiento !== undefined && { fechaVencimiento: datosFuente.fechaVencimiento }),
+      ...(source.contactoId !== null && { contactoId: source.contactoId }),
+      ...(dto.razonModificacion !== undefined && { razonModificacion: dto.razonModificacion }),
+      ...(dto.indicadorNotaCredito !== undefined && { indicadorNotaCredito: dto.indicadorNotaCredito }),
+    }
+
+    const nota = await this.crear(tenantId, notaDto)
+
+    // Enlace a la factura referenciada.
+    return prisma.comprobante.update({
+      where: { id: nota.id },
+      data: { comprobanteReferenciaId: source.id },
+    })
   }
 
   async findAll(tenantId: string, query: ListComprobantesDto): Promise<PaginatedResponse<Comprobante>> {

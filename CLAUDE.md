@@ -99,7 +99,9 @@ APP_URL=http://localhost:3000
 - ✅ Productos — catálogo CRUD + soft delete; snapshot de producto en items al emitir (Sprint 2)
 - ✅ Contactos — CRUD + soft delete, validación RNC vs DGII, upsert por RNC; snapshot comprador al emitir (Sprint 3)
 - ✅ Contactos GHL — sincronización (GET services.leadconnectorhq.com/contacts), token cifrado + ghlRncFieldKey por tenant (Sprint 3)
-- ✅ Cotizaciones — folio interno atómico (COT-000001), items snapshot, estados, convertir→comprobante reutilizando ComprobantesService.crear (Sprint 4)
+- ✅ Cotizaciones — folio interno atómico (COT-000001), items snapshot (incl. indicadorBienoServicio), estados, convertir→comprobante reutilizando ComprobantesService.crear (Sprint 4)
+- ✅ Notas CD — POST /comprobantes/:id/nota (E33/E34) sobre fuente ACEPTADO, hereda comprador + referencia fiscal, reutiliza pipeline (Sprint 5)
+- ✅ Branding — logoUrl/colorPrimario/colorSecundario en Tenant, PDF con logo (fetch 5s/2MB, tolerante) y colores; PATCH /tenants/branding valida hex (Sprint 6)
 - ✅ Secuencias — asignación automática con SELECT FOR UPDATE; eNCF E310000000001 ✓
 - ✅ API Keys — hash SHA-256, prefijo `frd_`
 - ✅ Webhooks — HMAC auto-generado

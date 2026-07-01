@@ -18,6 +18,7 @@ interface SnapItem {
   cantidad: number
   precioUnitario: number
   tratamientoITBIS: string
+  indicadorBienoServicio: string // "1"=Bien, "2"=Servicio
   unidadMedida?: string
 }
 
@@ -201,6 +202,7 @@ export class CotizacionesService {
             cantidad: item.cantidad,
             precioUnitario: item.precioUnitario as number,
             tratamientoITBIS: item.tratamientoITBIS as string,
+            indicadorBienoServicio: item.indicadorBienoServicio ?? '2',
             ...(item.descripcion !== undefined && { descripcion: item.descripcion }),
             ...(item.unidadMedida !== undefined && { unidadMedida: item.unidadMedida }),
           }
@@ -215,6 +217,7 @@ export class CotizacionesService {
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario ?? Number(producto.precioUnitario),
           tratamientoITBIS: item.tratamientoITBIS ?? producto.tratamientoITBIS,
+          indicadorBienoServicio: item.indicadorBienoServicio ?? (producto.tipo === 'BIEN' ? '1' : '2'),
           ...(descripcion !== undefined && { descripcion }),
           ...(unidadMedida !== undefined && { unidadMedida }),
         }
@@ -228,6 +231,7 @@ export class CotizacionesService {
       cantidad: Number(it.cantidad),
       precioUnitario: Number(it.precioUnitario),
       tratamientoITBIS: it.tratamientoITBIS,
+      indicadorBienoServicio: it.indicadorBienoServicio,
       ...(it.productoId !== null && { productoId: it.productoId }),
       ...(it.descripcion !== null && { descripcion: it.descripcion }),
       ...(it.unidadMedida !== null && { unidadMedida: it.unidadMedida }),
@@ -240,6 +244,7 @@ export class CotizacionesService {
       cantidad: s.cantidad,
       precioUnitario: s.precioUnitario,
       tratamientoITBIS: s.tratamientoITBIS,
+      indicadorBienoServicio: s.indicadorBienoServicio,
       ...(s.productoId !== undefined && { productoId: s.productoId }),
       ...(s.descripcion !== undefined && { descripcion: s.descripcion }),
       ...(s.unidadMedida !== undefined && { unidadMedida: s.unidadMedida }),
@@ -256,7 +261,7 @@ export class CotizacionesService {
         nombreItem: s.nombre,
         precioUnitarioItem: s.precioUnitario,
         indicadorFacturacion: s.tratamientoITBIS === 'EXENTO' ? 'E' : s.tratamientoITBIS,
-        indicadorBienoServicio: 2, // Servicio por defecto (CotizacionItem no distingue bien/servicio)
+        indicadorBienoServicio: s.indicadorBienoServicio === '1' ? 1 : 2,
         ...(unidad !== undefined && { unidadMedida: unidad }),
       }
     })
