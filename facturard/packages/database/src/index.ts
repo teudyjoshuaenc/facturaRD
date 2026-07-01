@@ -22,6 +22,8 @@ export type {
   GhlLocation,
   Producto,
   Contacto,
+  Cotizacion,
+  CotizacionItem,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

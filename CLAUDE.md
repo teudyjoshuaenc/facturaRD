@@ -99,6 +99,7 @@ APP_URL=http://localhost:3000
 - ✅ Productos — catálogo CRUD + soft delete; snapshot de producto en items al emitir (Sprint 2)
 - ✅ Contactos — CRUD + soft delete, validación RNC vs DGII, upsert por RNC; snapshot comprador al emitir (Sprint 3)
 - ✅ Contactos GHL — sincronización (GET services.leadconnectorhq.com/contacts), token cifrado + ghlRncFieldKey por tenant (Sprint 3)
+- ✅ Cotizaciones — folio interno atómico (COT-000001), items snapshot, estados, convertir→comprobante reutilizando ComprobantesService.crear (Sprint 4)
 - ✅ Secuencias — asignación automática con SELECT FOR UPDATE; eNCF E310000000001 ✓
 - ✅ API Keys — hash SHA-256, prefijo `frd_`
 - ✅ Webhooks — HMAC auto-generado

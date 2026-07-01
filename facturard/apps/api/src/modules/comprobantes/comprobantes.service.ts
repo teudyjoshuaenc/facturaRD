@@ -81,6 +81,14 @@ export class ComprobantesService {
     private readonly secuenciasService: SecuenciasService,
   ) {}
 
+  /**
+   * Totales de un conjunto de líneas, con la MISMA lógica que la emisión.
+   * Se expone para que Cotizaciones no duplique el cálculo de ITBIS/total.
+   */
+  calcularTotalesComprobante(items: CreateItemDto[]): ReturnType<typeof calcularTotales> {
+    return calcularTotales(items)
+  }
+
   async crear(tenantId: string, dtoOriginal: CreateComprobanteDto): Promise<Comprobante> {
     // Resuelve snapshots de producto (items) y del comprador (contacto) ANTES de
     // calcular totales y persistir, para que el documento sea inmutable.

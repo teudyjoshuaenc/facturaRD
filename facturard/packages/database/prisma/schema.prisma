@@ -82,8 +82,59 @@ model Tenant {
   ghlLocations         GhlLocation[]
   productos            Producto[]
   contactos            Contacto[]
+  cotizaciones         Cotizacion[]
 
   @@map("tenants")
+}
+
+model Cotizacion {
+  id            String   @id @default(uuid())
+  tenantId      String
+  folio         String   // interno, p.ej. COT-000123 (NO es e-NCF, nunca va a la DGII)
+  contactoId    String?
+  estado        String   @default("BORRADOR") // BORRADOR|ENVIADA|APROBADA|RECHAZADA|VENCIDA|CONVERTIDA
+  fechaVigencia DateTime?
+  subtotal      Decimal  @db.Decimal(18, 2)
+  itbis         Decimal  @db.Decimal(18, 2)
+  total         Decimal  @db.Decimal(18, 2)
+  comprobanteId String?  // seteado al convertir
+  notas         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  items  CotizacionItem[]
+
+  @@unique([tenantId, folio])
+  @@index([tenantId, estado])
+  @@map("cotizaciones")
+}
+
+model CotizacionItem {
+  id               String   @id @default(uuid())
+  cotizacionId     String
+  productoId       String?
+  nombre           String
+  descripcion      String?
+  cantidad         Decimal  @db.Decimal(18, 3)
+  precioUnitario   Decimal  @db.Decimal(18, 2)
+  tratamientoITBIS String
+  unidadMedida     String?
+
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_items")
+}
+
+// Contador atómico de folios por tenant (mismo patrón de incremento que las
+// secuencias e-NCF). El INSERT ... ON CONFLICT DO NOTHING crea la fila sin
+// condición de carrera y el UPDATE ... += 1 serializa por lock de fila.
+model CotizacionFolio {
+  tenantId    String   @id
+  ultimoFolio Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@map("cotizacion_folios")
 }
 
 model Contacto {
