@@ -226,6 +226,13 @@ export class ReceptorService {
       extractXmlTag(xmlRaw, 'rncComprador') ??
       ''
 
+    const razonSocialEmisor =
+      extractXmlTag(xmlRaw, 'RazonSocialEmisor') ??
+      extractXmlTag(xmlRaw, 'razonSocialEmisor')
+    const montoTotalXml = extractXmlTag(xmlRaw, 'MontoTotal')
+    const itbisXml = extractXmlTag(xmlRaw, 'TotalITBIS') ?? extractXmlTag(xmlRaw, 'TotalITBIS1')
+    const fechaEmisionXml = extractXmlTag(xmlRaw, 'FechaEmision')
+
     if (!eNCF) {
       throw new BadRequestException('No se encontró eNCF en el XML del e-CF')
     }
@@ -326,6 +333,20 @@ export class ReceptorService {
       this.logger.error(`[Receptor][Paso5] ERROR en DB upsert: ${String(dbErr)}`)
       throw dbErr
     }
+
+    // Bridge Sprint 7: además del comprobante_recibido, se persiste una
+    // CompraRecibida (feed 606) para que el tenant la vea en su módulo de compras.
+    // Es una escritura ADICIONAL — no altera la respuesta ARECF a la DGII, por eso
+    // va en try/catch: si falla, se loguea y el receptor responde igual.
+    await this.persistirCompraRecibida({
+      tenantId,
+      rncEmisor,
+      eNCF,
+      razonSocialProveedor: razonSocialEmisor,
+      montoTotal: this.parseNum(montoTotalXml),
+      itbis: this.parseNum(itbisXml),
+      fechaEmision: this.parseFechaDGII(fechaEmisionXml),
+    }).catch((e) => this.logger.warn(`[Receptor][Bridge] CompraRecibida no persistida: ${String(e)}`))
 
     this.logger.log(
       `[Receptor] e-CF recibido: ${eNCF} de RNC ${rncEmisor} → tenant ${tenantId}`,
@@ -428,6 +449,59 @@ export class ReceptorService {
   }
 
   // ── Helpers privados ──────────────────────────────────────────────────────
+
+  /**
+   * Bridge receptor → compras (Sprint 7). Crea una CompraRecibida por cada e-CF
+   * entrante aceptado (origen RECEPCION_DGII, tipo RECIBIDO_ECF, estadoAprobacion
+   * PENDIENTE). Idempotente: si ya existe (mismo tenant/ncf/rncProveedor) no duplica.
+   */
+  private async persistirCompraRecibida(data: {
+    tenantId: string
+    rncEmisor: string
+    eNCF: string
+    razonSocialProveedor: string | undefined
+    montoTotal: number
+    itbis: number
+    fechaEmision: Date | undefined
+  }): Promise<void> {
+    const existente = await prisma.compraRecibida.findFirst({
+      where: { tenantId: data.tenantId, ncf: data.eNCF, rncProveedor: data.rncEmisor, origen: 'RECEPCION_DGII' },
+      select: { id: true },
+    })
+    if (existente) return
+
+    const subtotal = Math.max(0, Math.round((data.montoTotal - data.itbis) * 100) / 100)
+    await prisma.compraRecibida.create({
+      data: {
+        tenantId: data.tenantId,
+        tipo: 'RECIBIDO_ECF',
+        origen: 'RECEPCION_DGII',
+        estadoAprobacion: 'PENDIENTE',
+        ncf: data.eNCF,
+        rncProveedor: data.rncEmisor,
+        subtotal,
+        itbis: data.itbis,
+        itbisRetenido: 0,
+        total: data.montoTotal,
+        ...(data.razonSocialProveedor !== undefined && { razonSocialProveedor: data.razonSocialProveedor }),
+        ...(data.fechaEmision !== undefined && { fechaComprobante: data.fechaEmision }),
+      },
+    })
+  }
+
+  private parseNum(v: string | undefined): number {
+    const n = Number((v ?? '').replace(/,/g, ''))
+    return Number.isFinite(n) ? n : 0
+  }
+
+  /** Convierte DD-MM-YYYY (formato DGII) a Date; undefined si no parsea. */
+  private parseFechaDGII(v: string | undefined): Date | undefined {
+    if (!v) return undefined
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(v.trim())
+    if (!m) return undefined
+    const d = new Date(`${m[3]}-${m[2]}-${m[1]}T00:00:00.000-04:00`)
+    return Number.isNaN(d.getTime()) ? undefined : d
+  }
 
   private async obtenerNuestroRnc(tenantId: string): Promise<string> {
     const tenant = await prisma.tenant.findUnique({

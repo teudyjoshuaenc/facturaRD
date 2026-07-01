@@ -102,6 +102,7 @@ APP_URL=http://localhost:3000
 - ✅ Cotizaciones — folio interno atómico (COT-000001), items snapshot (incl. indicadorBienoServicio), estados, convertir→comprobante reutilizando ComprobantesService.crear (Sprint 4)
 - ✅ Notas CD — POST /comprobantes/:id/nota (E33/E34) sobre fuente ACEPTADO, hereda comprador + referencia fiscal, reutiliza pipeline (Sprint 5)
 - ✅ Branding — logoUrl/colorPrimario/colorSecundario en Tenant, PDF con logo (fetch 5s/2MB, tolerante) y colores; PATCH /tenants/branding valida hex (Sprint 6)
+- ✅ Compras — CompraRecibida CRUD (E41/GASTO_MENOR/SIN_COMPROBANTE), bridge receptor /fe/recepcion → CompraRecibida (RECEPCION_DGII, aditivo, no cambia el ARECF), aprobación comercial reusando el motor ACECF del ecf-engine (Sprint 7)
 - ✅ Secuencias — asignación automática con SELECT FOR UPDATE; eNCF E310000000001 ✓
 - ✅ API Keys — hash SHA-256, prefijo `frd_`
 - ✅ Webhooks — HMAC auto-generado

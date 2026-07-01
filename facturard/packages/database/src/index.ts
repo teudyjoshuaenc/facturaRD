@@ -24,6 +24,7 @@ export type {
   Contacto,
   Cotizacion,
   CotizacionItem,
+  CompraRecibida,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

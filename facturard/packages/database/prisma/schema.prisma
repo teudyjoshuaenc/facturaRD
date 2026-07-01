@@ -87,8 +87,33 @@ model Tenant {
   productos            Producto[]
   contactos            Contacto[]
   cotizaciones         Cotizacion[]
+  comprasRecibidas     CompraRecibida[]
 
   @@map("tenants")
+}
+
+model CompraRecibida {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  contactoId           String?   // proveedor (Contacto tipo PROVEEDOR)
+  tipo                 String    // "E41" | "GASTO_MENOR" | "SIN_COMPROBANTE" | "RECIBIDO_ECF"
+  ncf                  String?   // NCF/e-NCF del proveedor
+  rncProveedor         String?
+  razonSocialProveedor String?
+  fechaComprobante     DateTime?
+  subtotal             Decimal   @db.Decimal(18, 2)
+  itbis                Decimal   @db.Decimal(18, 2)
+  itbisRetenido        Decimal   @db.Decimal(18, 2) @default(0)
+  total                Decimal   @db.Decimal(18, 2)
+  estadoAprobacion     String?   // e-CF recibido: APROBADO|RECHAZADO|PENDIENTE
+  origen               String    @default("MANUAL") // MANUAL|RECEPCION_DGII
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, fechaComprobante])
+  @@map("compras_recibidas")
 }
 
 model Cotizacion {
