@@ -11,22 +11,27 @@ export interface TestContext {
   queueAdd: jest.Mock
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface ProviderOverride { provide: any; useValue: any }
+
 /**
  * Construye la app Nest para e2e con la cola de emisión y el worker MOCKEADOS.
  * Con esto los tests verifican el pipeline sin encolar jobs reales ni tocar la
  * DGII: basta con aseverar cuántas veces se llamó a `queueAdd`.
+ * `overrides` permite mockear servicios adicionales (p.ej. DgiiContribuyentesService).
  */
-export async function createTestApp(): Promise<TestContext> {
+export async function createTestApp(overrides: ProviderOverride[] = []): Promise<TestContext> {
   const queueAdd = jest.fn().mockResolvedValue({ id: 'test-job' })
 
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  })
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(getQueueToken('ecf-emission'))
     .useValue({ add: queueAdd })
     .overrideProvider(EcfEmissionProcessor)
     .useValue({})
-    .compile()
+  for (const o of overrides) {
+    builder = builder.overrideProvider(o.provide).useValue(o.useValue)
+  }
+  const moduleRef = await builder.compile()
 
   const app = moduleRef.createNestApplication()
   app.useGlobalPipes(

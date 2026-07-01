@@ -83,7 +83,7 @@ function r2(n: number): number {
 }
 
 function calcularMontoItem(item: CreateItemDto): number {
-  const bruto = r2(item.cantidad * item.precioUnitarioItem)
+  const bruto = r2(item.cantidad * (item.precioUnitarioItem ?? 0))
   return r2(bruto - r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100)))
 }
 
@@ -110,12 +110,14 @@ function buildReferenciaOpcional(datos: CreateComprobanteDto): InformacionRefere
 }
 
 function mapItems(datos: CreateComprobanteDto) {
+  // Los items ya vienen resueltos (snapshot de producto) desde el servicio; los
+  // coalesce son sólo para estrechar los tipos opcionales del DTO.
   return datos.items.map((item) => ({
-    nombre: item.nombreItem,
+    nombre: item.nombreItem ?? '',
     cantidad: item.cantidad,
-    precioUnitario: item.precioUnitarioItem,
-    indicadorFacturacion: mapIndicador(item.indicadorFacturacion),
-    indicadorBienoServicio: item.indicadorBienoServicio as IndicadorBienoServicio,
+    precioUnitario: item.precioUnitarioItem ?? 0,
+    indicadorFacturacion: mapIndicador(item.indicadorFacturacion ?? 'E'),
+    indicadorBienoServicio: (item.indicadorBienoServicio ?? 2) as IndicadorBienoServicio,
     ...(item.unidadMedida !== undefined && { unidadMedida: item.unidadMedida }),
     ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
   }))
@@ -547,9 +549,9 @@ export class EcfEmissionProcessor extends WorkerHost {
     const pdfPath = join(outDir, `${eNCF}.pdf`)
 
     const items = datos.items.map((item) => ({
-      descripcion: item.nombreItem,
+      descripcion: item.nombreItem ?? '',
       cantidad: item.cantidad,
-      precioUnitario: item.precioUnitarioItem,
+      precioUnitario: item.precioUnitarioItem ?? 0,
       valor: calcularMontoItem(item),
     }))
 

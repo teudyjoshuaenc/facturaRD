@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import type { Queue } from 'bullmq'
 import { Prisma, prisma } from '@facturard/database'
@@ -37,6 +37,11 @@ export interface EcfJobData {
   tenantId: string
 }
 
+// tratamientoITBIS del catálogo (I1|I2|I3|EXENTO) → indicadorFacturacion del e-CF.
+function mapTratamientoITBIS(t: string): string {
+  return t === 'EXENTO' ? 'E' : t
+}
+
 function calcularTotales(items: CreateItemDto[]): {
   montoGravadoI1: number
   montoGravadoI2: number
@@ -50,7 +55,7 @@ function calcularTotales(items: CreateItemDto[]): {
   let gI1 = 0, gI2 = 0, gI3 = 0, exento = 0, itbis = 0
 
   for (const item of items) {
-    const bruto = r2(item.cantidad * item.precioUnitarioItem)
+    const bruto = r2(item.cantidad * (item.precioUnitarioItem ?? 0))
     const desc = r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100))
     const monto = r2(bruto - desc)
 
@@ -76,7 +81,10 @@ export class ComprobantesService {
     private readonly secuenciasService: SecuenciasService,
   ) {}
 
-  async crear(tenantId: string, dto: CreateComprobanteDto): Promise<Comprobante> {
+  async crear(tenantId: string, dtoOriginal: CreateComprobanteDto): Promise<Comprobante> {
+    // Resuelve snapshots de producto (items) y del comprador (contacto) ANTES de
+    // calcular totales y persistir, para que el documento sea inmutable.
+    const dto = await this.resolverDto(tenantId, dtoOriginal)
     const totales = calcularTotales(dto.items)
 
     // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
@@ -90,6 +98,7 @@ export class ComprobantesService {
           montoTotal: totales.montoTotal,
           rnc: dto.rncComprador ?? '',
           razonSocial: dto.razonSocialComprador ?? '',
+          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
           datos: JSON.parse(JSON.stringify(dto)) as object,
         },
       })
@@ -114,6 +123,7 @@ export class ComprobantesService {
         montoTotal: totales.montoTotal,
         rnc: dto.rncComprador ?? '',
         razonSocial: dto.razonSocialComprador ?? '',
+        ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
         datos: JSON.parse(JSON.stringify(dtoConEncf)) as object,
       },
     })
@@ -122,6 +132,77 @@ export class ComprobantesService {
     await this.ecfQueue.add('emit', { comprobanteId: comprobante.id, tenantId })
 
     return comprobante
+  }
+
+  /**
+   * Resuelve las referencias de un DTO de comprobante:
+   *  - Cada item con `productoId` copia nombre/precio/tratamientoITBIS/unidad del
+   *    catálogo (override explícito del cliente prevalece). Snapshot inmutable.
+   *  - `contactoId` copia identidad del comprador. CONSUMIDOR_FINAL o sin contacto
+   *    conserva el flujo sin comprador (E32).
+   */
+  private async resolverDto(tenantId: string, dto: CreateComprobanteDto): Promise<CreateComprobanteDto> {
+    const items = await Promise.all(dto.items.map((item) => this.resolverItem(tenantId, item)))
+    for (const it of items) {
+      if (
+        it.nombreItem === undefined ||
+        it.indicadorFacturacion === undefined ||
+        it.indicadorBienoServicio === undefined ||
+        it.precioUnitarioItem === undefined
+      ) {
+        throw new BadRequestException(
+          'Cada línea requiere nombre, indicadorFacturacion, indicadorBienoServicio y precio (o un productoId válido)',
+        )
+      }
+    }
+
+    let resolved: CreateComprobanteDto = { ...dto, items }
+
+    if (dto.contactoId !== undefined) {
+      const contacto = await prisma.contacto.findFirst({ where: { id: dto.contactoId, tenantId } })
+      if (!contacto) throw new BadRequestException(`Contacto ${dto.contactoId} no encontrado`)
+      if (contacto.tipo !== 'CONSUMIDOR_FINAL') {
+        const rncComprador = dto.rncComprador ?? contacto.rnc ?? undefined
+        const direccionComprador = dto.direccionComprador ?? contacto.direccion ?? undefined
+        const identificadorExtranjero = dto.identificadorExtranjero ?? contacto.identificadorExtranjero ?? undefined
+        const paisComprador = dto.paisComprador ?? contacto.paisExtranjero ?? undefined
+        resolved = {
+          ...resolved,
+          razonSocialComprador: dto.razonSocialComprador ?? contacto.razonSocial,
+          ...(rncComprador !== undefined && { rncComprador }),
+          ...(direccionComprador !== undefined && { direccionComprador }),
+          ...(identificadorExtranjero !== undefined && { identificadorExtranjero }),
+          ...(paisComprador !== undefined && { paisComprador }),
+        }
+      }
+    }
+
+    return resolved
+  }
+
+  private async resolverItem(tenantId: string, item: CreateItemDto): Promise<CreateItemDto> {
+    if (item.productoId === undefined) return item
+
+    const producto = await prisma.producto.findFirst({ where: { id: item.productoId, tenantId } })
+    if (!producto) throw new BadRequestException(`Producto ${item.productoId} no encontrado`)
+
+    const unidadProducto =
+      producto.unidadMedida != null && producto.unidadMedida !== '' && !Number.isNaN(Number(producto.unidadMedida))
+        ? Number(producto.unidadMedida)
+        : undefined
+    const unidadMedida = item.unidadMedida ?? unidadProducto
+
+    return {
+      numeroLinea: item.numeroLinea,
+      cantidad: item.cantidad,
+      productoId: item.productoId,
+      nombreItem: item.nombreItem ?? producto.nombre,
+      precioUnitarioItem: item.precioUnitarioItem ?? Number(producto.precioUnitario),
+      indicadorFacturacion: item.indicadorFacturacion ?? mapTratamientoITBIS(producto.tratamientoITBIS),
+      indicadorBienoServicio: item.indicadorBienoServicio ?? (producto.tipo === 'SERVICIO' ? 2 : 1),
+      ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
+      ...(unidadMedida !== undefined && { unidadMedida }),
+    }
   }
 
   /**
@@ -140,7 +221,8 @@ export class ComprobantesService {
     }
 
     const datosActuales = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
-    const datos = { ...datosActuales, ...dto } as CreateComprobanteDto
+    const merged = { ...datosActuales, ...dto } as CreateComprobanteDto
+    const datos = await this.resolverDto(tenantId, merged)
     const totales = calcularTotales(datos.items)
 
     return prisma.comprobante.update({
@@ -150,6 +232,7 @@ export class ComprobantesService {
         rnc: datos.rncComprador ?? '',
         razonSocial: datos.razonSocialComprador ?? '',
         ...(dto.tipoECF !== undefined && { tipoECF: dto.tipoECF }),
+        ...(datos.contactoId !== undefined && { contactoId: datos.contactoId }),
         datos: JSON.parse(JSON.stringify(datos)) as object,
       },
     })

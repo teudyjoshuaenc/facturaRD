@@ -64,6 +64,10 @@ model Tenant {
   estado          TenantEstado @default(ACTIVO)
   planActivo      Boolean      @default(true)
   trialEndsAt     DateTime?
+  // Config GHL para sincronización de contactos (Sprint 3).
+  // ghlAccessToken cifrado AES-256-GCM (formato iv:tag:data en base64).
+  ghlAccessToken  String?
+  ghlRncFieldKey  String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -76,8 +80,59 @@ model Tenant {
   secuencias           Secuencia[]
   comprobantesRecibidos ComprobanteRecibido[]
   ghlLocations         GhlLocation[]
+  productos            Producto[]
+  contactos            Contacto[]
 
   @@map("tenants")
+}
+
+model Contacto {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  tipo                    String   // CLIENTE|PROVEEDOR|CONSUMIDOR_FINAL
+  rnc                     String?
+  razonSocial             String
+  nombreComercial         String?
+  identificadorExtranjero String?
+  paisExtranjero          String?
+  direccion               String?
+  telefono                String?
+  email                   String?
+  origen                  String   @default("MANUAL") // MANUAL|GHL
+  ghlContactId            String?
+  rncValidado             Boolean  @default(false)
+  activo                  Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, rnc])
+  @@unique([tenantId, ghlContactId])
+  @@index([tenantId, tipo, activo])
+  @@map("contactos")
+}
+
+model Producto {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tipo             String   // "BIEN" | "SERVICIO"
+  nombre           String
+  descripcion      String?
+  precioUnitario   Decimal  @db.Decimal(18, 2)
+  tratamientoITBIS String   @default("I1") // I1|I2|I3|EXENTO
+  unidadMedida     String?  // codificación DGII
+  codigo           String?
+  categoria        String?
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, activo])
+  @@map("productos")
 }
 
 model User {
