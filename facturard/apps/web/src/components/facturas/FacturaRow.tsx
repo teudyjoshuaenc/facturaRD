@@ -27,32 +27,32 @@ interface Props {
 function getStatusBadge(estado: string): JSX.Element {
   if (estado === 'ACEPTADO') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50/70 px-2.5 py-1 text-ui-xs font-semibold text-green-700">
-        <CheckCircle2 size={12} className="text-green-600 flex-shrink-0" />
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(6,118,71,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#067647] font-sans">
+        <CheckCircle2 size={14} className="text-[#067647] flex-shrink-0" />
         Aceptado
       </span>
     )
   }
   if (estado === 'ACEPTADO_CONDICIONAL') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50/70 px-2.5 py-1 text-ui-xs font-semibold text-warning-700">
-        <AlertTriangle size={12} className="text-warning-600 flex-shrink-0" />
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(225,113,0,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#e17100] font-sans">
+        <AlertTriangle size={14} className="text-[#e17100] flex-shrink-0" />
         Aceptado c/obs.
       </span>
     )
   }
   if (estado === 'RECHAZADO') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50/70 px-2.5 py-1 text-ui-xs font-semibold text-red-700">
-        <XCircle size={12} className="text-red-600 flex-shrink-0" />
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#b42318] font-sans">
+        <XCircle size={14} className="text-[#b42318] flex-shrink-0" />
         Rechazado
       </span>
     )
   }
   // En proceso / Pendiente
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/70 px-2.5 py-1 text-ui-xs font-semibold text-blue-700">
-      <RefreshCw size={12} className="text-blue-600 animate-spin flex-shrink-0" />
+    <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#f1f5f9] px-[10px] py-[5px] text-[12px] font-normal text-[#64748b] font-sans">
+      <RefreshCw size={14} className="text-[#64748b] animate-spin flex-shrink-0" />
       En proceso
     </span>
   )
@@ -74,23 +74,25 @@ const FacturaRow = React.memo(function FacturaRow({
     : '—'
 
   return (
-    <tr className="border-b border-border-subtle last:border-0 hover:bg-neutral-50/40 transition-colors">
-      <td className="px-4 py-3.5 font-medium text-text-primary text-body-sm">{c.eNCF}</td>
-      <td className="px-4 py-3.5 text-text-primary text-body-sm font-medium line-clamp-1 max-w-[180px] mt-1.5" title={c.razonSocial}>
-        {c.razonSocial}
+    <tr className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px]">
+      <td className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle">{c.eNCF}</td>
+      <td className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left align-middle">
+        <div className="w-[120px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
+          {c.razonSocial}
+        </div>
       </td>
-      <td className="px-4 py-3.5 text-text-secondary text-body-sm font-semibold">{formattedRnc}</td>
-      <td className="px-4 py-3.5 text-text-primary text-body-sm font-bold">{formatCurrency(c.montoTotal)}</td>
-      <td className="px-4 py-3.5 text-text-secondary text-body-sm">{formatCurrency(itbis)}</td>
-      <td className="px-4 py-3.5 text-text-secondary text-body-sm">{formatDate(c.createdAt)}</td>
-      <td className="px-4 py-3.5">{getStatusBadge(c.estado)}</td>
-      <td className="px-4 py-3.5">
-        <div className="flex items-center gap-3.5">
+      <td className="px-[16px] py-[16px] w-[70px] min-w-[70px] text-left text-[#333] font-semibold text-[12px] align-middle">{formattedRnc}</td>
+      <td className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#333] font-semibold text-[12px] align-middle">{formatCurrency(c.montoTotal)}</td>
+      <td className="px-[16px] py-[16px] w-[81px] min-w-[81px] text-left text-[#64748b] font-normal text-[12px] align-middle">{formatCurrency(itbis)}</td>
+      <td className="px-[16px] py-[16px] w-[80px] min-w-[80px] text-left text-[#64748b] font-normal text-[12px] align-middle">{formatDate(c.createdAt)}</td>
+      <td className="px-[16px] py-[16px] w-[105.63px] min-w-[105.63px] text-left align-middle">{getStatusBadge(c.estado)}</td>
+      <td className="px-[16px] py-[16px] w-[112px] min-w-[112px] text-left align-middle">
+        <div className="flex items-center gap-[4px] w-[112px]">
           <button
             type="button"
             title="Ver detalle"
             onClick={() => onViewDetail(c.id)}
-            className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
           >
             <Eye size={16} />
           </button>
@@ -100,7 +102,7 @@ const FacturaRow = React.memo(function FacturaRow({
             title="Descargar PDF"
             disabled={downloadingId === c.id}
             onClick={() => onDownload(c)}
-            className="text-text-secondary hover:text-brand-500 disabled:opacity-50 transition-colors focus:outline-none"
+            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] disabled:opacity-50 transition-colors focus:outline-none flex-shrink-0"
           >
             {downloadingId === c.id ? <Spinner size={14} /> : <Download size={16} />}
           </button>
@@ -109,7 +111,7 @@ const FacturaRow = React.memo(function FacturaRow({
             type="button"
             title="Enviar correo"
             onClick={() => alert('Enviando factura por correo...')}
-            className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
           >
             <Send size={16} />
           </button>
@@ -118,7 +120,7 @@ const FacturaRow = React.memo(function FacturaRow({
             type="button"
             title="Anular factura"
             onClick={() => alert('Anulando comprobante fiscal...')}
-            className="text-red-500 hover:text-red-700 transition-colors focus:outline-none"
+            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#b42318] hover:bg-red-50 hover:text-red-700 transition-colors focus:outline-none flex-shrink-0"
           >
             <Ban size={16} />
           </button>

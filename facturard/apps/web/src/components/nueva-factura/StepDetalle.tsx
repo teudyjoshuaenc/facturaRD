@@ -359,7 +359,7 @@ export function StepDetalle({
               onClick={onBack} 
               className="w-[114px] h-[48px] rounded-[14px] border border-[#F5F5F5] text-black font-normal text-[16px] font-sans hover:bg-neutral-50"
             >
-              Back
+              Atrás
             </Button>
             <Button 
               variant="primary" 

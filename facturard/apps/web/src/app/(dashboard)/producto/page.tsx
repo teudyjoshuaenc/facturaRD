@@ -43,9 +43,9 @@ export default function ProductosPage(): JSX.Element {
   // Mock initial dataset matching Foto 2 to make it high-fidelity
   const extendedProductos = useMemo(() => {
     const list = [
-      { id: 'p1', nombre: 'Consultoría tecnológica', codigo: 'SRV-001 · Hora', tipo: 'SERVICIO', precio: 125400, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 42, estado: 'ACTIVO' },
-      { id: 'p2', nombre: 'Licencia de software anual', codigo: 'SRV-002 · Hora', tipo: 'BIEN', precio: 21271.19, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 18, estado: 'ACTIVO' },
-      { id: 'p3', nombre: 'Soporte técnico mensual', codigo: 'SRV-003 · Hora', tipo: 'SERVICIO', precio: 15000, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 21, estado: 'ACTIVO' },
+      { id: 'mock-p1', nombre: 'Consultoría tecnológica', codigo: 'SRV-001 · Hora', tipo: 'SERVICIO', precio: 125400, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 42, estado: 'ACTIVO' },
+      { id: 'mock-p2', nombre: 'Licencia de software anual', codigo: 'SRV-002 · Hora', tipo: 'BIEN', precio: 21271.19, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 18, estado: 'ACTIVO' },
+      { id: 'mock-p3', nombre: 'Soporte técnico mensual', codigo: 'SRV-003 · Hora', tipo: 'SERVICIO', precio: 15000, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 21, estado: 'ACTIVO' },
     ]
     // Append user-registered products
     allProductos.forEach((p) => {

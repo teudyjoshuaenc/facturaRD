@@ -33,6 +33,7 @@ export interface ComprobanteFormData {
   fechaNCFModificado: string
   codigoModificacion: '' | '1' | '2' | '3' | '4' | '5'
   items: ItemRow[]
+  emitirConComprobante?: boolean
 }
 
 function toDDMMYYYY(iso: string): string {
@@ -61,7 +62,8 @@ export function useNuevaFactura() {
       const res = await api.post<{ eNCF: string }>('/comprobantes', {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
-        ...(tiposConTipoIngresos.includes(data.tipoECF) && { tipoIngresos: data.tipoIngresos }),
+        emitirConComprobante: data.emitirConComprobante,
+        ...(data.emitirConComprobante !== false && tiposConTipoIngresos.includes(data.tipoECF) && { tipoIngresos: data.tipoIngresos }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
         ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
         ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),

@@ -165,29 +165,14 @@ export function StepCliente({
                 <span>Nuevo Cliente</span>
               </Button>
             </div>
-
-            {/* Section Title */}
-            <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
-              Frecuentes
-            </p>
-
-            {/* Cards grid */}
-            <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-2">
-              {frecuentes.map((c) => (
-                <ClienteCard
-                  key={c.id}
-                  contacto={c}
-                  selected={selectedCliente?.id === c.id}
-                  onClick={() => onSelectCliente(c)}
-                />
-              ))}
-            </div>
           </div>
         )}
 
         {/* Identificación del Documento */}
         <div className="flex flex-col gap-4 w-[904px]">
-          <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">IDENTIFICACIÓN DEL DOCUMENTO</h3>
+          <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
+            Identificación del Documento
+          </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 text-left select-none w-full">
             
@@ -343,6 +328,28 @@ export function StepCliente({
 
           </div>
         </div>
+
+        {/* Frecuentes */}
+        {!skipCliente && (
+          <div className="flex flex-col gap-4 w-[904px]">
+            {/* Section Title */}
+            <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
+              Frecuentes
+            </p>
+
+            {/* Cards grid */}
+            <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-2">
+              {frecuentes.map((c) => (
+                <ClienteCard
+                  key={c.id}
+                  contacto={c}
+                  selected={selectedCliente?.id === c.id}
+                  onClick={() => onSelectCliente(c)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Next button (full-width) */}
         {!isQuickMode && (

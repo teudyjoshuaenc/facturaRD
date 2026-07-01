@@ -43,14 +43,14 @@ export default function ContactosPage(): JSX.Element {
   // Mock initial dataset matching Foto 1 to make it high-fidelity
   const extendedContactos = useMemo(() => {
     const list = [
-      { id: 'c1', nombre: 'Distribuidora López SRL', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'c2', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'INACTIVO' },
-      { id: 'c3', nombre: 'Comercial Díaz & Asoc.', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'c4', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'c5', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'c6', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'c7', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'c8', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
+      { id: 'mock-c1', nombre: 'Distribuidora López SRL', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
+      { id: 'mock-c2', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'INACTIVO' },
+      { id: 'mock-c3', nombre: 'Comercial Díaz & Asoc.', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
+      { id: 'mock-c4', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
+      { id: 'mock-c5', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
+      { id: 'mock-c6', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
+      { id: 'mock-c7', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
+      { id: 'mock-c8', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
     ]
     // Append user-registered contacts
     contactos.forEach((c) => {

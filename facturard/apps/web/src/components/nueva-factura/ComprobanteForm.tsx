@@ -87,6 +87,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const [fechaLimite, setFechaLimite] = useState<string>('')
   const [items, setItems] = useState<ItemRow[]>([])
   const [notas, setNotas] = useState('')
+  const [emitirConComprobante, setEmitirConComprobante] = useState(true)
 
   // Popover states for quick mode
   const [showClientDropdown, setShowClientDropdown] = useState(false)
@@ -157,6 +158,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         fechaNCFModificado: '',
         codigoModificacion: '',
         items,
+        emitirConComprobante,
       })
     } catch (err) {
       const msg = getErrorMessage(err)
@@ -174,7 +176,10 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const isFechaLimiteRequired = tipoPago === 'CREDITO'
   const isFechaLimiteValid = !isFechaLimiteRequired || fechaLimite !== ''
 
-  const isClienteStepValid = (tipoECF === 'E43' || selectedCliente !== null) && isTipoIngresoValid && isFechaLimiteValid
+  const isClienteStepValid =
+    (!emitirConComprobante || tipoECF === 'E43' || selectedCliente !== null) &&
+    (!emitirConComprobante || isTipoIngresoValid) &&
+    isFechaLimiteValid
   const isDetalleStepValid = items.length > 0 && items.every(
     (i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0,
   )
@@ -182,13 +187,13 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] flex flex-col overflow-hidden pb-6">
+    <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
       {/* Main 2-column layout */}
       <div className={cn(
-        "w-full overflow-hidden",
+        "w-full",
         facturacionMode === 'estandar'
-          ? "flex flex-col lg:flex-row gap-[24px] lg:w-[1336px] lg:h-[948px] mx-auto"
-          : "grid grid-cols-1 gap-6 lg:grid-cols-3 h-full"
+          ? "flex flex-col lg:flex-row gap-[24px] lg:w-[1336px] lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
+          : "grid grid-cols-1 gap-6 lg:grid-cols-3 h-full overflow-hidden"
       )}>
         {/* Left Column */}
         {facturacionMode === 'estandar' ? (
@@ -458,7 +463,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           <Card className={cn(
             "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300",
             facturacionMode === 'estandar'
-              ? cn("w-[360px] p-5 gap-4 shadow-sm", selectedCliente ? "h-[472px]" : "h-[380px]")
+              ? "w-[360px] p-5 gap-4 shadow-sm h-auto min-h-[380px] lg:self-start"
               : "flex-1 p-6 gap-5 shadow-sm overflow-y-auto h-full"
           )}>
             <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-3 select-none">
@@ -476,6 +481,18 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 <span className="truncate" title={TIPO_ECF_LABELS[tipoECF]}>
                   {TIPO_ECF_LABELS[tipoECF].split(' - ')[0] + ' - ' + TIPO_ECF_LABELS[tipoECF].split(' - ')[1]?.replace('Factura de Crédito Fiscal', 'Crédito Fiscal').replace('Factura de Consumo', 'Consumidor Final').replace('Nota de Débito', 'Nota de Débito').replace('Nota de Crédito', 'Nota de Crédito').replace('Comprobante de Compras', 'Compras').replace('Gastos Menores', 'Gastos Menores').replace('Regímenes Especiales', 'Régimen Especial').replace('Gubernamental', 'Gubernamental').replace('Exportaciones', 'Exportación').replace('Pagos al Exterior', 'Pagos al Exterior')}
                 </span>
+              </div>
+              <div className="flex items-center gap-2 select-none">
+                <input
+                  id="emitirConComprobante"
+                  type="checkbox"
+                  checked={emitirConComprobante}
+                  onChange={(e) => setEmitirConComprobante(e.target.checked)}
+                  className="h-3 w-3 rounded border-neutral-300 text-[#0379D5] focus:ring-[#0379D5] cursor-pointer flex-shrink-0"
+                />
+                <label htmlFor="emitirConComprobante" className="text-[13px] text-[#64748B] cursor-pointer select-none truncate">
+                  Comprobante fiscal
+                </label>
               </div>
             </div>
 
@@ -544,13 +561,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               </div>
             )}
 
+
+
             <button
               type="button"
-              disabled={facturacionMode === 'estandar' ? (currentStep !== 3 || !isEmitEnabled || submitting) : (!isEmitEnabled || submitting)}
+              disabled={!isEmitEnabled || submitting}
               onClick={handleSubmit}
               className={cn(
-                "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-normal leading-[24px] font-sans flex items-center justify-center transition-all duration-200 mt-2 select-none",
-                (facturacionMode === 'estandar' ? (currentStep !== 3 || !isEmitEnabled || submitting) : (!isEmitEnabled || submitting))
+                "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-normal leading-[24px] font-sans flex items-center justify-center transition-all duration-200 mt-1 select-none",
+                (!isEmitEnabled || submitting)
                   ? "opacity-20 cursor-not-allowed"
                   : "hover:bg-[#0379D5]/90 cursor-pointer"
               )}

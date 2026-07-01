@@ -241,7 +241,7 @@ export function StepResumen({
       {/* Back button (full-width) */}
       <div className="flex justify-center pt-2">
         <Button variant="secondary" size="lg" onClick={onBack} className="w-full h-12 text-body-sm font-semibold bg-white border border-neutral-200 hover:bg-neutral-50 transition-colors">
-          Back
+          Atrás
         </Button>
       </div>
     </div>

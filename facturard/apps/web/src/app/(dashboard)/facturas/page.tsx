@@ -48,28 +48,31 @@ export default function FacturasPage(): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       {/* Header row: count + actions */}
-      <div className="flex items-center justify-between">
-        <p className="text-ui-default font-semibold text-text-secondary">
-          {paginationData ? `${paginationData.total} comprobantes` : `${comprobantes.length} comprobantes`} · {comprobantes.length} visibles
-        </p>
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between select-none">
+        <div className="flex flex-col items-start font-sans">
+          <h1 className="text-[24px] font-semibold leading-[36px] text-[#333333]">
+            Comprobantes
+          </h1>
+          <p className="text-[14px] font-normal leading-[21px] text-[#64748b] mt-0.5">
+            {paginationData ? `${paginationData.total} comprobantes` : `${comprobantes.length} comprobantes`} · {comprobantes.length} visibles
+          </p>
+        </div>
+        <div className="flex items-center gap-[8px]">
           <Button
             variant="secondary"
-            size="md"
             onClick={() => window.location.reload()}
-            className="h-10 w-10 p-0 flex items-center justify-center border border-neutral-200 hover:bg-neutral-50"
+            className="h-[44px] w-[44px] p-0 flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] transition-colors"
             title="Refrescar"
           >
-            <RotateCw size={16} className="text-text-secondary" />
+            <RotateCw size={16} />
           </Button>
           <Button
             variant="secondary"
-            size="md"
-            className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
+            className="h-[44px] px-[16px] flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] font-normal text-[14px] transition-colors font-sans gap-2"
             title="Exportar comprobantes"
           >
-            <Download size={16} className="mr-1.5" />
-            Exportar
+            <Download size={16} className="text-[#64748b]" />
+            <span>Exportar</span>
           </Button>
         </div>
       </div>
@@ -91,7 +94,7 @@ export default function FacturasPage(): JSX.Element {
         onMaxAmountChange={setMaxAmount}
       />
 
-      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-[14px] border border-[#e2e8f0] bg-white shadow-sm overflow-hidden flex flex-col">
         {isLoading ? (
           <div className="flex items-center justify-center p-12">
             <Spinner size={28} />
@@ -102,17 +105,17 @@ export default function FacturasPage(): JSX.Element {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-body-sm">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
-                  <th className="px-4 py-3 font-semibold">e-NCF</th>
-                  <th className="px-4 py-3 font-semibold">Cliente</th>
-                  <th className="px-4 py-3 font-semibold">RNC</th>
-                  <th className="px-4 py-3 font-semibold">Total</th>
-                  <th className="px-4 py-3 font-semibold">ITBIS</th>
-                  <th className="px-4 py-3 font-semibold">Fecha</th>
-                  <th className="px-4 py-3 font-semibold">Estado DGII</th>
-                  <th className="px-4 py-3 font-semibold">Acciones</th>
+                <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px]">
+                  <th className="px-[16px] py-[10px] w-[90px] min-w-[90px] font-normal">e-NCF</th>
+                  <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">Cliente</th>
+                  <th className="px-[16px] py-[10px] w-[70px] min-w-[70px] font-normal">RNC</th>
+                  <th className="px-[16px] py-[10px] w-[85px] min-w-[85px] font-normal">Total</th>
+                  <th className="px-[16px] py-[10px] w-[81px] min-w-[81px] font-normal">ITBIS</th>
+                  <th className="px-[16px] py-[10px] w-[80px] min-w-[80px] font-normal">Fecha</th>
+                  <th className="px-[16px] py-[10px] w-[105.63px] min-w-[105.63px] font-normal">Estado DGII</th>
+                  <th className="px-[16px] py-[10px] w-[112px] min-w-[112px] font-normal">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,28 +134,28 @@ export default function FacturasPage(): JSX.Element {
         )}
 
         {/* Custom Pagination styled exactly like Figma */}
-        <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
-          <p className="text-ui-sm text-text-secondary">
-            {comprobantes.length} resultados
+        <div className="border-[#f1f5f9] border-t flex h-[57px] items-center justify-between px-[20px] bg-white select-none">
+          <p className="text-[13px] font-sans font-normal text-[#64748b]">
+            {paginationData ? `${paginationData.total} resultados` : `${comprobantes.length} resultados`}
           </p>
           
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               disabled={page <= 1}
               onClick={() => setPage(page - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+              className="flex h-8 w-8 items-center justify-center text-[#64748b] hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none rounded-[4px]"
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-ui-sm font-bold text-white shadow-sm shadow-brand-500/10">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#0379d5] text-[13px] font-normal text-white font-sans">
               {page}
             </span>
             <button
               type="button"
               disabled={paginationData ? page >= paginationData.totalPages : true}
               onClick={() => setPage(page + 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+              className="flex h-8 w-8 items-center justify-center text-[#64748b] hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none rounded-[4px]"
             >
               <ChevronRight size={16} />
             </button>

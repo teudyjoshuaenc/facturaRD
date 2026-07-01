@@ -109,7 +109,7 @@ export function useComprobantes() {
     maxAmount
 
   const { data, isLoading } = useQuery({
-    queryKey: ['comprobantes-lista', page, filterActive],
+    queryKey: ['comprobantes-lista', filterActive ? 'filtered' : page],
     queryFn: () =>
       api
         .get<PaginatedResponse<Comprobante>>('/comprobantes', {
@@ -236,6 +236,31 @@ export function useComprobantes() {
     setPage(1)
   }, [])
 
+  const handleTipoFilterChange = useCallback((t: string) => {
+    setTipoFilter(t)
+    setPage(1)
+  }, [])
+
+  const handleStartDateChange = useCallback((d: string) => {
+    setStartDate(d)
+    setPage(1)
+  }, [])
+
+  const handleEndDateChange = useCallback((d: string) => {
+    setEndDate(d)
+    setPage(1)
+  }, [])
+
+  const handleMinAmountChange = useCallback((a: string) => {
+    setMinAmount(a)
+    setPage(1)
+  }, [])
+
+  const handleMaxAmountChange = useCallback((a: string) => {
+    setMaxAmount(a)
+    setPage(1)
+  }, [])
+
   return {
     comprobantes: paginatedComprobantes,
     paginationData: customPaginationData,
@@ -247,15 +272,15 @@ export function useComprobantes() {
     search,
     setSearch: handleSearchChange,
     tipoFilter,
-    setTipoFilter,
+    setTipoFilter: handleTipoFilterChange,
     startDate,
-    setStartDate,
+    setStartDate: handleStartDateChange,
     endDate,
-    setEndDate,
+    setEndDate: handleEndDateChange,
     minAmount,
-    setMinAmount,
+    setMinAmount: handleMinAmountChange,
     maxAmount,
-    setMaxAmount,
+    setMaxAmount: handleMaxAmountChange,
     selectedId,
     setSelectedId,
     detail,
