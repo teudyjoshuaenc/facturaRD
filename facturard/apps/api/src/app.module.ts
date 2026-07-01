@@ -16,6 +16,8 @@ import { ProductosModule } from './modules/productos/productos.module'
 import { ContactosModule } from './modules/contactos/contactos.module'
 import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module'
 import { ComprasModule } from './modules/compras/compras.module'
+import { ReportesModule } from './modules/reportes/reportes.module'
+import { CumplimientoModule } from './modules/cumplimiento/cumplimiento.module'
 import appConfig from './config/app.config'
 import databaseConfig from './config/database.config'
 import redisConfig from './config/redis.config'
@@ -56,6 +58,8 @@ import jwtConfig from './config/jwt.config'
     ContactosModule,
     CotizacionesModule,
     ComprasModule,
+    ReportesModule,
+    CumplimientoModule,
   ],
 })
 export class AppModule {}
