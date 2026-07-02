@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma, UserRole } from '@facturard/database'
 import type { Tenant } from '@facturard/database'
 import type { CreateTenantDto } from './dto/create-tenant.dto'
+import type { BrandingDto } from './dto/branding.dto'
 
 @Injectable()
 export class TenantsService {
@@ -15,6 +16,17 @@ export class TenantsService {
     }
     const tenant = await prisma.tenant.findUnique({ where: { id: callerTenantId } })
     return tenant ? [tenant] : []
+  }
+
+  async updateBranding(tenantId: string, dto: BrandingDto): Promise<Tenant> {
+    return prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        ...(dto.logoUrl !== undefined && { logoUrl: dto.logoUrl }),
+        ...(dto.colorPrimario !== undefined && { colorPrimario: dto.colorPrimario }),
+        ...(dto.colorSecundario !== undefined && { colorSecundario: dto.colorSecundario }),
+      },
+    })
   }
 
   async findOne(id: string, callerTenantId: string, callerRole: string): Promise<Tenant> {

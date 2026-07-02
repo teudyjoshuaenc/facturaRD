@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import { createWriteStream, mkdirSync } from 'fs';
+import { createWriteStream, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 
 export interface EcfItem {
@@ -49,6 +49,47 @@ export interface EcfPdfInput {
   itbisTotal?: number;
   montoExentoTotal?: number;
   montoTotal: number;
+
+  // Branding por tenant (Sprint 6). Si faltan, se usan los defaults actuales.
+  /** URL http(s) o ruta local del logo. Si falla la carga, se omite (nunca lanza). */
+  logoUrl?: string;
+  /** Color hex (#RRGGBB) para acentos: nombre, tipo y total. */
+  colorPrimario?: string;
+  /** Color hex (#RRGGBB) para el fondo de la cabecera de la tabla. */
+  colorSecundario?: string;
+}
+
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+const MAX_LOGO_BYTES = 2 * 1024 * 1024; // 2 MB
+const LOGO_TIMEOUT_MS = 5000;
+
+/**
+ * Carga el logo desde URL http(s) (fetch con timeout + tope de tamaño) o ruta
+ * local. NUNCA lanza: ante cualquier error devuelve undefined y el PDF se genera
+ * sin logo.
+ */
+async function loadLogo(src: string | undefined): Promise<Buffer | undefined> {
+  if (!src) return undefined;
+  try {
+    if (/^https?:\/\//i.test(src)) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), LOGO_TIMEOUT_MS);
+      try {
+        const res = await fetch(src, { signal: controller.signal });
+        if (!res.ok) return undefined;
+        const declared = res.headers.get('content-length');
+        if (declared && Number(declared) > MAX_LOGO_BYTES) return undefined;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.byteLength > MAX_LOGO_BYTES) return undefined;
+        return buf;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return readFileSync(src);
+  } catch {
+    return undefined;
+  }
 }
 
 const TIPO_LABELS: Record<string, string> = {
@@ -141,6 +182,11 @@ export async function generarRepresentacionImpresa(
 ): Promise<void> {
   mkdirSync(dirname(outputPath), { recursive: true });
 
+  // Branding: sólo se aplican colores hex válidos; cualquier otra cosa cae al default.
+  const ACCENT = ecf.colorPrimario && HEX_RE.test(ecf.colorPrimario) ? ecf.colorPrimario : TEXT;
+  const HEADER_BG = ecf.colorSecundario && HEX_RE.test(ecf.colorSecundario) ? ecf.colorSecundario : GRAY_HEADER;
+  const logoBuffer = await loadLogo(ecf.logoUrl);
+
   const qrContent = buildQrUrl(ecf);
 
   // QR con nivel de corrección M según spec DGII.
@@ -197,7 +243,7 @@ export async function generarRepresentacionImpresa(
     const nombreMostrar = ecf.nombreComercial ?? ecf.nombreEmisor;
 
     // Nombre comercial — bold 14pt, may wrap; measure first to advance curY correctly
-    doc.font('Helvetica-Bold').fontSize(14).fillColor(TEXT);
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(ACCENT);
     const nombreH = doc.heightOfString(nombreMostrar, { width: LEFT_W });
     doc.text(nombreMostrar, margin, curY, { width: LEFT_W });
     curY += nombreH + 4;
@@ -225,14 +271,27 @@ export async function generarRepresentacionImpresa(
        .text(`Fecha Emisión: ${ecf.fechaEmision}`, margin, curY, { width: LEFT_W });
     const leftEndY = curY + 13;
 
-    // ── HEADER RIGHT: Tipo + e-NCF ────────────────────────────────────────────
+    // ── HEADER RIGHT: (Logo) + Tipo + e-NCF ───────────────────────────────────
     const tipo     = tipoLabel(ecf.tipoECF);
     const tipoCode = ecf.tipoECF.replace(/^[Ee]/, '');
 
-    doc.font('Helvetica-Bold').fontSize(12).fillColor(TEXT);
+    // Logo opcional arriba a la derecha; el tipo baja para no solaparse.
+    let tipoTopY = margin;
+    if (logoBuffer) {
+      const LOGO_W = 90;
+      const LOGO_H = 40;
+      try {
+        doc.image(logoBuffer, RIGHT_X + RIGHT_W - LOGO_W, margin, { fit: [LOGO_W, LOGO_H], align: 'right' });
+        tipoTopY = margin + LOGO_H + 6;
+      } catch {
+        // imagen inválida → se ignora, se sigue sin logo
+      }
+    }
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(ACCENT);
     const tipoH = doc.heightOfString(tipo, { width: RIGHT_W });
-    doc.text(tipo, RIGHT_X, margin, { width: RIGHT_W, align: 'right' });
-    let rY = margin + tipoH + 5;
+    doc.text(tipo, RIGHT_X, tipoTopY, { width: RIGHT_W, align: 'right' });
+    let rY = tipoTopY + tipoH + 5;
 
     doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
        .text(`e-NCF: ${ecf.eNCF}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
@@ -290,7 +349,7 @@ export async function generarRepresentacionImpresa(
     // ── ITEMS TABLE ───────────────────────────────────────────────────────────
     const ROW_H = 18;
 
-    doc.rect(margin, curY, contentW, ROW_H).fill(GRAY_HEADER);
+    doc.rect(margin, curY, contentW, ROW_H).fill(HEADER_BG);
     doc.font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT);
     doc.text('Cantidad',     xQty   + 2, curY + 5, { width: COL_QTY - 4,   align: 'right' });
     doc.text('Descripción',  xDesc  + 4, curY + 5, { width: COL_DESC - 8 });
@@ -346,9 +405,10 @@ export async function generarRepresentacionImpresa(
     const drawTotalLine = (label: string, value: number, bold = false) => {
       const font = bold ? 'Helvetica-Bold' : 'Helvetica';
       const size = bold ? 10 : 9;
-      doc.font(font).fontSize(size).fillColor(bold ? TEXT : MUTED)
+      const color = bold ? ACCENT : MUTED;
+      doc.font(font).fontSize(size).fillColor(color)
          .text(label + ':', TOTALS_X, totY, { width: LABEL_COL });
-      doc.font(font).fontSize(size).fillColor(TEXT)
+      doc.font(font).fontSize(size).fillColor(bold ? ACCENT : TEXT)
          .text(fmt(value), TOTALS_X + LABEL_COL, totY, { width: VALUE_COL, align: 'right' });
       totY += bold ? 16 : 14;
     };

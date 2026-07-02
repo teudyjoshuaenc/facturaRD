@@ -20,6 +20,11 @@ export type {
   AuditLog,
   Secuencia,
   GhlLocation,
+  Producto,
+  Contacto,
+  Cotizacion,
+  CotizacionItem,
+  CompraRecibida,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common'
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
+import { Controller, Get, Post, Body, Param, UseGuards, ParseArrayPipe } from '@nestjs/common'
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger'
 import { SecuenciasService } from './secuencias.service'
 import { InicializarSecuenciasDto } from './dto/inicializar-secuencia.dto'
+import { SincronizarSecuenciaItemDto } from './dto/sincronizar-secuencias.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { SameTenantGuard } from '../../common/guards/same-tenant.guard'
@@ -55,5 +56,15 @@ export class SecuenciasController {
   @ApiOperation({ summary: 'Inicializa todos los tipos de e-CF para el tenant (SUPER_ADMIN)' })
   inicializarTodos(@CurrentUser() user: JwtPayload) {
     return this.service.inicializarTodosLosTipos(user.tenantId)
+  }
+
+  @Post('sincronizar')
+  @ApiOperation({ summary: 'Sincroniza últimas secuencias emitidas (migración de cliente; fix error 1209)' })
+  @ApiBody({ type: [SincronizarSecuenciaItemDto] })
+  sincronizar(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ParseArrayPipe({ items: SincronizarSecuenciaItemDto })) body: SincronizarSecuenciaItemDto[],
+  ) {
+    return this.service.sincronizar(user.tenantId, body)
   }
 }

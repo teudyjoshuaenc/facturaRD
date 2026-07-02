@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import type { Response } from 'express'
 import { createReadStream, existsSync } from 'fs'
 import { ComprobantesService } from './comprobantes.service'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
+import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
+import { CrearNotaDto } from './dto/crear-nota.dto'
 import { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
@@ -20,9 +22,34 @@ export class ComprobantesController {
   constructor(private readonly service: ComprobantesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crea un comprobante y lo encola para envío a la DGII' })
+  @ApiOperation({
+    summary:
+      'Crea un comprobante. emitir=true (default) lo encola para la DGII; emitir=false lo guarda como borrador (DRAFT).',
+  })
   crear(@CurrentTenant() tenantId: string, @Body() dto: CreateComprobanteDto) {
     return this.service.crear(tenantId, dto)
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Edita un borrador (DRAFT) y recalcula totales. 409 si ya fue emitido.' })
+  actualizar(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateComprobanteDto,
+  ) {
+    return this.service.actualizarDraft(tenantId, id, dto)
+  }
+
+  @Post(':id/emitir')
+  @ApiOperation({ summary: 'Emite un borrador: asigna e-NCF, encola y envía a la DGII. 409 si no es DRAFT.' })
+  emitir(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.emitir(tenantId, id)
+  }
+
+  @Post(':id/nota')
+  @ApiOperation({ summary: 'Emite una nota de crédito (E34) o débito (E33) sobre un comprobante ACEPTADO' })
+  crearNota(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: CrearNotaDto) {
+    return this.service.crearNota(tenantId, id, dto)
   }
 
   @Get()

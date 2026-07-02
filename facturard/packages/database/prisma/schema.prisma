@@ -42,6 +42,7 @@ enum TipoECF {
 }
 
 enum ComprobanteEstado {
+  DRAFT
   PENDIENTE
   EN_COLA
   ENVIANDO
@@ -63,6 +64,14 @@ model Tenant {
   estado          TenantEstado @default(ACTIVO)
   planActivo      Boolean      @default(true)
   trialEndsAt     DateTime?
+  // Config GHL para sincronización de contactos (Sprint 3).
+  // ghlAccessToken cifrado AES-256-GCM (formato iv:tag:data en base64).
+  ghlAccessToken  String?
+  ghlRncFieldKey  String?
+  // Branding para la representación impresa (Sprint 6).
+  logoUrl         String?
+  colorPrimario   String?
+  colorSecundario String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -75,8 +84,136 @@ model Tenant {
   secuencias           Secuencia[]
   comprobantesRecibidos ComprobanteRecibido[]
   ghlLocations         GhlLocation[]
+  productos            Producto[]
+  contactos            Contacto[]
+  cotizaciones         Cotizacion[]
+  comprasRecibidas     CompraRecibida[]
 
   @@map("tenants")
+}
+
+model CompraRecibida {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  contactoId           String?   // proveedor (Contacto tipo PROVEEDOR)
+  tipo                 String    // "E41" | "GASTO_MENOR" | "SIN_COMPROBANTE" | "RECIBIDO_ECF"
+  ncf                  String?   // NCF/e-NCF del proveedor
+  rncProveedor         String?
+  razonSocialProveedor String?
+  fechaComprobante     DateTime?
+  subtotal             Decimal   @db.Decimal(18, 2)
+  itbis                Decimal   @db.Decimal(18, 2)
+  itbisRetenido        Decimal   @db.Decimal(18, 2) @default(0)
+  total                Decimal   @db.Decimal(18, 2)
+  estadoAprobacion     String?   // e-CF recibido: APROBADO|RECHAZADO|PENDIENTE
+  origen               String    @default("MANUAL") // MANUAL|RECEPCION_DGII
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, fechaComprobante])
+  @@map("compras_recibidas")
+}
+
+model Cotizacion {
+  id            String   @id @default(uuid())
+  tenantId      String
+  folio         String   // interno, p.ej. COT-000123 (NO es e-NCF, nunca va a la DGII)
+  contactoId    String?
+  estado        String   @default("BORRADOR") // BORRADOR|ENVIADA|APROBADA|RECHAZADA|VENCIDA|CONVERTIDA
+  fechaVigencia DateTime?
+  subtotal      Decimal  @db.Decimal(18, 2)
+  itbis         Decimal  @db.Decimal(18, 2)
+  total         Decimal  @db.Decimal(18, 2)
+  comprobanteId String?  // seteado al convertir
+  notas         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  items  CotizacionItem[]
+
+  @@unique([tenantId, folio])
+  @@index([tenantId, estado])
+  @@map("cotizaciones")
+}
+
+model CotizacionItem {
+  id               String   @id @default(uuid())
+  cotizacionId     String
+  productoId       String?
+  nombre           String
+  descripcion      String?
+  cantidad             Decimal @db.Decimal(18, 3)
+  precioUnitario       Decimal @db.Decimal(18, 2)
+  tratamientoITBIS     String
+  indicadorBienoServicio String @default("2") // "1"=Bien, "2"=Servicio
+  unidadMedida         String?
+
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_items")
+}
+
+// Contador atómico de folios por tenant (mismo patrón de incremento que las
+// secuencias e-NCF). El INSERT ... ON CONFLICT DO NOTHING crea la fila sin
+// condición de carrera y el UPDATE ... += 1 serializa por lock de fila.
+model CotizacionFolio {
+  tenantId    String   @id
+  ultimoFolio Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@map("cotizacion_folios")
+}
+
+model Contacto {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  tipo                    String   // CLIENTE|PROVEEDOR|CONSUMIDOR_FINAL
+  rnc                     String?
+  razonSocial             String
+  nombreComercial         String?
+  identificadorExtranjero String?
+  paisExtranjero          String?
+  direccion               String?
+  telefono                String?
+  email                   String?
+  origen                  String   @default("MANUAL") // MANUAL|GHL
+  ghlContactId            String?
+  rncValidado             Boolean  @default(false)
+  activo                  Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, rnc])
+  @@unique([tenantId, ghlContactId])
+  @@index([tenantId, tipo, activo])
+  @@map("contactos")
+}
+
+model Producto {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tipo             String   // "BIEN" | "SERVICIO"
+  nombre           String
+  descripcion      String?
+  precioUnitario   Decimal  @db.Decimal(18, 2)
+  tratamientoITBIS String   @default("I1") // I1|I2|I3|EXENTO
+  unidadMedida     String?  // codificación DGII
+  codigo           String?
+  categoria        String?
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, activo])
+  @@map("productos")
 }
 
 model User {
@@ -132,7 +269,10 @@ model Certificado {
 model Comprobante {
   id           String            @id @default(uuid())
   tenantId     String
-  eNCF         String
+  // eNCF es nullable: los borradores (estado DRAFT) aún no consumen secuencia.
+  // El e-NCF se asigna atómicamente sólo al emitir. NULLs son distintos en el
+  // índice único de Postgres, así que múltiples borradores conviven sin colisión.
+  eNCF         String?
   tipoECF      TipoECF
   estado       ComprobanteEstado @default(PENDIENTE)
   xmlFirmado   String?
@@ -144,6 +284,11 @@ model Comprobante {
   pdfUrl       String?
   intentos     Int               @default(0)
   datos        Json?             // DTO original para el worker
+  // Referencias (nullable). Las relaciones a Contacto/Cotizacion se agregan en
+  // sprints posteriores; por ahora se persisten como columnas sueltas.
+  contactoId              String?
+  cotizacionId            String?
+  comprobanteReferenciaId String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 

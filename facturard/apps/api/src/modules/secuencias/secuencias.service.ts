@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common'
 import { prisma, TipoECF } from '@facturard/database'
 import type { Secuencia } from '@facturard/database'
@@ -56,6 +57,48 @@ export class SecuenciasService {
       })
 
       return formatENCF(tipoECF, updated.ultimaSecuencia)
+    })
+  }
+
+  /**
+   * Sincroniza las secuencias de un cliente que migra desde otro emisor, para
+   * que FacturaRD continúe numerando desde last+1 y no reincida en la secuencia
+   * (fix error DGII [1209] "secuencia ya utilizada").
+   *
+   * Guard: nunca se retrocede una secuencia (nuevo valor >= almacenado) → 409.
+   * Atómico dentro de una $transaction (mismo patrón que siguienteENCF).
+   */
+  async sincronizar(
+    tenantId: string,
+    entries: { tipoECF: TipoECF; ultimaSecuencia: number }[],
+  ): Promise<Secuencia[]> {
+    return prisma.$transaction(async (tx) => {
+      const results: Secuencia[] = []
+      for (const { tipoECF, ultimaSecuencia } of entries) {
+        const seq = await tx.secuencia.findUnique({
+          where: { tenantId_tipoECF: { tenantId, tipoECF } },
+        })
+
+        if (seq && ultimaSecuencia < seq.ultimaSecuencia) {
+          throw new ConflictException(
+            `No se puede retroceder la secuencia ${tipoECF}: valor almacenado ${seq.ultimaSecuencia}, solicitado ${ultimaSecuencia}`,
+          )
+        }
+
+        const upserted = await tx.secuencia.upsert({
+          where: { tenantId_tipoECF: { tenantId, tipoECF } },
+          create: {
+            tenantId,
+            tipoECF,
+            prefijo: `E${TIPO_PREFIJO[tipoECF]}`,
+            ultimaSecuencia,
+            activo: true,
+          },
+          update: { ultimaSecuencia },
+        })
+        results.push(upserted)
+      }
+      return results
     })
   }
 

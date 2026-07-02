@@ -93,6 +93,21 @@ APP_URL=http://localhost:3000
 - ✅ Tenants — SUPER_ADMIN ve todos, ADMIN ve solo el suyo
 - ✅ Certificados — P12 cifrado AES-256-GCM, nunca en plano
 - ✅ Comprobantes — crear → BullMQ → worker → DGII → DB
+- ✅ Comprobantes — borradores DRAFT (crear emitir=false), PATCH draft, POST :id/emitir (Sprint 1)
+- ✅ Certificados — firma multi-tenant verificada (cada tenant firma con su P12, sin fallback DMAIA)
+- ✅ Test harness e2e — `pnpm --filter @facturard/api test:e2e` (Postgres efímero 5433, cola BullMQ mockeada)
+- ✅ Productos — catálogo CRUD + soft delete; snapshot de producto en items al emitir (Sprint 2)
+- ✅ Contactos — CRUD + soft delete, validación RNC vs DGII, upsert por RNC; snapshot comprador al emitir (Sprint 3)
+- ✅ Contactos GHL — sincronización (GET services.leadconnectorhq.com/contacts), token cifrado + ghlRncFieldKey por tenant (Sprint 3)
+- ✅ Cotizaciones — folio interno atómico (COT-000001), items snapshot (incl. indicadorBienoServicio), estados, convertir→comprobante reutilizando ComprobantesService.crear (Sprint 4)
+- ✅ Notas CD — POST /comprobantes/:id/nota (E33/E34) sobre fuente ACEPTADO, hereda comprador + referencia fiscal, reutiliza pipeline (Sprint 5)
+- ✅ Branding — logoUrl/colorPrimario/colorSecundario en Tenant, PDF con logo (fetch 5s/2MB, tolerante) y colores; PATCH /tenants/branding valida hex (Sprint 6)
+- ✅ Compras — CompraRecibida CRUD (E41/GASTO_MENOR/SIN_COMPROBANTE), bridge receptor /fe/recepcion → CompraRecibida (RECEPCION_DGII, aditivo, no cambia el ARECF), aprobación comercial reusando el motor ACECF del ecf-engine (Sprint 7)
+- ✅ Reportes DGII — GET /reportes/607|606|608 (json|txt). TXT oficial COMPLETO: delimitado por pipe, encabezado `RNC|codigo|AAAAMM|cantidad` + detalle en orden exacto (606: 23 campos, layout feb-2026; 607: 23 campos, layout dic-2025; 608: 3 campos, catálogo anulación verificado). Nombre archivo `DGII_F_{fmt}_{RNC}_{AAAAMM}.TXT`, modo "en cero", suma decimal-safe, catálogos centrales (`reportes.catalogo.ts`). Campos no capturados van VACÍOS (no se inventan). (Sprint 8)
+  - **607 Facturas de Consumo (E32 < RD$250,000):** NO van al detalle del TXT; se reportan como RESUMEN AGREGADO (cantidad + monto) que se carga en la OFV. Método `resumenFacturasConsumo()` lo calcula aparte. E32 ≥ 250,000 sí van al detalle.
+  - **608 con e-CF:** los e-CF anulados se gestionan por NOTA DE CRÉDITO / cancelación electrónica que la DGII recibe directamente, NO por el 608 (que aplica sobre todo a comprobantes físicos serie B). Para tenants 100% e-CF el 608 normalmente será en cero. El generador mapea la anulación por nota (codigoModificacion=1) al catálogo (código 4 = Corrección de la información; motivos e-CF realistas: 4,5,6,7).
+- ✅ Cumplimiento — GET /cumplimiento (certificado/secuencias/rechazos/reportes + indicadorGeneral OK/WARN/CRITICAL, flag bloqueaEmision) (Sprint 9)
+- ✅ Secuencias sync — POST /secuencias/sincronizar (guard no-retroceso 409, atómico; fix error 1209) (Sprint 10)
 - ✅ Secuencias — asignación automática con SELECT FOR UPDATE; eNCF E310000000001 ✓
 - ✅ API Keys — hash SHA-256, prefijo `frd_`
 - ✅ Webhooks — HMAC auto-generado
@@ -109,10 +124,15 @@ APP_URL=http://localhost:3000
 2. ~~Refresh token — `POST /auth/refresh`~~ ✅ Rotación + jti + SHA-256
 3. ~~Forgot/reset password~~ ✅ + Sendgrid (poner SENDGRID_API_KEY real en prod)
 4. ~~Webhooks GHL — receiver + salientes HMAC-SHA256~~ ✅ Receiver + sender + integrado en worker
-5. Suscripciones — Azul/CardNet
-6. Reportes DGII — 606, 607, 608
+5. ~~Reportes DGII — 606, 607, 608~~ ✅ GET /reportes/607|606|608 (json|txt) — Sprint 8
+6. Suscripciones — Azul/CardNet
 7. Frontend Next.js 16.2
 8. Cambiar ENV a producción cuando certifiquen
+
+**Backend roadmap (BACKEND_ROADMAP.md) COMPLETO — Sprints 1-10 + TXT oficial reportes.** 62 tests e2e + 112 ecf-engine, build 0.
+TXT reportes 606/607/608 implementado contra los instructivos oficiales DGII (606 feb-2026,
+607 dic-2025, 608 catálogo verificado). Los campos que aún no capturamos por comprobante/compra
+van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos por defecto.
 
 ---
 

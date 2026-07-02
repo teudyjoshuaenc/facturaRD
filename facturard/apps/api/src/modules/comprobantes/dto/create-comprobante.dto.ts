@@ -4,7 +4,9 @@ import {
   IsNumber,
   IsOptional,
   IsArray,
+  IsBoolean,
   ValidateNested,
+  ValidateIf,
   Min,
   IsIn,
   Matches,
@@ -19,17 +21,27 @@ export class CreateItemDto {
   @Min(1)
   numeroLinea!: number
 
-  @ApiProperty({ enum: ['I1', 'I2', 'I3', 'I4', 'E'], example: 'I1' })
-  @IsIn(['I1', 'I2', 'I3', 'I4', 'E'])
-  indicadorFacturacion!: string
-
-  @ApiProperty({ example: 'Servicio de facturación electrónica' })
+  @ApiPropertyOptional({ description: 'Si se envía, el servidor copia nombre/precio/ITBIS/unidad del producto (snapshot).' })
   @IsString()
-  nombreItem!: string
+  @IsOptional()
+  productoId?: string
 
-  @ApiProperty({ enum: [1, 2], description: '1=Bien, 2=Servicio' })
+  // Los campos crudos son obligatorios SÓLO en líneas ad-hoc (sin productoId);
+  // con productoId se toman del catálogo salvo override explícito.
+  @ApiPropertyOptional({ enum: ['I1', 'I2', 'I3', 'I4', 'E'], example: 'I1' })
+  @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
+  @IsIn(['I1', 'I2', 'I3', 'I4', 'E'])
+  indicadorFacturacion?: string
+
+  @ApiPropertyOptional({ example: 'Servicio de facturación electrónica' })
+  @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
+  @IsString()
+  nombreItem?: string
+
+  @ApiPropertyOptional({ enum: [1, 2], description: '1=Bien, 2=Servicio' })
+  @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
   @IsIn([1, 2])
-  indicadorBienoServicio!: 1 | 2
+  indicadorBienoServicio?: 1 | 2
 
   @ApiProperty({ example: 1 })
   @Type(() => Number)
@@ -42,11 +54,12 @@ export class CreateItemDto {
   @IsOptional()
   unidadMedida?: number
 
-  @ApiProperty({ example: 5000 })
+  @ApiPropertyOptional({ example: 5000 })
+  @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  precioUnitarioItem!: number
+  precioUnitarioItem?: number
 
   @ApiPropertyOptional({ example: 10, description: 'Porcentaje de descuento 0-100' })
   @Type(() => Number)
@@ -60,6 +73,15 @@ export class CreateComprobanteDto {
   @ApiProperty({ enum: TipoECF, example: 'E31' })
   @IsEnum(TipoECF)
   tipoECF!: TipoECF
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'true (default) emite de inmediato (asigna e-NCF, encola y firma). false crea un borrador (DRAFT) sin consumir secuencia ni contactar la DGII.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  emitir?: boolean
 
   @ApiPropertyOptional({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito. Requerido para E31/E32/E33/E34/E41/E44/E45/E46' })
   @IsIn([1, 2, 3])
@@ -112,6 +134,11 @@ export class CreateComprobanteDto {
   @ValidateNested({ each: true })
   @Type(() => CreateItemDto)
   items!: CreateItemDto[]
+
+  @ApiPropertyOptional({ description: 'Contacto comprador. El servidor copia RNC/razón social/dirección al comprobante (snapshot).' })
+  @IsString()
+  @IsOptional()
+  contactoId?: string
 
   // Información de Referencia (E33/E34 obligatorio, resto condicional)
   @ApiPropertyOptional({ example: 'E310000000001', description: 'e-NCF que se modifica (obligatorio E33/E34, condicional en otros)' })

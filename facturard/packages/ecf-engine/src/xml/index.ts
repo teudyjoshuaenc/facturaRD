@@ -13,6 +13,7 @@ export type { ECF31Input, ItemCalculado, Totales, ValidationResult };
 // ── e-CF Tipo 32 ──────────────────────────────────────────────────────────────
 export {
   generarECF32,
+  generarECF32ParaRFCE,
   generarRFCE32,
   MONTO_LIMITE_RFCE,
 } from './e32';

@@ -51,6 +51,15 @@ export function resolveEndpoints(env: DgiiEnv | undefined): DgiiEndpoints {
   return env === 'ecf' ? ENDPOINTS_ECF : ENDPOINTS_CERTECF;
 }
 
+/**
+ * Resuelve el ambiente DGII desde la variable de entorno `DGII_ENV`.
+ * Default seguro: 'certecf' (certificación). Solo `DGII_ENV=production`
+ * activa producción ('ecf').
+ */
+export function resolveDgiiEnv(): DgiiEnv {
+  return process.env['DGII_ENV'] === 'production' ? 'ecf' : 'certecf';
+}
+
 // ── Autenticación ─────────────────────────────────────────────────────────────
 // GET  {auth}/api/Autenticacion/Semilla
 // POST {auth}/api/Autenticacion/ValidarSemilla

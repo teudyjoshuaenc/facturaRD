@@ -16,4 +16,4 @@ export type {
   DgiiAprobacionInput,
   DgiiAprobacionResponse,
 } from './types';
-export { DgiiApiError, ENDPOINTS_CERTECF, ENDPOINTS_ECF } from './types';
+export { DgiiApiError, ENDPOINTS_CERTECF, ENDPOINTS_ECF, resolveEndpoints, resolveDgiiEnv } from './types';

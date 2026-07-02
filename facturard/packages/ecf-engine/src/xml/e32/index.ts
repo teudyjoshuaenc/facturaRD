@@ -35,6 +35,37 @@ export function generarRFCE32(input: ECF32Input): GenerarRFCE32Result {
 }
 
 /**
+ * Genera el e-CF 32 COMPLETO en su forma "plana" para el flujo RFCE (< 250 K),
+ * exactamente como fue aceptado en certificación (eNCFs E320000000165-168):
+ * un `<ECF>` normal SIN `<InformacionReferencia>`.
+ *
+ * Diferencia con `generarECF32` flujo B:
+ *  - NO requiere `input.rfce` (no lanza error por monto < 250 K).
+ *  - NO inyecta `<InformacionReferencia><CodigoModificacion>5</...>`.
+ *
+ * El resumen (RFCE) se genera aparte con `generarRFCE32`, pasando en
+ * `codigoSeguridadeCF` los primeros 6 caracteres del `SignatureValue` de
+ * ESTE e-CF ya firmado. Ambos documentos comparten el mismo eNCF.
+ *
+ * @throws {Error} si el XML generado no pasa la validación XSD
+ */
+export function generarECF32ParaRFCE(input: ECF32Input): GenerarECF32Result {
+  const items = calcularItems(input.items);
+  const totales = calcularTotales(items);
+  // Forzar XML plano: ignorar cualquier `rfce` para no emitir InformacionReferencia
+  const xml = buildECF32Xml({ ...input, rfce: undefined }, items, totales);
+  const validation = validateECF32(xml);
+
+  if (!validation.valid) {
+    throw new Error(
+      `El e-CF 32 (RFCE) generado no es válido según el XSD:\n${validation.errors.join('\n')}`,
+    );
+  }
+
+  return { xml, totales, items, validation, flujo: 'B' };
+}
+
+/**
  * Genera el XML del e-CF Tipo 32 (Factura de Consumo Electrónica).
  *
  * **Flujo A** (montoTotal ≥ RD$250,000): se puede llamar directamente.

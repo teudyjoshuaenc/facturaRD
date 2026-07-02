@@ -12,6 +12,12 @@ import { HealthModule } from './modules/health/health.module'
 import { SecuenciasModule } from './modules/secuencias/secuencias.module'
 import { ReceptorModule } from './modules/receptor/receptor.module'
 import { GhlAuthModule } from './modules/ghl-auth/ghl-auth.module'
+import { ProductosModule } from './modules/productos/productos.module'
+import { ContactosModule } from './modules/contactos/contactos.module'
+import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module'
+import { ComprasModule } from './modules/compras/compras.module'
+import { ReportesModule } from './modules/reportes/reportes.module'
+import { CumplimientoModule } from './modules/cumplimiento/cumplimiento.module'
 import appConfig from './config/app.config'
 import databaseConfig from './config/database.config'
 import redisConfig from './config/redis.config'
@@ -48,6 +54,12 @@ import jwtConfig from './config/jwt.config'
     SecuenciasModule,
     ReceptorModule,  // Paso 7 certificación DGII — /fe/* sin prefijo api/v1
     GhlAuthModule,
+    ProductosModule,
+    ContactosModule,
+    CotizacionesModule,
+    ComprasModule,
+    ReportesModule,
+    CumplimientoModule,
   ],
 })
 export class AppModule {}
