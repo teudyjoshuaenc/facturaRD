@@ -163,8 +163,8 @@ export class CreateComprobanteDto {
   @IsOptional()
   razonModificacion?: string
 
-  @ApiPropertyOptional({ description: 'IndicadorNotaCredito: 1=Anulación total, 2=Corrección (solo E34)' })
-  @IsIn([1, 2])
+  @ApiPropertyOptional({ description: 'IndicadorNotaCredito (solo E34): 0 si el e-CF afectado tiene <=30 días calendario, 1 si >30. Lo calcula el servidor por fecha.' })
+  @IsIn([0, 1])
   @IsOptional()
-  indicadorNotaCredito?: 1 | 2
+  indicadorNotaCredito?: 0 | 1
 }

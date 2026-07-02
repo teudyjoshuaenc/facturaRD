@@ -75,7 +75,7 @@ function baseE34(overrides: Partial<ECF34Input> = {}): ECF34Input {
   return {
     idDoc: {
       eNCF: 'E340000000001',
-      indicadorNotaCredito: 2,
+      indicadorNotaCredito: 0, // 0 = e-CF afectado con <=30 días calendario
       tipoIngresos: '01',
       tipoPago: 1,
       fechaHoraFirma: '02-04-2025 10:00:00',
@@ -243,8 +243,8 @@ describe('e-CF 34 — Nota de Crédito: reduce monto original', () => {
     expect(result.xml).not.toContain('<FechaVencimientoSecuencia>');
   });
 
-  it('incluye IndicadorNotaCredito 2 (corrección parcial)', () => {
-    expect(result.xml).toContain('<IndicadorNotaCredito>2</IndicadorNotaCredito>');
+  it('incluye IndicadorNotaCredito 0 (e-CF afectado <=30 días)', () => {
+    expect(result.xml).toContain('<IndicadorNotaCredito>0</IndicadorNotaCredito>');
   });
 
   it('incluye InformacionReferencia obligatoria', () => {
@@ -273,12 +273,12 @@ describe('e-CF 34 — Nota de Crédito: reduce monto original', () => {
   });
 });
 
-describe('e-CF 34 — anulación total (IndicadorNotaCredito = 1)', () => {
+describe('e-CF 34 — e-CF afectado >30 días (IndicadorNotaCredito = 1)', () => {
   const result = generarECF34(
     baseE34({
       idDoc: {
         eNCF: 'E340000000002',
-        indicadorNotaCredito: 1,
+        indicadorNotaCredito: 1, // 1 = >30 días calendario (no rebaja ITBIS)
         tipoIngresos: '01',
         tipoPago: 1,
         fechaHoraFirma: '02-04-2025 11:00:00',
@@ -290,7 +290,7 @@ describe('e-CF 34 — anulación total (IndicadorNotaCredito = 1)', () => {
       },
       items: [
         {
-          nombre: 'Anulación total del comprobante',
+          nombre: 'Nota de crédito fuera de 30 días',
           cantidad: 1,
           precioUnitario: 7_080,
           indicadorFacturacion: INDICADOR_FACTURACION.GRAVADO_I1,
@@ -304,33 +304,39 @@ describe('e-CF 34 — anulación total (IndicadorNotaCredito = 1)', () => {
     expect(result.validation.valid).toBe(true);
   });
 
-  it('incluye IndicadorNotaCredito 1 (anulación)', () => {
+  it('incluye IndicadorNotaCredito 1 (>30 días)', () => {
     expect(result.xml).toContain('<IndicadorNotaCredito>1</IndicadorNotaCredito>');
   });
 
-  it('incluye CodigoModificacion 1 (anulación del NCF)', () => {
+  it('incluye CodigoModificacion 1', () => {
     expect(result.xml).toContain('<CodigoModificacion>1</CodigoModificacion>');
   });
 });
 
-describe('e-CF 34 — sin IndicadorNotaCredito (campo opcional)', () => {
-  const result = generarECF34(
-    baseE34({
-      idDoc: {
-        eNCF: 'E340000000003',
-        tipoIngresos: '01',
-        tipoPago: 1,
-        fechaHoraFirma: '02-04-2025 12:00:00',
-      },
-    }),
-  );
-
-  it('pasa la validación XSD sin IndicadorNotaCredito', () => {
-    expect(result.validation.valid).toBe(true);
+describe('e-CF 34 — IndicadorNotaCredito es OBLIGATORIO (XSD oficial v.1.0)', () => {
+  it('acepta el valor 0 (<=30 días)', () => {
+    const r = generarECF34(baseE34({ idDoc: { eNCF: 'E340000000003', indicadorNotaCredito: 0, tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 12:00:00' } }));
+    expect(r.validation.valid).toBe(true);
+    expect(r.xml).toContain('<IndicadorNotaCredito>0</IndicadorNotaCredito>');
   });
 
-  it('no emite IndicadorNotaCredito en el XML', () => {
-    expect(result.xml).not.toContain('<IndicadorNotaCredito>');
+  it('acepta el valor 1 (>30 días)', () => {
+    const r = generarECF34(baseE34({ idDoc: { eNCF: 'E340000000004', indicadorNotaCredito: 1, tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 12:00:00' } }));
+    expect(r.validation.valid).toBe(true);
+    expect(r.xml).toContain('<IndicadorNotaCredito>1</IndicadorNotaCredito>');
+  });
+
+  it('rechaza el valor 2 (fuera del rango 0..1 del XSD oficial)', () => {
+    expect(() =>
+      // @ts-expect-error — 2 ya no es válido en el tipo (0|1); se prueba el rechazo del XSD
+      generarECF34(baseE34({ idDoc: { eNCF: 'E340000000005', indicadorNotaCredito: 2, tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 12:00:00' } })),
+    ).toThrow(/XSD/i);
+  });
+
+  it('rechaza si se omite el campo (ahora minOccurs=1)', () => {
+    expect(() =>
+      generarECF34(baseE34({ idDoc: { eNCF: 'E340000000006', tipoIngresos: '01', tipoPago: 1, fechaHoraFirma: '02-04-2025 12:00:00' } })),
+    ).toThrow(/XSD/i);
   });
 });
 

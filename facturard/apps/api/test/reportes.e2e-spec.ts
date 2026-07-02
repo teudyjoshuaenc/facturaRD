@@ -51,6 +51,8 @@ describe('Reportes DGII — TXT oficial (e2e)', () => {
     await prisma.compraRecibida.create({ data: { tenantId: tenantA.tenant.id, tipo: 'E41', origen: 'MANUAL', ncf: 'E410000000001', rncProveedor: '130111222', subtotal: 1000, itbis: 180, itbisRetenido: 0, total: 1180, fechaComprobante: new Date('2026-05-05T10:00:00-04:00') } })
     await prisma.compraRecibida.create({ data: { tenantId: tenantA.tenant.id, tipo: 'GASTO_MENOR', origen: 'MANUAL', ncf: 'B0100000005', rncProveedor: '00112345678', subtotal: 500, itbis: 90, itbisRetenido: 10, total: 590, fechaComprobante: new Date('2026-05-20T10:00:00-04:00') } })
     await prisma.compraRecibida.create({ data: { tenantId: tenantA.tenant.id, tipo: 'E41', origen: 'MANUAL', subtotal: 3333, itbis: 0, itbisRetenido: 0, total: 3333, fechaComprobante: new Date('2026-06-02T10:00:00-04:00') } }) // fuera
+    // FIX 3: compra SIN_COMPROBANTE en rango — NO debe figurar en el 606 (sin NCF)
+    await prisma.compraRecibida.create({ data: { tenantId: tenantA.tenant.id, tipo: 'SIN_COMPROBANTE', origen: 'MANUAL', subtotal: 700, itbis: 0, itbisRetenido: 0, total: 700, fechaComprobante: new Date('2026-05-22T10:00:00-04:00') } })
   })
 
   afterAll(async () => { await app.close() })
@@ -107,8 +109,12 @@ describe('Reportes DGII — TXT oficial (e2e)', () => {
     const lines = res.text.split('\n')
     expect(lines[0].split('|')).toEqual([tenantA.tenant.rnc, '606', PERIODO, '2'])
     const detalle = lines.slice(1)
-    expect(detalle).toHaveLength(2)
-    for (const l of detalle) expect(l.split('|')).toHaveLength(23)
+    expect(detalle).toHaveLength(2) // FIX 3: la SIN_COMPROBANTE (sin NCF) queda excluida
+    for (const l of detalle) {
+      const campos = l.split('|')
+      expect(campos).toHaveLength(23)
+      expect(campos[3].trim()).not.toBe('') // campo 4 NCF siempre presente
+    }
 
     const f = detalle[0].split('|') // primera compra: RNC 130111222
     expect(f[0]).toBe('130111222') // campo 1 proveedor

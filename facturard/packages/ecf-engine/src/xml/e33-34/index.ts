@@ -47,8 +47,8 @@ export function generarECF33(input: ECF33Input): GenerarECF33Result {
  * Genera un XML de e-CF Tipo 34 (Nota de Crédito Electrónica) válido según el
  * XSD de la DGII. Reduce o anula el monto de la factura original referenciada.
  *
- * - `indicadorNotaCredito = 1`: anulación total del comprobante original
- * - `indicadorNotaCredito = 2`: corrección parcial de texto o montos
+ * - `indicadorNotaCredito = 0`: el e-CF afectado tiene <=30 días calendario.
+ * - `indicadorNotaCredito = 1`: el e-CF afectado tiene >30 días (la nota NO rebaja ITBIS).
  *
  * El monto de la nota de crédito no puede superar el del comprobante original.
  *

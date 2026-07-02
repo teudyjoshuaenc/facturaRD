@@ -207,10 +207,14 @@ export class ReportesService {
 
   // ── 606 Compras ─────────────────────────────────────────────────────────────
   async reporte606(tenantId: string, desde: string, hasta: string): Promise<ReporteResult<Reporte606Row>> {
-    const compras = await prisma.compraRecibida.findMany({
+    const todas = await prisma.compraRecibida.findMany({
       where: { tenantId, fechaComprobante: { gte: inicioDia(desde), lte: finDia(hasta) } },
       orderBy: { fechaComprobante: 'asc' },
     })
+
+    // El 606 exige NCF (campo 4). Las compras SIN_COMPROBANTE (o sin NCF) NO
+    // figuran en el 606 ni dan crédito fiscal; siguen disponibles en /compras.
+    const compras = todas.filter((c) => c.tipo !== 'SIN_COMPROBANTE' && !!c.ncf && c.ncf.trim() !== '')
 
     const rows: Reporte606Row[] = compras.map((c) => ({
       rncProveedor: c.rncProveedor || null,

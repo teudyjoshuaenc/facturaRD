@@ -128,4 +128,31 @@ describe('Comprobantes — draft + emisión (e2e)', () => {
     await request(app.getHttpServer()).patch(`/api/v1/comprobantes/${created.body.id}`).set(auth(tenantB)).send({ items: draftBody.items }).expect(404)
     await request(app.getHttpServer()).post(`/api/v1/comprobantes/${created.body.id}/emitir`).set(auth(tenantB)).expect(404)
   })
+
+  // ── FIX 4: E32 consumo >= RD$250,000 exige identificación del comprador ──────
+  const e32 = (over: Record<string, unknown> = {}) => ({
+    tipoECF: 'E32', fechaEmision: '01-07-2026', tipoPago: 1,
+    items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'Bien', indicadorBienoServicio: 1, cantidad: 1, precioUnitarioItem: 300000 }],
+    ...over,
+  })
+
+  it('E32 >= 250K sin identificación del comprador → 400', async () => {
+    await request(app.getHttpServer()).post('/api/v1/comprobantes').set(auth(tenantA)).send(e32()).expect(400)
+  })
+
+  it('E32 >= 250K con cédula del comprador → 201', async () => {
+    ctx.queueAdd.mockClear()
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA)).send(e32({ rncComprador: '00112345678', razonSocialComprador: 'CLIENTE FISICO' })).expect(201)
+    expect(res.body.estado).toBe('PENDIENTE')
+    expect(ctx.queueAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('E32 < 250K sin identificación → 201 (permitido)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA))
+      .send(e32({ items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'Bien', indicadorBienoServicio: 1, cantidad: 1, precioUnitarioItem: 5000 }] }))
+      .expect(201)
+    expect(res.body.estado).toBe('PENDIENTE')
+  })
 })
