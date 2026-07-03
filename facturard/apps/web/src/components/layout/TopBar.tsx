@@ -1,14 +1,18 @@
 'use client'
 
 import type { JSX } from 'react'
-import { Shield, ShieldAlert } from 'lucide-react'
+import { Plus, FileText, Zap, Search, Bell, Activity, ShieldCheck, ToggleRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useUI } from '@/lib/context/UIContext'
 
 interface Props {
   pageTitle: string
   pageSubtitle: string
-  certDias: number | null
+  certDias?: number | null
+  dgiiConectado?: boolean
+  automatizacionActivos?: number
+  notificacionesCount?: number
   onEmitir: () => void
   showEmitir: boolean
 }
@@ -16,80 +20,87 @@ interface Props {
 export function TopBar({
   pageTitle,
   pageSubtitle,
-  certDias,
+  certDias = 12,
+  dgiiConectado = true,
+  automatizacionActivos = 4,
+  notificacionesCount = 7,
   onEmitir,
   showEmitir,
 }: Props): JSX.Element {
-  const certOk = certDias !== null && certDias > 30
-  const certWarn = certDias !== null && certDias > 0 && certDias <= 30
-  const certExp = certDias !== null && certDias <= 0
+  const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
+
+  const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Emitir Factura'
+  const isEmitir = pageTitle === 'Emitir Factura'
 
   return (
-    <header className="hidden border-b border-border-subtle bg-white px-6 py-3 md:flex md:items-center md:justify-between">
-      {/* Breadcrumb */}
-      <div>
-        <h1 className="text-h6 text-text-primary">{pageTitle}</h1>
-        <p className="text-ui-sm text-text-secondary">{pageSubtitle}</p>
-      </div>
-
-      {/* Status chips + CTA */}
-      <div className="flex items-center gap-3">
-        {/* DGII status */}
-        <div className="flex items-center gap-1.5 rounded-full border border-border-subtle bg-background-canvas px-3 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-success-500" />
-          <span className="text-ui-sm text-text-primary">DGII</span>
-          <span className="text-ui-sm text-success-600">Conectado</span>
+    <header className="hidden border-b border-border-subtle bg-white px-6 py-3.5 md:flex md:items-center md:justify-between h-[68px] shrink-0">
+      {/* Left side: title/subtitle OR global search */}
+      {isDashboardOrEmitir ? (
+        <div className="flex items-baseline gap-2.5 text-left">
+          <h1 className="text-body-base font-bold text-text-primary tracking-tight">{pageTitle}</h1>
+          {pageSubtitle && (
+            <span className="text-ui-sm text-text-secondary font-medium">{pageSubtitle}</span>
+          )}
         </div>
+      ) : (
+        <div className="relative w-80">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Buscar o ejecutar — e-NCF, RNC, acciones... ⌘K"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50/50 pl-9 pr-3 text-ui-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none"
+          />
+        </div>
+      )}
 
-        {/* Certificate status */}
-        {certDias !== null && (
-          <div
-            className={cn(
-              'flex items-center gap-1.5 rounded-full border px-3 py-1.5',
-              certExp
-                ? 'border-danger-200 bg-danger-50'
-                : certWarn
-                  ? 'border-warning-200 bg-warning-50'
-                  : 'border-border-subtle bg-background-canvas',
-            )}
-          >
-            {certExp || certWarn ? (
-              <ShieldAlert
-                size={14}
-                className={certExp ? 'text-danger-500' : 'text-warning-500'}
-              />
-            ) : (
-              <Shield size={14} className="text-success-500" />
-            )}
-            <span className="text-ui-sm text-text-primary">Certificado</span>
-            <span
-              className={cn(
-                'text-ui-sm',
-                certExp
-                  ? 'text-danger-600'
-                  : certWarn
-                    ? 'text-warning-700'
-                    : 'text-success-600',
+      {/* Right side: standard actions */}
+      <div className="flex items-center gap-3">
+        {/* DGII Status chip */}
+        {!isEmitir && (
+          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50/50 px-2.5 py-1 text-ui-xs font-semibold text-green-700">
+            <Activity size={13} className="text-green-600" />
+            DGII <span className="text-green-600 font-bold">Conectado</span>
+          </span>
+        )}
+
+        {/* Certificado status chip */}
+        {!isEmitir && (
+          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50/50 px-2.5 py-1 text-ui-xs font-semibold text-orange-700">
+            <ShieldCheck size={13} className="text-orange-600" />
+            Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
+          </span>
+        )}
+
+        {/* Automatizacion chip */}
+        {!isEmitir && (
+          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/50 px-2.5 py-1 text-ui-xs font-semibold text-blue-700">
+            <ToggleRight size={13} className="text-blue-600" />
+            Automatización <span className="text-blue-600 font-bold">{automatizacionActivos} activos</span>
+          </span>
+        )}
+
+        {/* Notification Bell */}
+        <button
+          type="button"
+          className="relative p-2 text-text-secondary hover:text-text-primary hover:bg-neutral-50 rounded-lg transition-colors focus:outline-none"
+        >
+              <Bell size={18} />
+              {notificacionesCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[9px] font-bold text-white leading-none">
+                  {notificacionesCount}
+                </span>
               )}
-            >
-              {certExp ? 'Vencido' : `${certDias} días`}
-            </span>
-          </div>
-        )}
+            </button>
 
-        {certOk === false && certDias === null && (
-          <div className="flex items-center gap-1.5 rounded-full border border-border-subtle bg-background-canvas px-3 py-1.5">
-            <ShieldAlert size={14} className="text-text-secondary" />
-            <span className="text-ui-sm text-text-secondary">Sin certificado</span>
-          </div>
-        )}
-
-        {/* Emitir button */}
-        {showEmitir && (
-          <Button variant="primary" size="sm" onClick={onEmitir}>
-            Emitir Factura
-          </Button>
-        )}
+            {/* Emitir Factura CTA button */}
+            {showEmitir && (
+              <Button variant="primary" size="md" onClick={onEmitir} className="h-9 px-3.5 font-semibold">
+                <Plus size={16} className="mr-1" />
+                Emitir Factura
+              </Button>
+            )}
       </div>
     </header>
   )

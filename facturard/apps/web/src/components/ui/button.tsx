@@ -27,7 +27,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all active:scale-[0.98] duration-150 disabled:cursor-not-allowed disabled:transform-none',
           variantStyles[variant],
           sizeStyles[size],
           className,

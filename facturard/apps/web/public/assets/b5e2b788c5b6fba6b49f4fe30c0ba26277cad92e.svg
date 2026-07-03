@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="grommet-icons:compliance" clip-path="url(#clip0_839_29483)">
+<path id="Vector" d="M13.3333 2.5H17.5V19.1667H2.5V2.5H6.66667M6.66667 11.6667L9.16667 14.1667L14.1667 9.16667M6.66667 5H13.3333V0.833333H6.66667V5Z" stroke="var(--stroke-0, #737373)" stroke-width="2"/>
+</g>
+<defs>
+<clipPath id="clip0_839_29483">
+<rect width="20" height="20" fill="white"/>
+</clipPath>
+</defs>
+</svg>

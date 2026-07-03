@@ -11,13 +11,19 @@ export default function NuevaFacturaPage(): JSX.Element {
   const router = useRouter()
   const { createComprobante } = useNuevaFactura()
 
-  async function handleSubmit(data: ComprobanteFormData): Promise<string> {
-    const newENCF = await createComprobante(data)
-    toast.success('Factura enviada a la DGII, verifica el estado en unos segundos', {
-      description: `e-NCF asignado: ${newENCF}`,
-    })
-    router.push('/facturas')
-    return newENCF
+  async function handleSubmit(data: ComprobanteFormData): Promise<void> {
+    const res = await createComprobante(data)
+    if (data.emitirConComprobante === false) {
+      toast.success('Factura creada exitosamente como borrador/factura interna', {
+        description: `Código asignado: ${res.eNCF}`,
+      })
+      router.push('/facturas')
+    } else {
+      toast.success('Factura enviada a la DGII, verifica el estado en unos segundos', {
+        description: `e-NCF asignado: ${res.eNCF}`,
+      })
+      router.push(`/nueva-factura/exito?id=${res.id}&encf=${res.eNCF}&total=${res.montoTotal}`)
+    }
   }
 
   return (
