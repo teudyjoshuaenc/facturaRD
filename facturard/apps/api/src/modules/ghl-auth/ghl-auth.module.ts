@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TenantsModule } from '../tenants/tenants.module'
 import { SecuenciasModule } from '../secuencias/secuencias.module'
+import { CertificadosModule } from '../certificados/certificados.module'
 import { GhlAuthController } from './ghl-auth.controller'
 import { GhlAuthService } from './ghl-auth.service'
 
@@ -18,6 +19,7 @@ import { GhlAuthService } from './ghl-auth.service'
     }),
     TenantsModule,
     SecuenciasModule,
+    CertificadosModule,
   ],
   controllers: [GhlAuthController],
   providers: [GhlAuthService],

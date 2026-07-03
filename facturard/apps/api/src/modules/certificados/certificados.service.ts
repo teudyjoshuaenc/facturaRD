@@ -18,53 +18,69 @@ function conDiasRestantes(cert: SafeCertificado): SafeCertificadoConVigencia {
   return { ...cert, diasRestantes: dias }
 }
 
+// Datos de un certificado listos para persistir (P12 ya validado y cifrado),
+// sin tenantId. Reutilizable tanto por upload() como por el onboarding atómico.
+export type CertificadoData = {
+  titular: string
+  rnc: string
+  serial: string
+  emitidoPor: string
+  validoDesde: Date
+  validoHasta: Date
+  p12Encrypted: string
+  p12Iv: string
+  p12Tag: string
+  passphraseCifrada: string
+}
+
 @Injectable()
 export class CertificadosService {
   constructor(private readonly crypto: CryptoService) {}
 
-  async upload(tenantId: string, file: Buffer, passphrase: string): Promise<SafeCertificado> {
-    // 1. Validar el P12 extrayendo sus metadatos (lanza si es inválido / passphrase incorrecta)
-    let info: Awaited<ReturnType<typeof parseCertificateInfo>>
+  /**
+   * Valida el P12 (que abra con la passphrase y esté vigente) y cifra P12 +
+   * passphrase con AES-256-GCM. NO toca la DB. Lanza 400 si es inválido.
+   * Fuente única de la lógica de validación/cifrado de certificados.
+   */
+  buildCertificadoData(file: Buffer, passphrase: string): CertificadoData {
+    let info: ReturnType<typeof parseCertificateInfo>
     try {
       info = parseCertificateInfo(file, passphrase)
     } catch {
       throw new BadRequestException('Certificado inválido o passphrase incorrecta')
     }
 
-    // 2. Verificar vigencia
     if (info.validoHasta < new Date()) {
       throw new BadRequestException(
         `El certificado venció el ${info.validoHasta.toLocaleDateString('es-DO')}`,
       )
     }
 
-    // 3. Cifrar P12 y passphrase
     const { encrypted, iv, tag } = this.crypto.encryptBuffer(file)
-    const passphraseCifrada = this.crypto.encryptString(passphrase)
+    return {
+      titular: info.titular,
+      rnc: info.rnc,
+      serial: info.serial,
+      emitidoPor: info.emitidoPor,
+      validoDesde: info.validoDesde,
+      validoHasta: info.validoHasta,
+      p12Encrypted: encrypted.toString('base64'),
+      p12Iv: iv,
+      p12Tag: tag,
+      passphraseCifrada: this.crypto.encryptString(passphrase),
+    }
+  }
 
-    // 4. Desactivar certificado activo anterior (solo uno activo por tenant)
+  async upload(tenantId: string, file: Buffer, passphrase: string): Promise<SafeCertificado> {
+    const data = this.buildCertificadoData(file, passphrase)
+
+    // Desactivar certificado activo anterior (solo uno activo por tenant)
     await prisma.certificado.updateMany({
       where: { tenantId, activo: true },
       data: { activo: false },
     })
 
-    // 5. Guardar en DB
-    const cert = await prisma.certificado.create({
-      data: {
-        tenantId,
-        titular: info.titular,
-        rnc: info.rnc,
-        serial: info.serial,
-        emitidoPor: info.emitidoPor,
-        validoDesde: info.validoDesde,
-        validoHasta: info.validoHasta,
-        p12Encrypted: encrypted.toString('base64'),
-        p12Iv: iv,
-        p12Tag: tag,
-        passphraseCifrada,
-      },
-    })
-
+    const cert = await prisma.certificado.create({ data: { tenantId, ...data } })
     return toSafe(cert)
   }
 
