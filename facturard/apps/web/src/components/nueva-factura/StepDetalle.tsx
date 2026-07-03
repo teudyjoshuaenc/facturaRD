@@ -7,7 +7,7 @@ import { NuevoProductoModal } from './NuevoProductoModal'
 import { useProductos } from '@/hooks/useProductos'
 import type { Producto, NuevoProductoData } from '@/hooks/useProductos'
 import { formatCurrency } from '@/lib/comprobantes'
-import type { ItemRow } from '@/hooks/useNuevaFactura'
+import type { ItemRow, TipoECF } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
 
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
@@ -36,6 +36,7 @@ interface StepDetalleProps {
   onNext: () => void
   onBack: () => void
   isQuickMode?: boolean
+  tipoECF?: TipoECF | undefined
 }
 
 export function StepDetalle({
@@ -46,6 +47,7 @@ export function StepDetalle({
   onNext,
   onBack,
   isQuickMode,
+  tipoECF,
 }: StepDetalleProps): JSX.Element {
   const baseId = useId()
   const { allProductos, crearProducto } = useProductos()
@@ -66,12 +68,17 @@ export function StepDetalle({
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return []
     const q = productSearch.toLowerCase()
-    return allProductos.filter(
-      (p) =>
+    const isExemptOnly = tipoECF && ['E41', 'E43', 'E44', 'E47'].includes(tipoECF)
+    return allProductos.filter((p) => {
+      if (isExemptOnly && p.indicadorFacturacion !== 'E' && p.indicadorFacturacion !== 'I4') {
+        return false
+      }
+      return (
         p.nombre.toLowerCase().includes(q) ||
         p.codigo.toLowerCase().includes(q)
-    )
-  }, [allProductos, productSearch])
+      )
+    })
+  }, [allProductos, productSearch, tipoECF])
 
   function addFromProduct(p: Producto): void {
     const newItem: ItemRow = {
@@ -97,6 +104,12 @@ export function StepDetalle({
           if (patch.descuento === undefined) {
             delete res.descuento
           }
+          if (patch.itbisRetenido === undefined) {
+            delete res.itbisRetenido
+          }
+          if (patch.isrRetenido === undefined) {
+            delete res.isrRetenido
+          }
           return res
         }
         return item
@@ -108,9 +121,13 @@ export function StepDetalle({
     onItemsChange(items.filter((item) => item.key !== key))
   }
 
-  function handleNuevoProducto(data: NuevoProductoData): void {
-    const nuevo = crearProducto(data)
-    addFromProduct(nuevo)
+  async function handleNuevoProducto(data: NuevoProductoData): Promise<void> {
+    try {
+      const nuevo = await crearProducto(data)
+      addFromProduct(nuevo)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const hasValidItems = items.length > 0 && items.every(
@@ -218,7 +235,7 @@ export function StepDetalle({
                     <th className={cn("py-3 px-4 font-semibold text-text-secondary", isQuickMode ? "w-28 text-center" : "w-24")}>Cant.</th>
                     <th className="py-3 px-4 font-semibold text-text-secondary text-right w-28">Precio</th>
                     <th className="py-3 px-4 font-semibold text-text-secondary text-center w-20">ITBIS</th>
-                    {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-center w-24">Descuento</th>}
+                    {!isQuickMode && tipoECF !== 'E43' && tipoECF !== 'E47' && <th className="py-3 px-4 font-semibold text-text-secondary text-center w-24">Descuento</th>}
                     {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ITBIS Ret.</th>}
                     {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ISR Ret.</th>}
                     <th className="py-3 px-4 font-semibold text-text-secondary text-right w-32">Total</th>
@@ -289,7 +306,7 @@ export function StepDetalle({
                         <td className="py-3.5 px-4 text-center font-medium text-text-secondary">
                           {itbisPercent}
                         </td>
-                        {!isQuickMode && (
+                        {!isQuickMode && tipoECF !== 'E43' && tipoECF !== 'E47' && (
                           <td className="py-3.5 px-4 text-center">
                             <input
                               type="number"
@@ -304,12 +321,36 @@ export function StepDetalle({
                         )}
                         {!isQuickMode && (
                           <td className="py-3.5 px-4 text-right font-semibold text-text-secondary">
-                            {formatCurrency(item.itbisRetenido ?? 0)}
+                            {tipoECF === 'E41' ? (
+                              <input
+                                type="number"
+                                min={0}
+                                step="any"
+                                placeholder="0.00"
+                                className="ml-auto w-20 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm text-center font-medium focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                                value={item.itbisRetenido !== undefined ? item.itbisRetenido : ''}
+                                onChange={(e) => updateItem(item.key, { itbisRetenido: e.target.value ? Number(e.target.value) : undefined })}
+                              />
+                            ) : (
+                              formatCurrency(item.itbisRetenido ?? 0)
+                            )}
                           </td>
                         )}
                         {!isQuickMode && (
                           <td className="py-3.5 px-4 text-right font-semibold text-text-secondary">
-                            {formatCurrency(item.isrRetenido ?? 0)}
+                            {tipoECF === 'E47' ? (
+                              <input
+                                type="number"
+                                min={0}
+                                step="any"
+                                placeholder="0.00"
+                                className="ml-auto w-20 rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm text-center font-medium focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+                                value={item.isrRetenido !== undefined ? item.isrRetenido : ''}
+                                onChange={(e) => updateItem(item.key, { isrRetenido: e.target.value ? Number(e.target.value) : undefined })}
+                              />
+                            ) : (
+                              formatCurrency(item.isrRetenido ?? 0)
+                            )}
                           </td>
                         )}
                         <td className="py-3.5 px-4 text-right font-semibold text-text-primary">
@@ -379,6 +420,7 @@ export function StepDetalle({
         open={showNuevoProducto}
         onClose={() => setShowNuevoProducto(false)}
         onSave={handleNuevoProducto}
+        tipoECF={tipoECF}
       />
     </>
   )

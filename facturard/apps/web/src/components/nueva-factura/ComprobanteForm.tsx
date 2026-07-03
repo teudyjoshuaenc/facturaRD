@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useState, useMemo } from 'react'
 import type { JSX } from 'react'
-import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2 } from 'lucide-react'
+import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
@@ -25,16 +25,16 @@ const WIZARD_STEPS = [
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
 
 const TIPO_ECF_LABELS: Record<TipoECF, string> = {
-  E31: 'B01 - Factura de Crédito Fiscal Electrónica',
-  E32: 'B02 - Factura de Consumo Electrónica',
-  E33: 'B03 - Nota de Débito Electrónica',
-  E34: 'B04 - Nota de Crédito Electrónica',
-  E41: 'B11 - Comprobante de Compras Electrónico',
-  E43: 'B13 - Gastos Menores Electrónico',
-  E44: 'B14 - Regímenes Especiales Electrónico',
-  E45: 'B15 - Gubernamental Electrónico',
-  E46: 'B16 - Exportaciones Electrónico',
-  E47: 'B17 - Pagos al Exterior Electrónico',
+  E31: 'B01 - Factura de Crédito Fiscal Electrónica (E31)',
+  E32: 'B02 - Factura de Consumo Electrónica (E32)',
+  E33: 'B03 - Nota de Débito Electrónica (E33)',
+  E34: 'B04 - Nota de Crédito Electrónica (E34)',
+  E41: 'B11 - Comprobante de Compras Electrónico (E41)',
+  E43: 'B13 - Gastos Menores Electrónico (E43)',
+  E44: 'B14 - Regímenes Especiales Electrónico (E44)',
+  E45: 'B15 - Gubernamental Electrónico (E45)',
+  E46: 'B16 - Exportaciones Electrónico (E46)',
+  E47: 'B17 - Pagos al Exterior Electrónico (E47)',
 }
 
 const TIPO_PAGO_OPTIONS = [
@@ -65,7 +65,7 @@ function todayISO(): string {
 }
 
 interface Props {
-  onSubmit: (data: ComprobanteFormData) => Promise<string>
+  onSubmit: (data: ComprobanteFormData) => Promise<any>
   onError?: (message: string) => void
 }
 
@@ -88,6 +88,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const [items, setItems] = useState<ItemRow[]>([])
   const [notas, setNotas] = useState('')
   const [emitirConComprobante, setEmitirConComprobante] = useState(true)
+  
+  // Reference Info state (E33/E34)
+  const [ncfModificado, setNcfModificado] = useState('')
+  const [fechaNCFModificado, setFechaNCFModificado] = useState('')
+  const [codigoModificacion, setCodigoModificacion] = useState('')
+  const [indicadorNotaCredito, setIndicadorNotaCredito] = useState('')
 
   // Popover states for quick mode
   const [showClientDropdown, setShowClientDropdown] = useState(false)
@@ -122,24 +128,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   }
 
   // Calculate totals
-  const { subtotal, itbis, total } = useMemo(() => {
+  const { subtotal, itbis, total, descuento, itbisRetenido, isrRetenido } = useMemo(() => {
     let sub = 0
     let tax = 0
     let retItbis = 0
     let retIsr = 0
+    let descTotal = 0
     for (const item of items) {
       const base = item.cantidad * item.precioUnitarioItem
       const desc = item.descuento ?? 0
+      descTotal += desc
       const baseNet = Math.max(0, base - desc)
       sub += baseNet
       tax += baseNet * (ITBIS_RATES[item.indicadorFacturacion] ?? 0)
       retItbis += item.itbisRetenido ?? 0
       retIsr += item.isrRetenido ?? 0
     }
-    return { subtotal: sub, itbis: tax, total: Math.max(0, sub + tax - retItbis - retIsr) }
+    return {
+      subtotal: sub,
+      itbis: tax,
+      total: Math.max(0, sub + tax - retItbis - retIsr),
+      descuento: descTotal,
+      itbisRetenido: retItbis,
+      isrRetenido: retIsr,
+    }
   }, [items])
 
-  async function handleSubmit(): Promise<void> {
+  async function handleSubmit(emitConCF: boolean): Promise<void> {
     setSubmitting(true)
     setError('')
     try {
@@ -154,11 +169,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         tipoIngresos: tipoIngreso as ComprobanteFormData['tipoIngresos'],
         ...(tipoPago === 'CREDITO' && fechaLimite ? { fechaVencimiento: fechaLimite } : {}),
         ...(terminoPago ? { terminoPago } : {}),
-        ncfModificado: '',
-        fechaNCFModificado: '',
-        codigoModificacion: '',
+        ncfModificado,
+        fechaNCFModificado,
+        codigoModificacion: codigoModificacion as any,
+        ...(indicadorNotaCredito && { indicadorNotaCredito: Number(indicadorNotaCredito) as 1 | 2 }),
         items,
-        emitirConComprobante,
+        emitirConComprobante: emitConCF,
       })
     } catch (err) {
       const msg = getErrorMessage(err)
@@ -176,10 +192,19 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const isFechaLimiteRequired = tipoPago === 'CREDITO'
   const isFechaLimiteValid = !isFechaLimiteRequired || fechaLimite !== ''
 
+  const isReferenciaRequired = tipoECF === 'E33' || tipoECF === 'E34'
+  const isReferenciaValid =
+    !isReferenciaRequired ||
+    (ncfModificado.trim().length > 0 &&
+      fechaNCFModificado.trim().length > 0 &&
+      codigoModificacion !== '' &&
+      (tipoECF !== 'E34' || indicadorNotaCredito !== ''))
+
   const isClienteStepValid =
     (!emitirConComprobante || tipoECF === 'E43' || selectedCliente !== null) &&
     (!emitirConComprobante || isTipoIngresoValid) &&
-    isFechaLimiteValid
+    isFechaLimiteValid &&
+    isReferenciaValid
   const isDetalleStepValid = items.length > 0 && items.every(
     (i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0,
   )
@@ -230,6 +255,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onFechaEmisionChange={setFechaEmision}
                   fechaLimite={fechaLimite}
                   onFechaLimiteChange={setFechaLimite}
+                  ncfModificado={ncfModificado}
+                  onNcfModificadoChange={setNcfModificado}
+                  fechaNCFModificado={fechaNCFModificado}
+                  onFechaNCFModificadoChange={setFechaNCFModificado}
+                  codigoModificacion={codigoModificacion}
+                  onCodigoModificacionChange={setCodigoModificacion}
+                  indicadorNotaCredito={indicadorNotaCredito}
+                  onIndicadorNotaCreditoChange={setIndicadorNotaCredito}
                   onNext={() => goToStep(2)}
                 />
               )}
@@ -242,6 +275,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onNotasChange={setNotas}
                   onNext={() => goToStep(3)}
                   onBack={() => goToStep(1)}
+                  tipoECF={tipoECF}
                 />
               )}
 
@@ -271,6 +305,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               onNext={() => { }}
               onBack={() => { }}
               isQuickMode={true}
+              tipoECF={tipoECF}
             />
           </Card>
         )}
@@ -461,161 +496,218 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
           {/* Resumen Card */}
           <Card className={cn(
-            "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300",
+            "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300 gap-[16px] items-stretch p-[21px] relative",
             facturacionMode === 'estandar'
-              ? "w-[360px] p-5 gap-4 shadow-sm h-auto min-h-[380px] lg:self-start"
-              : "flex-1 p-6 gap-5 shadow-sm overflow-y-auto h-full"
+              ? "w-[360px] shadow-sm h-auto lg:self-start"
+              : "flex-1 shadow-sm overflow-y-auto h-full"
           )}>
-            <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-3 select-none">
-              <FileText size={20} className="text-[#0379D5]" />
-              <h3 className="text-[16px] text-[#333333] font-semibold font-sans">Resumen</h3>
-            </div>
-
-            <div className="flex flex-col gap-1 text-[13px] text-[#64748B] py-1 select-none font-sans">
-              <div className="flex items-center gap-2">
-                <Calendar size={14} className="text-[#64748B] flex-shrink-0" />
-                <span className="truncate">{formatDateSpanish(fechaEmision)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-[#64748B] flex-shrink-0" />
-                <span className="truncate" title={TIPO_ECF_LABELS[tipoECF]}>
-                  {TIPO_ECF_LABELS[tipoECF].split(' - ')[0] + ' - ' + TIPO_ECF_LABELS[tipoECF].split(' - ')[1]?.replace('Factura de Crédito Fiscal', 'Crédito Fiscal').replace('Factura de Consumo', 'Consumidor Final').replace('Nota de Débito', 'Nota de Débito').replace('Nota de Crédito', 'Nota de Crédito').replace('Comprobante de Compras', 'Compras').replace('Gastos Menores', 'Gastos Menores').replace('Regímenes Especiales', 'Régimen Especial').replace('Gubernamental', 'Gubernamental').replace('Exportaciones', 'Exportación').replace('Pagos al Exterior', 'Pagos al Exterior')}
+            {/* Header */}
+            <div className="flex items-center justify-between w-full select-none">
+              <div className="flex items-center gap-[8px]">
+                <FileText size={20} className="text-[#333333]" />
+                <span className="font-['Open_Sans'] font-semibold leading-[24px] text-[#333333] text-[16px]">
+                  Resumen e-CF
                 </span>
               </div>
-              <div className="flex items-center gap-2 select-none">
-                <input
-                  id="emitirConComprobante"
-                  type="checkbox"
-                  checked={emitirConComprobante}
-                  onChange={(e) => setEmitirConComprobante(e.target.checked)}
-                  className="h-3 w-3 rounded border-neutral-300 text-[#0379D5] focus:ring-[#0379D5] cursor-pointer flex-shrink-0"
-                />
-                <label htmlFor="emitirConComprobante" className="text-[13px] text-[#64748B] cursor-pointer select-none truncate">
-                  Comprobante fiscal
-                </label>
+              <div className="flex items-center gap-[12px]">
+                <button
+                  type="button"
+                  title="Vista Previa"
+                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors"
+                >
+                  <Eye size={18} />
+                </button>
+                <button
+                  type="button"
+                  title="Guardar Borrador"
+                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors"
+                >
+                  <Save size={17} />
+                </button>
               </div>
             </div>
 
-            {/* Selected Client details inside Resumen card */}
-            {selectedCliente && (
-              <div className="flex flex-col justify-center items-start gap-[2px] bg-[#F8FAFC] p-3 rounded-[10px] w-[318px] h-[62px] border-0 select-none">
-                <span className="text-[13px] font-semibold text-[#333333] font-sans truncate w-full leading-5">{selectedCliente.nombre}</span>
-                <span className="text-[12px] font-normal text-[#64748B] font-sans leading-[18px]">
-                  RNC: {selectedCliente.rnc.length === 9
-                    ? selectedCliente.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-                    : selectedCliente.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')}
+            {/* Metadata (Invoice Info) */}
+            <div className="flex flex-col gap-[8px] items-start w-full select-none">
+              {/* Date */}
+              <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans">
+                <Calendar size={16} className="text-[#64748B] flex-shrink-0" />
+                <span className="leading-[19.5px]">{fechaEmision}</span>
+              </div>
+              
+              {/* Payment Condition */}
+              <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans">
+                <CreditCard size={16} className="text-[#64748B] flex-shrink-0" />
+                <span className="leading-[19.5px] truncate">
+                  {tipoPago === 'CREDITO' ? 'Crédito' : tipoPago === 'GRATUITO' ? 'Gratuito' : 'Contado'}
+                  {tipoPago === 'CREDITO' && terminoPago ? ` - ${terminoPago}` : ''}
                 </span>
               </div>
-            )}
 
-            <div className="flex flex-col gap-2 pt-1 font-sans">
-              <div className="flex justify-between text-[13px] text-[#64748B]">
+              {/* e-CF Document Type */}
+              <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans w-full min-w-0">
+                <FileText size={16} className="text-[#64748B] flex-shrink-0" />
+                <span className="leading-[19.5px] truncate" title={TIPO_ECF_LABELS[tipoECF]}>
+                  {TIPO_ECF_LABELS[tipoECF]}
+                </span>
+              </div>
+            </div>
+
+            <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Customer Section */}
+            <div className="flex flex-col gap-[4px] items-start w-full text-left font-sans select-none">
+              <p className="font-semibold leading-[18px] text-[#374B6A] text-[12px] truncate w-full">
+                {selectedCliente ? selectedCliente.nombre : 'Consumidor Final'}
+              </p>
+              <p className="font-normal leading-[16.5px] text-[#7A8FAD] text-[11px] truncate w-full">
+                {selectedCliente && selectedCliente.rnc
+                  ? `RNC: ${
+                      selectedCliente.rnc.length === 9
+                        ? selectedCliente.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+                        : selectedCliente.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+                    }`
+                  : 'RNC: -'}
+              </p>
+            </div>
+
+            <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Totals Summary breakdown */}
+            <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] font-sans select-none">
+              <div className="flex items-center justify-between w-full">
                 <span>Subtotal</span>
                 <span>{formatCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-[13px] text-[#64748B]">
+              <div className="flex items-center justify-between w-full">
+                <span>Descuento</span>
+                <span>{formatCurrency(descuento)}</span>
+              </div>
+              <div className="flex items-center justify-between w-full">
                 <span>ITBIS (18%)</span>
                 <span>{formatCurrency(itbis)}</span>
               </div>
-              <hr className="border-[#E2E8F0] my-1" />
-              <div className="flex justify-between items-baseline select-none">
-                <span className="text-[18px] font-bold text-[#333333]">Total</span>
-                <span className={cn(
-                  "font-bold",
-                  facturacionMode === 'rapido' ? "text-brand-500 text-h5" : "text-[#333333] text-[18px]"
-                )}>
-                  {formatCurrency(total)}
-                </span>
+              <div className="flex items-center justify-between w-full">
+                <span>ITBIS Retenido (18%)</span>
+                <span>{formatCurrency(itbisRetenido)}</span>
               </div>
+              <div className="flex items-center justify-between w-full">
+                <span>ISR Retenido</span>
+                <span>{formatCurrency(isrRetenido)}</span>
+              </div>
+              {!['E41', 'E44', 'E46', 'E47'].includes(tipoECF) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Propina Legal</span>
+                  <span>{formatCurrency(0)}</span>
+                </div>
+              )}
             </div>
 
-            {/* Payment Method section inside Resumen card in quick mode */}
-            {facturacionMode === 'rapido' && (
-              <div className="flex flex-col gap-3 pt-2 border-t border-border-subtle text-left">
-                <h3 className="text-ui-xs font-semibold text-text-secondary uppercase">Tipo de Pago</h3>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {TIPO_PAGO_OPTIONS.map((opt) => {
-                    const isSelected = tipoPago === opt.value
-                    const Icon = opt.icon
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setTipoPago(opt.value)}
-                        className={cn(
-                          'flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2.5 transition-all duration-200 min-w-[60px] flex-1 hover:scale-[1.02] active:scale-[0.98]',
-                          isSelected
-                            ? 'border-brand-500 bg-brand-500 text-white shadow-md shadow-brand-500/25'
-                            : 'border-neutral-200 bg-white text-text-secondary hover:border-brand-300'
-                        )}
-                      >
-                        <Icon size={16} className={isSelected ? 'text-white' : 'text-text-secondary'} />
-                        <span className={cn(
-                          'text-[9px] font-semibold whitespace-nowrap',
-                          isSelected ? 'text-white' : 'text-text-secondary'
-                        )}>{opt.label}</span>
-                      </button>
-                    )
-                  })}
+            <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Total and Emit Button */}
+            <div className="flex flex-col gap-[24px] w-full select-none">
+              <div className="flex items-center justify-between w-full font-bold text-[#333333] text-[18px] font-sans">
+                <span>Total</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+
+              {/* Payment Method section inside Resumen card in quick mode */}
+              {facturacionMode === 'rapido' && (
+                <div className="flex flex-col gap-3 border-t border-border-subtle text-left pt-3">
+                  <h3 className="text-ui-xs font-semibold text-text-secondary uppercase">Tipo de Pago</h3>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {TIPO_PAGO_OPTIONS.map((opt) => {
+                      const isSelected = tipoPago === opt.value
+                      const Icon = opt.icon
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setTipoPago(opt.value)}
+                          className={cn(
+                            'flex flex-col items-center gap-1.5 rounded-lg border px-1 py-2.5 transition-all duration-200 min-w-[60px] flex-1 hover:scale-[1.02] active:scale-[0.98]',
+                            isSelected
+                              ? 'border-brand-500 bg-brand-500 text-white shadow-md shadow-brand-500/25'
+                              : 'border-neutral-200 bg-white text-text-secondary hover:border-brand-300'
+                          )}
+                        >
+                          <Icon size={16} className={isSelected ? 'text-white' : 'text-text-secondary'} />
+                          <span className={cn(
+                            'text-[9px] font-semibold whitespace-nowrap',
+                            isSelected ? 'text-white' : 'text-text-secondary'
+                          )}>{opt.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-
-
-
-            <button
-              type="button"
-              disabled={!isEmitEnabled || submitting}
-              onClick={handleSubmit}
-              className={cn(
-                "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-normal leading-[24px] font-sans flex items-center justify-center transition-all duration-200 mt-1 select-none",
-                (!isEmitEnabled || submitting)
-                  ? "opacity-20 cursor-not-allowed"
-                  : "hover:bg-[#0379D5]/90 cursor-pointer"
               )}
-            >
-              {submitting ? (
-                <Spinner size={18} className="text-white" />
-              ) : (
-                'Emitir Factura'
-              )}
-            </button>
 
-            {/* Borrador & Limpiar buttons in quick mode */}
-            {facturacionMode === 'rapido' && (
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  onClick={() => alert('Borrador guardado exitosamente.')}
-                  className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold"
+              <div className="flex flex-col gap-[8px] w-full">
+                {/* Emitir e-CF Button */}
+                <button
+                  type="button"
+                  disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting}
+                  onClick={() => handleSubmit(true)}
+                  className={cn(
+                    "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                    ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting)
+                      ? "opacity-20 cursor-not-allowed"
+                      : "hover:bg-[#0379D5]/90 cursor-pointer"
+                  )}
                 >
-                  <FileText size={15} className="text-text-secondary" />
-                  Borrador
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="md"
-                  onClick={() => {
-                    setItems([])
-                    setSelectedCliente(null)
-                    setTipoPago('CONTADO')
-                    setTipoIngreso('')
-                    setTerminoPago('')
-                    setFechaLimite('')
-                    setNotas('')
-                  }}
-                  className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold"
-                >
-                  <RefreshCw size={15} className="text-text-secondary" />
-                  Limpiar
-                </Button>
+                  {submitting ? (
+                    <Spinner size={18} className="text-white" />
+                  ) : (
+                    <>
+                      <Send size={15} className="text-white" />
+                      <span>Emitir e-CF</span>
+                    </>
+                  )}
+                </button>
               </div>
-            )}
+              
+              {/* Borrador & Limpiar buttons in quick mode */}
+              {facturacionMode === 'rapido' && (
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    type="button"
+                    onClick={() => alert('Borrador guardado exitosamente.')}
+                    className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold"
+                  >
+                    <FileText size={15} className="text-text-secondary" />
+                    Borrador
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => {
+                      setItems([])
+                      setSelectedCliente(null)
+                      setTipoPago('CONTADO')
+                      setTipoIngreso('')
+                      setTerminoPago('')
+                      setFechaLimite('')
+                      setNotas('')
+                    }}
+                    className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold"
+                  >
+                    <RefreshCw size={15} className="text-text-secondary" />
+                    Limpiar
+                  </Button>
+                </div>
+              )}
+            </div>
 
-            <p className="text-center text-[12px] text-[#64748B] font-normal font-sans leading-4 mt-4 w-full select-none">
-              e-NCF • Comprobante Fiscal Electrónico
-            </p>
+            {/* Footer e-CF label */}
+            <div className="flex justify-center items-center px-[38px] w-full select-none font-sans mt-1">
+              <span className="text-[#64748B] text-[12px] text-center leading-[16.5px] whitespace-nowrap">
+                e-NCF • Comprobante Fiscal Electrónico
+              </span>
+            </div>
           </Card>
         </div>
       </div>

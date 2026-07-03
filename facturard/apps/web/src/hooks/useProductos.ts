@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api, getErrorMessage } from '@/lib/api'
+import { toast } from 'sonner'
 
 export interface Producto {
   id: string
@@ -17,16 +20,6 @@ export interface Producto {
   aplicarPropinaLegal?: boolean
 }
 
-// Mock data — replace with API calls when endpoints are ready
-const MOCK_PRODUCTOS: Producto[] = [
-  { id: 'p1', nombre: 'Salami Induveca 1lb', tipo: 'BIEN', codigo: 'SAL-001', precio: 325.00, indicadorFacturacion: 'I1', precioIncluyeItbis: false },
-  { id: 'p2', nombre: 'Queso de Freír Sosúa', tipo: 'BIEN', codigo: 'QUE-001', precio: 280.00, indicadorFacturacion: 'I1', precioIncluyeItbis: false },
-  { id: 'p3', nombre: 'Cerveza Presidente 12oz', tipo: 'BIEN', codigo: 'CER-001', precio: 195.00, indicadorFacturacion: 'I1', precioIncluyeItbis: true },
-  { id: 'p4', nombre: 'Pan de Agua (unidad)', tipo: 'BIEN', codigo: 'PAN-001', precio: 15.00, indicadorFacturacion: 'I4', precioIncluyeItbis: false },
-  { id: 'p5', nombre: 'Servicio de Consultoría TI', tipo: 'SERVICIO', codigo: 'SRV-001', precio: 5000.00, indicadorFacturacion: 'I1', precioIncluyeItbis: false },
-  { id: 'p6', nombre: 'Mantenimiento de Equipos', tipo: 'SERVICIO', codigo: 'SRV-002', precio: 2500.00, indicadorFacturacion: 'I1', precioIncluyeItbis: false },
-]
-
 export interface NuevoProductoData {
   nombre: string
   tipo: 'BIEN' | 'SERVICIO'
@@ -42,33 +35,86 @@ export interface NuevoProductoData {
 }
 
 export function useProductos() {
-  const [productos, setProductos] = useState<Producto[]>(MOCK_PRODUCTOS)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return productos
-    const q = searchQuery.toLowerCase()
-    return productos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(q) ||
-        p.codigo.toLowerCase().includes(q),
-    )
-  }, [productos, searchQuery])
+  const { data: productos = [], isLoading } = useQuery({
+    queryKey: ['productos', searchQuery],
+    queryFn: async () => {
+      const res = await api.get('/productos', {
+        params: {
+          search: searchQuery.trim() || undefined,
+          limit: 100,
+        },
+      })
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+      return raw.map((p: any) => {
+        const item: Producto = {
+          id: p.id,
+          nombre: p.nombre,
+          tipo: p.tipo as 'BIEN' | 'SERVICIO',
+          codigo: p.codigo || '',
+          precio: Number(p.precioUnitario),
+          indicadorFacturacion: p.tratamientoITBIS === 'EXENTO' ? 'E' : (p.tratamientoITBIS || 'I1'),
+          precioIncluyeItbis: false,
+        }
+        if (p.unidadMedida) {
+          item.unidadMedida = Number(p.unidadMedida)
+        }
+        return item
+      }) as Producto[]
+    },
+  })
 
-  const crearProducto = useCallback((data: NuevoProductoData): Producto => {
-    const nuevo: Producto = {
-      id: `p-${Date.now()}`,
-      ...data,
-    }
-    setProductos((prev) => [nuevo, ...prev])
-    return nuevo
-  }, [])
+  const crearProductoMutation = useMutation({
+    mutationFn: async (data: NuevoProductoData) => {
+      const body = {
+        tipo: data.tipo,
+        nombre: data.nombre,
+        precioUnitario: data.precio,
+        tratamientoITBIS: data.indicadorFacturacion === 'E' || data.indicadorFacturacion === 'I4' ? 'EXENTO' : data.indicadorFacturacion,
+        unidadMedida: data.unidadMedida ? String(data.unidadMedida) : undefined,
+        codigo: data.codigo || undefined,
+      }
+      const res = await api.post('/productos', body)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productos'] })
+      toast.success('Producto creado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al crear el producto', { description: msg })
+    },
+  })
+
+  const crearProducto = useCallback(
+    async (data: NuevoProductoData): Promise<Producto> => {
+      const result = await crearProductoMutation.mutateAsync(data)
+      const p: Producto = {
+        id: result.id,
+        nombre: result.nombre,
+        tipo: result.tipo as 'BIEN' | 'SERVICIO',
+        codigo: result.codigo || '',
+        precio: Number(result.precioUnitario),
+        indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
+        precioIncluyeItbis: false,
+      }
+      if (result.unidadMedida) {
+        p.unidadMedida = Number(result.unidadMedida)
+      }
+      return p
+    },
+    [crearProductoMutation],
+  )
 
   return {
-    productos: filtered,
+    productos,
     allProductos: productos,
     searchQuery,
     setSearchQuery,
     crearProducto,
+    isLoading,
   }
 }

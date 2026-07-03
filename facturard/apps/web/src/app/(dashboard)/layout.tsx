@@ -18,6 +18,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Emitir Factura',
     subtitle: 'Crea y emite comprobantes fiscales electrónicos',
   },
+  '/nueva-factura/exito': {
+    title: 'Factura Emitida',
+    subtitle: 'El comprobante fiscal electrónico se generó correctamente',
+  },
   '/configuracion': {
     title: 'Configuración',
     subtitle: 'Ajustes globales del sistema',

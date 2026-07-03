@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { JSX } from 'react'
 import { PackagePlus, Package, Wrench, DollarSign, Percent, ChevronDown } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { NuevoProductoData } from '@/hooks/useProductos'
+import type { TipoECF } from '@/hooks/useNuevaFactura'
 
 interface NuevoProductoModalProps {
   open: boolean
   onClose: () => void
   onSave: (data: NuevoProductoData) => void
+  tipoECF?: TipoECF | undefined
 }
 
 const TIPO_OPTIONS = [
@@ -88,7 +90,7 @@ const UNIDADES_MEDIDA = [
   { value: '58', label: 'Servicio' },
 ]
 
-export function NuevoProductoModal({ open, onClose, onSave }: NuevoProductoModalProps): JSX.Element {
+export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProductoModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
   const [nombreTouched, setNombreTouched] = useState(false)
   const [tipo, setTipo] = useState<'BIEN' | 'SERVICIO'>('BIEN')
@@ -98,6 +100,12 @@ export function NuevoProductoModal({ open, onClose, onSave }: NuevoProductoModal
   const [indicadorFacturacion, setIndicadorFacturacion] = useState<'I1' | 'I2' | 'I3' | 'I4' | 'E'>('I1')
   const [precioIncluyeItbis, setPrecioIncluyeItbis] = useState(false)
 
+  useEffect(() => {
+    if (open && (tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47')) {
+      setIndicadorFacturacion('I4')
+    }
+  }, [open, tipoECF])
+
   function reset(): void {
     setNombre('')
     setNombreTouched(false)
@@ -105,7 +113,7 @@ export function NuevoProductoModal({ open, onClose, onSave }: NuevoProductoModal
     setUnidadMedida('')
     setPrecio('')
     setPrecioTouched(false)
-    setIndicadorFacturacion('I1')
+    setIndicadorFacturacion(tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47' ? 'I4' : 'I1')
     setPrecioIncluyeItbis(false)
   }
 
@@ -239,7 +247,11 @@ export function NuevoProductoModal({ open, onClose, onSave }: NuevoProductoModal
             <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">Itbis</label>
             <ToggleGroup
               variant="modal"
-              options={ITBIS_OPTIONS}
+              options={
+                tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47'
+                  ? [{ value: 'I4' as const, label: 'Exento' }]
+                  : ITBIS_OPTIONS
+              }
               value={indicadorFacturacion as 'I1' | 'I2' | 'I3' | 'I4'}
               onChange={(v) => setIndicadorFacturacion(v)}
             />

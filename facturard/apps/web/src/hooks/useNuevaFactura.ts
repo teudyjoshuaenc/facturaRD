@@ -32,6 +32,7 @@ export interface ComprobanteFormData {
   ncfModificado: string
   fechaNCFModificado: string
   codigoModificacion: '' | '1' | '2' | '3' | '4' | '5'
+  indicadorNotaCredito?: 1 | 2
   items: ItemRow[]
   emitirConComprobante?: boolean
 }
@@ -42,7 +43,7 @@ function toDDMMYYYY(iso: string): string {
 }
 
 export function useNuevaFactura() {
-  async function createComprobante(data: ComprobanteFormData): Promise<string> {
+  async function createComprobante(data: ComprobanteFormData): Promise<{ id: string; eNCF: string; montoTotal: number }> {
     try {
       const referencia = data.ncfModificado && data.fechaNCFModificado && data.codigoModificacion
         ? {
@@ -59,10 +60,10 @@ export function useNuevaFactura() {
       if (data.condicionPago === 'CREDITO') backendTipoPago = 2
       else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
 
-      const res = await api.post<{ eNCF: string }>('/comprobantes', {
+      const res = await api.post<{ id: string; eNCF: string; montoTotal: number }>('/comprobantes', {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
-        emitirConComprobante: data.emitirConComprobante,
+        emitir: data.emitirConComprobante,
         ...(data.emitirConComprobante !== false && tiposConTipoIngresos.includes(data.tipoECF) && { tipoIngresos: data.tipoIngresos }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
         ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
@@ -70,6 +71,7 @@ export function useNuevaFactura() {
         ...(!tiposSinComprador.includes(data.tipoECF) && { razonSocialComprador: data.razonSocialComprador }),
         ...(data.identificadorExtranjero && { identificadorExtranjero: data.identificadorExtranjero }),
         ...(data.paisComprador && { paisComprador: data.paisComprador }),
+        ...(data.indicadorNotaCredito && { indicadorNotaCredito: Number(data.indicadorNotaCredito) }),
         ...referencia,
         items: data.items.map((item, i) => ({
           numeroLinea: i + 1,
@@ -84,7 +86,7 @@ export function useNuevaFactura() {
           ...(item.isrRetenido && { isrRetenido: item.isrRetenido }),
         })),
       })
-      return res.data.eNCF
+      return res.data
     } catch (err) {
       throw new Error(getErrorMessage(err))
     }

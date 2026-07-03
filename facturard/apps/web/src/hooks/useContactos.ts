@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api, getErrorMessage } from '@/lib/api'
+import { toast } from 'sonner'
 
 export interface Contacto {
   id: string
@@ -14,17 +17,11 @@ export interface Contacto {
   provincia?: string
   municipio?: string
   comentarios?: string
+  validacion?: 'VALIDO' | 'NO_ENCONTRADO'
+  totalFacturado?: number
+  fecha?: string
+  estado?: 'ACTIVO' | 'INACTIVO' | 'OCASIONAL'
 }
-
-// Mock data — replace with API calls when endpoints are ready
-const MOCK_CONTACTOS: Contacto[] = [
-  { id: 'c1', nombre: 'Distribuidora López SRL', rnc: '130567891', email: 'info@distlopez.com.do', telefono: '809-555-0101', tipo: 'EMPRESA' },
-  { id: 'c2', nombre: 'Comercial Díaz & Asociados', rnc: '101234567', email: 'ventas@cdiaz.com.do', telefono: '809-555-0202', tipo: 'EMPRESA' },
-  { id: 'c3', nombre: 'Importadora Caribe', rnc: '131793916', email: 'compras@importcaribe.do', telefono: '809-555-0303', tipo: 'EMPRESA' },
-  { id: 'c4', nombre: 'Constructora Del Este', rnc: '130874523', email: 'admin@consteste.do', telefono: '809-555-0404', tipo: 'EMPRESA' },
-  { id: 'c5', nombre: 'Farmacia Central EIRL', rnc: '101234567', email: 'central@farmacias.do', telefono: '809-555-0505', tipo: 'EMPRESA' },
-  { id: 'c6', nombre: 'Restaurante El Corusco', rnc: '401012345', email: 'reservas@elcorusco.do', telefono: '809-555-0606', tipo: 'EMPRESA' },
-]
 
 export interface NuevoContactoData {
   nombre: string
@@ -40,35 +37,99 @@ export interface NuevoContactoData {
 }
 
 export function useContactos() {
-  const [contactos, setContactos] = useState<Contacto[]>(MOCK_CONTACTOS)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return contactos
-    const q = searchQuery.toLowerCase()
-    return contactos.filter(
-      (c) =>
-        c.nombre.toLowerCase().includes(q) ||
-        c.rnc.includes(q),
-    )
-  }, [contactos, searchQuery])
+  const { data: contactos = [], isLoading } = useQuery({
+    queryKey: ['contactos', searchQuery],
+    queryFn: async () => {
+      const res = await api.get('/contactos', {
+        params: {
+          search: searchQuery.trim() || undefined,
+          limit: 100,
+        },
+      })
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+      return raw.map((c: any) => ({
+        id: c.id,
+        nombre: c.razonSocial || c.nombreComercial || 'Sin nombre',
+        rnc: c.rnc || '',
+        email: c.email || '',
+        telefono: c.telefono || '',
+        tipo: c.tipo === 'CONSUMIDOR_FINAL' ? 'PERSONA' : 'EMPRESA',
+        idExtranjero: c.identificadorExtranjero || '',
+        direccion: c.direccion || '',
+        provincia: '',
+        municipio: '',
+        comentarios: '',
+        validacion: c.rncValidado ? 'VALIDO' : 'NO_ENCONTRADO',
+        totalFacturado: 0,
+        fecha: new Date(c.updatedAt || c.createdAt || Date.now()).toISOString().split('T')[0] ?? '',
+        estado: c.activo ? 'ACTIVO' : 'INACTIVO',
+      })) as Contacto[]
+    },
+  })
 
   const frecuentes = useMemo(() => contactos.slice(0, 4), [contactos])
 
-  const crearContacto = useCallback((data: NuevoContactoData): Contacto => {
-    const nuevo: Contacto = {
-      id: `c-${Date.now()}`,
-      ...data,
-    }
-    setContactos((prev) => [nuevo, ...prev])
-    return nuevo
-  }, [])
+  const crearContactoMutation = useMutation({
+    mutationFn: async (data: NuevoContactoData) => {
+      const cleanRnc = data.rnc.replace(/\D/g, '')
+      const resolvedTipo = cleanRnc.length === 9 || cleanRnc.length === 11 ? 'CLIENTE' : 'CONSUMIDOR_FINAL'
+
+      const body = {
+        tipo: resolvedTipo,
+        rnc: cleanRnc || undefined,
+        razonSocial: data.nombre,
+        email: data.email || undefined,
+        telefono: data.telefono.replace(/\D/g, '') || undefined,
+        direccion: data.direccion || undefined,
+        identificadorExtranjero: data.idExtranjero || undefined,
+      }
+
+      const res = await api.post('/contactos', body)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactos'] })
+      toast.success('Contacto creado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al crear el contacto', { description: msg })
+    },
+  })
+
+  const crearContacto = useCallback(
+    async (data: NuevoContactoData): Promise<Contacto> => {
+      const result = await crearContactoMutation.mutateAsync(data)
+      return {
+        id: result.id,
+        nombre: result.razonSocial || result.nombreComercial || '',
+        rnc: result.rnc || '',
+        email: result.email || '',
+        telefono: result.telefono || '',
+        tipo: result.tipo === 'CONSUMIDOR_FINAL' ? 'PERSONA' : 'EMPRESA',
+        idExtranjero: result.identificadorExtranjero || '',
+        direccion: result.direccion || '',
+        provincia: '',
+        municipio: '',
+        comentarios: '',
+        validacion: result.rncValidado ? 'VALIDO' : 'NO_ENCONTRADO',
+        totalFacturado: 0,
+        fecha: new Date(result.updatedAt || result.createdAt || Date.now()).toISOString().split('T')[0] ?? '',
+        estado: result.activo ? 'ACTIVO' : 'INACTIVO',
+      }
+    },
+    [crearContactoMutation],
+  )
 
   return {
-    contactos: filtered,
+    contactos,
     frecuentes,
     searchQuery,
     setSearchQuery,
     crearContacto,
+    isLoading,
   }
 }
