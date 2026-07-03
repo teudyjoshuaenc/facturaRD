@@ -1,7 +1,21 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
+import { ApiTags, ApiOperation, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger'
 import { GhlAuthService, type GhlInitResult, type GhlOnboardingResult } from './ghl-auth.service'
 import { GhlOnboardingDto } from './dto/ghl-onboarding.dto'
+
+const MAX_P12_SIZE = 1024 * 1024 // 1 MB
 
 @ApiTags('GHL Auth')
 @Controller('ghl')
@@ -25,10 +39,32 @@ export class GhlAuthController {
   }
 
   @Post('onboarding')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Registra un nuevo tenant a partir de un location_id de GoHighLevel (sin JWT)',
+    summary: 'Registra un nuevo tenant (RNC + P12 + passphrase) en una transacción atómica (sin JWT)',
+    description:
+      'Multipart/form-data: locationId, rnc, passphrase y el archivo P12 en el campo "file". ' +
+      'Crea tenant + location + secuencias + certificado cifrado en una sola transacción. ' +
+      'Devuelve el JWT del tenant recién creado.',
   })
-  onboarding(@Body() dto: GhlOnboardingDto): Promise<GhlOnboardingResult> {
-    return this.ghlAuthService.onboarding(dto)
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'locationId', 'rnc', 'passphrase'],
+      properties: {
+        file: { type: 'string', format: 'binary', description: 'Archivo .p12 / .pfx' },
+        locationId: { type: 'string' },
+        rnc: { type: 'string' },
+        passphrase: { type: 'string' },
+      },
+    },
+  })
+  onboarding(
+    @UploadedFile(new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: MAX_P12_SIZE })] }))
+    file: Express.Multer.File,
+    @Body() dto: GhlOnboardingDto,
+  ): Promise<GhlOnboardingResult> {
+    return this.ghlAuthService.onboarding(dto, file.buffer, dto.passphrase)
   }
 }

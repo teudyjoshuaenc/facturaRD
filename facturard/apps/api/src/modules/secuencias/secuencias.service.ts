@@ -6,7 +6,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common'
-import { prisma, TipoECF } from '@facturard/database'
+import { prisma, Prisma, TipoECF } from '@facturard/database'
 import type { Secuencia } from '@facturard/database'
 
 // eNCF prefix mapping — tipoECF → 2-char code
@@ -135,6 +135,23 @@ export class SecuenciasService {
       tenantId,
       tipos.map((tipoECF) => ({ tipoECF, ultimaSecuencia: 0 })),
     )
+  }
+
+  /**
+   * Inicializa todas las secuencias base dentro de una transacción existente
+   * (para onboarding atómico). El tenant es nuevo → no hay conflictos.
+   */
+  async inicializarTodosLosTiposTx(tx: Prisma.TransactionClient, tenantId: string): Promise<void> {
+    const tipos = Object.keys(TIPO_PREFIJO) as TipoECF[]
+    await tx.secuencia.createMany({
+      data: tipos.map((tipoECF) => ({
+        tenantId,
+        tipoECF,
+        prefijo: `E${TIPO_PREFIJO[tipoECF]}`,
+        ultimaSecuencia: 0,
+        activo: true,
+      })),
+    })
   }
 
   async getSecuencias(tenantId: string): Promise<Secuencia[]> {

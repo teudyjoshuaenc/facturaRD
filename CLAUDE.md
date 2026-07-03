@@ -257,7 +257,12 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 **Rutas (App Router, route group `(dashboard)`):**
 ```
 /                → entry point: lee ?location_id, decide onboarding o dashboard
-/onboarding      → 3 pasos: RNC → P12 → éxito
+/onboarding      → wizard 4 pasos + éxito: 1) Negocio (RNC vs DGII) →
+                   2) Certificado (captura .p12/.pfx + passphrase) →
+                   3) Cuenta (POST /ghl/onboarding multipart transaccional, guarda JWT;
+                      un 400 vuelve al paso 2 sin perder el RNC validado) →
+                   4) Secuencias (opcional: POST /secuencias/sincronizar; "Omitir" visible) →
+                   éxito → CTA a /nueva-factura
 /dashboard       → métricas del mes + facturas recientes
 /facturas        → lista paginada con filtros por estado y búsqueda
 /nueva-factura   → formulario emitir comprobante (E31/E32)
@@ -283,9 +288,16 @@ para instalar y construir desde la raíz del workspace, y fija `outputDirectory:
 **Arquitectura clave:**
 - Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)
 - Sin login propio: el entry point `/` siempre arranca desde GHL con `?location_id`
+- Sin `location_id` → pantalla "Abre FacturaRD desde GoHighLevel" (acceso inválido)
 - Interceptor 401: re-llama GET /ghl/init con el `frd_location_id` guardado para refrescar el token
 - Estado global: AuthContext (token + tenant) + UIContext (sidebar abierto/cerrado)
 - Server state: React Query con queryKey tipados por recurso
+
+**Onboarding transaccional (backend `POST /ghl/onboarding`):**
+- Es **multipart/form-data**: `locationId`, `rnc`, `passphrase` y el archivo P12 en `file`.
+- En UNA transacción atómica: valida RNC (DGII) + valida/cifra el P12 (reusa `CertificadosService.buildCertificadoData`, mismo AES-256-GCM que `/certificados/upload`) → crea Tenant + GhlLocation + secuencias base + Certificado. Si algo falla, rollback total (sin tenant ni certificado huérfanos). Devuelve el JWT del tenant nuevo.
+- Passphrase incorrecta o P12 inválido → 400 y NO se crea nada. Location/RNC ya registrados → 409.
+- `POST /certificados/upload` sigue vigente para RE-subir/renovar el certificado de un tenant existente.
 
 ---
 

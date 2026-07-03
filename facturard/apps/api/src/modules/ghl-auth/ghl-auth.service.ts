@@ -4,6 +4,7 @@ import { prisma } from '@facturard/database'
 import type { Tenant } from '@facturard/database'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import { SecuenciasService } from '../secuencias/secuencias.service'
+import { CertificadosService } from '../certificados/certificados.service'
 import type { GhlOnboardingDto } from './dto/ghl-onboarding.dto'
 
 export interface GhlInitResult {
@@ -24,6 +25,7 @@ export class GhlAuthService {
     private readonly jwt: JwtService,
     private readonly dgiiService: DgiiContribuyentesService,
     private readonly secuenciasService: SecuenciasService,
+    private readonly certificadosService: CertificadosService,
   ) {}
 
   async init(locationId?: string): Promise<GhlInitResult> {
@@ -48,7 +50,14 @@ export class GhlAuthService {
     }
   }
 
-  async onboarding(dto: GhlOnboardingDto): Promise<GhlOnboardingResult> {
+  /**
+   * Registra un nuevo tenant a partir del iframe de GHL, recibiendo TODO junto
+   * (RNC + P12 + passphrase). En UNA transacción atómica: crea Tenant, vincula
+   * GhlLocation, genera secuencias base y guarda el certificado cifrado.
+   * Si cualquier paso falla, rollback total — sin tenant ni certificado huérfanos.
+   */
+  async onboarding(dto: GhlOnboardingDto, file: Buffer, passphrase: string): Promise<GhlOnboardingResult> {
+    // 1. Validaciones que NO escriben en DB (fallan sin dejar basura).
     const [existingLocation, existingRnc, contribuyente] = await Promise.all([
       prisma.ghlLocation.findUnique({ where: { locationId: dto.locationId } }),
       prisma.tenant.findUnique({ where: { rnc: dto.rnc } }),
@@ -58,6 +67,11 @@ export class GhlAuthService {
     if (existingLocation) throw new ConflictException('Esta ubicación de GoHighLevel ya está registrada')
     if (existingRnc) throw new ConflictException('El RNC ya está registrado')
 
+    // 2. Validar + cifrar el P12 ANTES de la transacción. Si la passphrase es
+    //    incorrecta o el archivo no es un P12 válido/vigente → 400 y no se crea nada.
+    const certData = this.certificadosService.buildCertificadoData(file, passphrase)
+
+    // 3. Transacción atómica: tenant + location + secuencias + certificado.
     const tenant = await prisma.$transaction(async (tx) => {
       const newTenant = await tx.tenant.create({
         data: {
@@ -67,14 +81,12 @@ export class GhlAuthService {
         },
       })
 
-      await tx.ghlLocation.create({
-        data: { locationId: dto.locationId, tenantId: newTenant.id },
-      })
+      await tx.ghlLocation.create({ data: { locationId: dto.locationId, tenantId: newTenant.id } })
+      await this.secuenciasService.inicializarTodosLosTiposTx(tx, newTenant.id)
+      await tx.certificado.create({ data: { tenantId: newTenant.id, ...certData } })
 
       return newTenant
     })
-
-    await this.secuenciasService.inicializarTodosLosTipos(tenant.id)
 
     return {
       token: this.generateToken(tenant.id),
