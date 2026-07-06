@@ -77,6 +77,7 @@ export class GhlContactosService {
 
     const resultado: SyncResultado = { importados: 0, actualizados: 0, sinRnc: 0 }
     let url: string | null = `${GHL_CONTACTS_URL}?locationId=${encodeURIComponent(loc.locationId)}&limit=100`
+    let debugLogged = false // TEMPORAL: log del primer contacto crudo
 
     while (url) {
       let page: GhlPage
@@ -92,6 +93,19 @@ export class GhlContactosService {
             `${resultado.actualizados} actualizados, ${resultado.sinRnc} sin RNC.`,
         )
       }
+
+      // ─── TEMPORAL (diagnóstico de mapeo) — remover tras ajustar el mapeo ───
+      // Imprime el PRIMER contacto crudo tal como llega de GHL, con la estructura
+      // completa (incluye customFields con sus id/key/value) para mapear nombre y
+      // RNC con certeza. No hay secretos en el objeto contacto.
+      if (!debugLogged && (page.contacts?.length ?? 0) > 0) {
+        debugLogged = true
+        this.logger.log(`[GHL][DEBUG] rncFieldKey configurado = ${JSON.stringify(rncFieldKey)}`)
+        this.logger.log(`[GHL][DEBUG] claves del primer contacto = ${JSON.stringify(Object.keys(page.contacts![0] as object))}`)
+        this.logger.log(`[GHL][DEBUG] primer contacto CRUDO = ${JSON.stringify(page.contacts![0])}`)
+        this.logger.log(`[GHL][DEBUG] customFields del primer contacto = ${JSON.stringify((page.contacts![0] as { customFields?: unknown }).customFields)}`)
+      }
+      // ─── FIN TEMPORAL ─────────────────────────────────────────────────────
 
       for (const c of page.contacts ?? []) {
         await this.upsertContacto(tenantId, c, rncFieldKey, resultado)
