@@ -14,19 +14,39 @@ export interface SyncResultado {
 }
 
 // Shape parcial de un contacto de GHL (v2). customFields puede venir como arreglo
-// [{id,value}] o como objeto {id: value}; soportamos ambos.
+// customFields en la lista de contactos v2 llega como [{ id, value }] (keyed por
+// el id del campo, NO por el nombre visible). Se toleran variantes por robustez.
+interface GhlCustomFieldEntry {
+  id?: string
+  key?: string
+  fieldKey?: string
+  value?: unknown
+  field_value?: unknown
+}
 interface GhlContacto {
   id: string
-  name?: string
-  companyName?: string
-  email?: string
-  phone?: string
-  customFields?: Array<{ id: string; value?: unknown }> | Record<string, unknown>
+  contactName?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  firstNameRaw?: string | null
+  lastNameRaw?: string | null
+  name?: string | null
+  companyName?: string | null
+  email?: string | null
+  phone?: string | null
+  customFields?: GhlCustomFieldEntry[] | Record<string, unknown>
 }
 
 interface GhlPage {
   contacts?: GhlContacto[]
   meta?: { nextPageUrl?: string | null }
+}
+
+// Definición de custom field (GET /locations/{id}/customFields).
+interface GhlCustomFieldDef {
+  id?: string
+  name?: string
+  fieldKey?: string
 }
 
 @Injectable()
@@ -75,9 +95,13 @@ export class GhlContactosService {
       throw new BadRequestException('El tenant no tiene un location de GoHighLevel vinculado.')
     }
 
+    // El customField del RNC en el contacto viene keyed por el id del campo.
+    // El tenant configura el NOMBRE visible (p.ej. "RNC / Cedula"), así que
+    // resolvemos nombre → id(s) contra la API de custom fields de GHL.
+    const rncFieldIds = await this.resolverRncFieldIds(loc.locationId, token, rncFieldKey)
+
     const resultado: SyncResultado = { importados: 0, actualizados: 0, sinRnc: 0 }
     let url: string | null = `${GHL_CONTACTS_URL}?locationId=${encodeURIComponent(loc.locationId)}&limit=100`
-    let debugLogged = false // TEMPORAL: log del primer contacto crudo
 
     while (url) {
       let page: GhlPage
@@ -94,21 +118,8 @@ export class GhlContactosService {
         )
       }
 
-      // ─── TEMPORAL (diagnóstico de mapeo) — remover tras ajustar el mapeo ───
-      // Imprime el PRIMER contacto crudo tal como llega de GHL, con la estructura
-      // completa (incluye customFields con sus id/key/value) para mapear nombre y
-      // RNC con certeza. No hay secretos en el objeto contacto.
-      if (!debugLogged && (page.contacts?.length ?? 0) > 0) {
-        debugLogged = true
-        this.logger.log(`[GHL][DEBUG] rncFieldKey configurado = ${JSON.stringify(rncFieldKey)}`)
-        this.logger.log(`[GHL][DEBUG] claves del primer contacto = ${JSON.stringify(Object.keys(page.contacts![0] as object))}`)
-        this.logger.log(`[GHL][DEBUG] primer contacto CRUDO = ${JSON.stringify(page.contacts![0])}`)
-        this.logger.log(`[GHL][DEBUG] customFields del primer contacto = ${JSON.stringify((page.contacts![0] as { customFields?: unknown }).customFields)}`)
-      }
-      // ─── FIN TEMPORAL ─────────────────────────────────────────────────────
-
       for (const c of page.contacts ?? []) {
-        await this.upsertContacto(tenantId, c, rncFieldKey, resultado)
+        await this.upsertContacto(tenantId, c, rncFieldIds, resultado)
       }
 
       url = page.meta?.nextPageUrl ?? null
@@ -137,10 +148,10 @@ export class GhlContactosService {
   private async upsertContacto(
     tenantId: string,
     c: GhlContacto,
-    rncFieldKey: string | undefined,
+    rncFieldIds: Set<string>,
     resultado: SyncResultado,
   ): Promise<void> {
-    const rnc = rncFieldKey ? this.extraerRnc(c, rncFieldKey) : undefined
+    const rnc = this.extraerRnc(c, rncFieldIds)
     if (!rnc) resultado.sinRnc += 1
 
     let rncValidado = false
@@ -153,14 +164,23 @@ export class GhlContactosService {
       }
     }
 
+    // Nombre: empresa → nombre completo (versión "Raw" con mayúsculas) → contactName.
+    const nombreCompleto = [c.firstNameRaw ?? c.firstName, c.lastNameRaw ?? c.lastName]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+    const razonSocial =
+      c.companyName?.trim() || nombreCompleto || c.contactName?.trim() || c.name?.trim() || '(sin nombre)'
+
     const data = {
       tipo: 'CLIENTE',
       origen: 'GHL',
-      razonSocial: c.companyName ?? c.name ?? '(sin nombre)',
+      razonSocial,
       rncValidado,
       ...(rnc !== undefined && { rnc }),
-      ...(c.email !== undefined && { email: c.email }),
-      ...(c.phone !== undefined && { telefono: c.phone }),
+      ...(c.email ? { email: c.email } : {}),
+      ...(c.phone ? { telefono: c.phone } : {}),
     }
 
     const existing = await prisma.contacto.findFirst({ where: { tenantId, ghlContactId: c.id } })
@@ -173,16 +193,75 @@ export class GhlContactosService {
     }
   }
 
-  private extraerRnc(c: GhlContacto, key: string): string | undefined {
+  private extraerRnc(c: GhlContacto, fieldIds: Set<string>): string | undefined {
     const cf = c.customFields
-    if (!cf) return undefined
+    if (!cf || fieldIds.size === 0) return undefined
     let raw: unknown
     if (Array.isArray(cf)) {
-      raw = cf.find((f) => f.id === key)?.value
+      // Entradas keyed por id (v2). Se toleran también key/fieldKey.
+      const hit = cf.find(
+        (f) => (f.id && fieldIds.has(f.id)) || (f.key && fieldIds.has(f.key)) || (f.fieldKey && fieldIds.has(f.fieldKey)),
+      )
+      raw = hit?.value ?? hit?.field_value
     } else {
-      raw = cf[key]
+      for (const k of fieldIds) {
+        if (cf[k] != null) { raw = cf[k]; break }
+      }
     }
     const value = typeof raw === 'string' ? raw.trim() : raw != null ? String(raw) : ''
-    return value === '' ? undefined : value
+    return value === '' ? undefined : value.replace(/\D/g, '') || undefined
   }
+
+  /**
+   * Resuelve el/los identificadores del custom field del RNC. El tenant configura
+   * el NOMBRE visible (p.ej. "RNC / Cedula"), pero el contacto trae customFields
+   * keyed por el id del campo. Se consulta GET /locations/{id}/customFields y se
+   * hace match tolerante (id, fieldKey o nombre normalizado sin acentos). Si la
+   * consulta falla, se usa el valor configurado tal cual (por si ya es id/fieldKey).
+   */
+  private async resolverRncFieldIds(
+    locationId: string,
+    token: string,
+    configurado: string | undefined,
+  ): Promise<Set<string>> {
+    const ids = new Set<string>()
+    if (!configurado?.trim()) return ids
+    const objetivo = normalizar(configurado)
+    ids.add(configurado.trim()) // por si ya es id o fieldKey
+
+    try {
+      const res = await this.fetchGhl(
+        `https://services.leadconnectorhq.com/locations/${encodeURIComponent(locationId)}/customFields`,
+        token,
+      )
+      if (res.ok) {
+        const body = (await res.json()) as { customFields?: GhlCustomFieldDef[] }
+        for (const f of body.customFields ?? []) {
+          const match =
+            (f.id && f.id === configurado.trim()) ||
+            (f.fieldKey && (f.fieldKey === configurado.trim() || normalizar(f.fieldKey) === objetivo)) ||
+            (f.name && normalizar(f.name) === objetivo)
+          if (match) {
+            if (f.id) ids.add(f.id)
+            if (f.fieldKey) ids.add(f.fieldKey)
+          }
+        }
+      } else {
+        this.logger.warn(`[GHL] No se pudo listar customFields (${res.status}); se usa el valor configurado tal cual`)
+      }
+    } catch (err) {
+      this.logger.warn(`[GHL] Error resolviendo customFields del RNC: ${String(err)}`)
+    }
+    return ids
+  }
+}
+
+// Normaliza para comparar nombres: minúsculas, sin acentos, separadores colapsados.
+function normalizar(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[\s/_-]+/g, ' ')
+    .trim()
 }
