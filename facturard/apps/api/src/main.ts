@@ -75,7 +75,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: true,           // Acepta cualquier Origin (incluye dgii.gov.do)
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
