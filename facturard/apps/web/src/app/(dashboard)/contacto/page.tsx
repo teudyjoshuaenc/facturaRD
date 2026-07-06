@@ -1,54 +1,78 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
 import {
   Search,
   Plus,
   Building2,
-  Mail,
-  RotateCw,
+  User,
   RefreshCw,
-  Download,
-  Calendar,
+  RotateCw,
+  ChevronLeft,
   ChevronRight,
-  Send,
-  MoreHorizontal,
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  ChevronLeft
 } from 'lucide-react'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
+import { EmptyState } from '@/components/dashboard/EmptyState'
+import { useContactosDirectorio } from '@/hooks/useContactosDirectorio'
 import { useContactos } from '@/hooks/useContactos'
 import { useGhlSync, type SyncResultado } from '@/hooks/useGhlSync'
-import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
-import { formatCurrency } from '@/lib/comprobantes'
-
 import { useUI } from '@/lib/context/UIContext'
+import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 
-type ValidationFilter = 'todos' | 'VALIDO' | 'NO_ENCONTRADO'
-type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO' | 'OCASIONAL'
+type TipoFilter = 'todos' | 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
+type OrigenFilter = 'todos' | 'MANUAL' | 'GHL'
+
+const TIPO_LABEL: Record<string, string> = {
+  CLIENTE: 'Cliente',
+  PROVEEDOR: 'Proveedor',
+  CONSUMIDOR_FINAL: 'Consumidor final',
+}
+
+function formatRnc(rnc: string | null): string {
+  if (!rnc) return '—'
+  if (rnc.length === 9) return rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+  if (rnc.length === 11) return rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+  return rnc
+}
 
 export default function ContactosPage(): JSX.Element {
-  const { contactos, crearContacto } = useContactos()
   const { globalSearch } = useUI()
+  const { crearContacto } = useContactos()
   const { conectado, sincronizar, getErrorMessage } = useGhlSync()
+
   const [search, setSearch] = useState('')
-  const [validationFilter, setValidationFilter] = useState<ValidationFilter>('todos')
-  const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos')
+  const [origenFilter, setOrigenFilter] = useState<OrigenFilter>('todos')
+  const [soloSinRnc, setSoloSinRnc] = useState(false)
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
 
-  // Estado de la sincronización con GHL (importación GHL → FacturaRD).
   const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
   const [syncError, setSyncError] = useState('')
   const [avisoNoConectado, setAvisoNoConectado] = useState(false)
+
+  const activeSearch = (search.trim() ? search : globalSearch).trim()
+
+  const { contactos, total, totalPages, isLoading, isError, refetch } = useContactosDirectorio({
+    search: activeSearch,
+    tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
+    origen: origenFilter === 'todos' ? undefined : origenFilter,
+    page,
+    limit: 10,
+  })
+
+  // "Sin RNC" se filtra sobre la página cargada (el backend no tiene ese filtro).
+  const visibles = useMemo(
+    () => (soloSinRnc ? contactos.filter((c) => !c.rnc) : contactos),
+    [contactos, soloSinRnc],
+  )
 
   async function handleSincronizarGhl(): Promise<void> {
     if (!conectado) {
@@ -60,99 +84,32 @@ export default function ContactosPage(): JSX.Element {
     try {
       const res = await sincronizar.mutateAsync()
       setSyncResult(res)
+      setPage(1)
     } catch (err) {
       setSyncError(getErrorMessage(err, 'No pudimos sincronizar con GoHighLevel.'))
     }
   }
 
-  // Mock initial dataset matching Foto 1 to make it high-fidelity
-  const extendedContactos = useMemo(() => {
-    const list = [
-      { id: 'mock-c1', nombre: 'Distribuidora López SRL', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'mock-c2', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'INACTIVO' },
-      { id: 'mock-c3', nombre: 'Comercial Díaz & Asoc.', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'mock-c4', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'mock-c5', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'mock-c6', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-      { id: 'mock-c7', nombre: 'Tech Solutions DO', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'NO_ENCONTRADO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'OCASIONAL' },
-      { id: 'mock-c8', nombre: 'Importadora Caribe', rnc: '130874562', email: 'info@distlopez.com.do', tipo: 'EMPRESA', validacion: 'VALIDO', totalFacturado: 125400, fecha: '2026-04-20', estado: 'ACTIVO' },
-    ]
-    // Append user-registered contacts
-    contactos.forEach((c) => {
-      if (!list.some((item) => item.rnc === c.rnc)) {
-        list.push({
-          id: c.id,
-          nombre: c.nombre,
-          rnc: c.rnc,
-          email: c.email || 'info@distlopez.com.do',
-          tipo: c.tipo,
-          validacion: 'VALIDO',
-          totalFacturado: 0,
-          fecha: '2026-04-20',
-          estado: 'ACTIVO',
-        })
-      }
-    })
-    return list
-  }, [contactos])
-
-  // Filter logic
-  const filtered = useMemo(() => {
-    let list = [...extendedContactos]
-    const activeSearch = (search.trim() ? search : globalSearch).toLowerCase()
-
-    if (activeSearch) {
-      list = list.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(activeSearch) ||
-          c.rnc.includes(activeSearch)
-      )
+  function resetPage<T>(setter: (v: T) => void): (v: T) => void {
+    return (v: T) => {
+      setter(v)
+      setPage(1)
     }
-
-    if (validationFilter !== 'todos') {
-      list = list.filter((c) => c.validacion === validationFilter)
-    }
-
-    if (estadoFilter !== 'todos') {
-      list = list.filter((c) => c.estado === estadoFilter)
-    }
-
-    if (startDate) {
-      const parts = startDate.split('-').map(Number)
-      const start = new Date(parts[0] ?? 0, (parts[1] ?? 1) - 1, parts[2] ?? 1, 0, 0, 0, 0)
-      list = list.filter((c) => new Date(c.fecha) >= start)
-    }
-    if (endDate) {
-      const parts = endDate.split('-').map(Number)
-      const end = new Date(parts[0] ?? 0, (parts[1] ?? 1) - 1, parts[2] ?? 1, 23, 59, 59, 999)
-      list = list.filter((c) => new Date(c.fecha) <= end)
-    }
-
-    return list
-  }, [extendedContactos, search, globalSearch, validationFilter, estadoFilter, startDate, endDate])
-
-  const paginated = useMemo(() => {
-    const offset = (page - 1) * 10
-    return filtered.slice(offset, offset + 10)
-  }, [filtered, page])
-
-  const totalPages = Math.ceil(filtered.length / 10) || 1
+  }
 
   return (
     <div className="flex flex-col gap-6 text-left">
-      {/* Header and CTA */}
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-100 pb-5">
         <div className="flex flex-col gap-1">
           <h2 className="text-h4 font-bold text-text-primary">Contactos</h2>
-          <p className="text-body-sm text-text-secondary">
-            {filtered.length} entidades fiscales · 2 con incidencias
-          </p>
+          <p className="text-body-sm text-text-secondary">{total} contactos en tu directorio</p>
         </div>
         <div className="flex items-center gap-2.5">
           <Button
             variant="secondary"
             size="md"
-            onClick={() => window.location.reload()}
+            onClick={() => refetch()}
             className="h-10 w-10 p-0 flex items-center justify-center border border-neutral-200 hover:bg-neutral-50"
             title="Refrescar"
           >
@@ -166,28 +123,10 @@ export default function ContactosPage(): JSX.Element {
             className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
             title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
           >
-            {sincronizar.isPending ? (
-              <Spinner size={16} className="mr-1.5" />
-            ) : (
-              <RefreshCw size={16} className="mr-1.5" />
-            )}
+            {sincronizar.isPending ? <Spinner size={16} className="mr-1.5" /> : <RefreshCw size={16} className="mr-1.5" />}
             Sincronizar con GoHighLevel
           </Button>
-          <Button
-            variant="secondary"
-            size="md"
-            className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
-            title="Exportar"
-          >
-            <Download size={16} className="mr-1.5" />
-            Exportar
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setOpenModal(true)}
-            className="h-10 px-4 bg-brand-500 text-white font-semibold"
-          >
+          <Button variant="primary" size="md" onClick={() => setOpenModal(true)} className="h-10 px-4 font-semibold">
             <Plus size={16} className="mr-1.5" />
             Nuevo contacto
           </Button>
@@ -222,19 +161,17 @@ export default function ContactosPage(): JSX.Element {
 
       {/* Resultado de sincronización */}
       {syncResult && (
-        <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3 text-success-800">
+        <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3">
           <div className="flex items-center gap-2 text-body-sm font-semibold text-success-700">
             <CheckCircle2 size={18} className="shrink-0" />
             Importados: {syncResult.importados} · Actualizados: {syncResult.actualizados} · Sin RNC: {syncResult.sinRnc}
           </div>
           {syncResult.sinRnc > 0 && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-text-secondary">
-              <span>
-                {syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.
-              </span>
+              <span>{syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
               <button
                 type="button"
-                onClick={() => { setValidationFilter('NO_ENCONTRADO'); setPage(1) }}
+                onClick={() => { setOrigenFilter('GHL'); setSoloSinRnc(true); setPage(1) }}
                 className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
               >
                 Ver contactos sin RNC
@@ -244,227 +181,154 @@ export default function ContactosPage(): JSX.Element {
         </div>
       )}
 
-      {/* Filter Row */}
+      {/* Filtros (server-side: search, tipo, origen) */}
       <div className="flex flex-wrap items-center gap-3.5 bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm w-full">
-        {/* Search Input */}
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
           <input
             type="text"
-            placeholder="Buscar por cliente, RNC o e-NCF..."
+            placeholder="Buscar por razón social, RNC o email..."
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => resetPage(setSearch)(e.target.value)}
             className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
           />
         </div>
 
-        {/* Validacion Selector */}
-        <div className="relative">
-          <select
-            value={validationFilter}
-            onChange={(e) => {
-              setValidationFilter(e.target.value as ValidationFilter)
-              setPage(1)
-            }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
-          >
-            <option value="todos">Validacion</option>
-            <option value="VALIDO">Válido</option>
-            <option value="NO_ENCONTRADO">No encontrado</option>
-          </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        </div>
+        <select
+          value={tipoFilter}
+          onChange={(e) => resetPage(setTipoFilter)(e.target.value as TipoFilter)}
+          className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer hover:bg-neutral-50 transition-colors"
+        >
+          <option value="todos">Todos los tipos</option>
+          <option value="CLIENTE">Cliente</option>
+          <option value="PROVEEDOR">Proveedor</option>
+          <option value="CONSUMIDOR_FINAL">Consumidor final</option>
+        </select>
 
-        {/* Estado Selector */}
-        <div className="relative">
-          <select
-            value={estadoFilter}
-            onChange={(e) => {
-              setEstadoFilter(e.target.value as EstadoFilter)
-              setPage(1)
-            }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
-          >
-            <option value="todos">Estado</option>
-            <option value="ACTIVO">Activo</option>
-            <option value="INACTIVO">Inactivo</option>
-            <option value="OCASIONAL">Ocasional</option>
-          </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        </div>
+        <select
+          value={origenFilter}
+          onChange={(e) => { resetPage(setOrigenFilter)(e.target.value as OrigenFilter); setSoloSinRnc(false) }}
+          className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer hover:bg-neutral-50 transition-colors"
+        >
+          <option value="todos">Todos los orígenes</option>
+          <option value="MANUAL">Manual</option>
+          <option value="GHL">GoHighLevel</option>
+        </select>
 
-        {/* Date Picker Group */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 h-10 min-w-[260px]">
-          <Calendar size={14} className="text-text-tertiary flex-shrink-0" />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value)
-              setPage(1)
-            }}
-            className="text-body-sm text-text-primary bg-transparent focus:outline-none w-full placeholder:text-text-tertiary"
-          />
-          <span className="text-text-tertiary px-1 font-medium">-</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value)
-              setPage(1)
-            }}
-            className="text-body-sm text-text-primary bg-transparent focus:outline-none w-full placeholder:text-text-tertiary"
-          />
-        </div>
+        {soloSinRnc && (
+          <Badge variant="warning" className="h-10">
+            Solo sin RNC
+            <button type="button" onClick={() => setSoloSinRnc(false)} className="ml-1 focus:outline-none" title="Quitar filtro">
+              <XCircle size={14} />
+            </button>
+          </Badge>
+        )}
       </div>
 
-      {/* Directory Table */}
+      {/* Tabla */}
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-body-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
-                <th className="px-4 py-3 font-semibold">Nombre / Razón social</th>
-                <th className="px-4 py-3 font-semibold">RNC / Cédula</th>
-                <th className="px-4 py-3 font-semibold">Validación</th>
-                <th className="px-4 py-3 font-semibold">Total facturado</th>
-                <th className="px-4 py-3 font-semibold">Última actividad</th>
-                <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold text-right pr-6">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((c) => {
-                const isEmpresa = c.tipo === 'EMPRESA'
-                const formattedRnc = c.rnc.length === 9
-                  ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-                  : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
-
-                return (
+        {isLoading ? (
+          <div className="flex items-center justify-center p-16">
+            <Spinner size={28} />
+          </div>
+        ) : isError ? (
+          <div className="p-12 text-center text-body-sm text-danger-600">
+            No pudimos cargar los contactos. Intenta refrescar.
+          </div>
+        ) : visibles.length === 0 ? (
+          <EmptyState
+            title=""
+            description={
+              activeSearch || tipoFilter !== 'todos' || origenFilter !== 'todos' || soloSinRnc
+                ? 'No hay contactos que coincidan con los filtros.'
+                : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-body-sm">
+              <thead>
+                <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
+                  <th className="px-4 py-3">Nombre / Razón social</th>
+                  <th className="px-4 py-3">RNC / Cédula</th>
+                  <th className="px-4 py-3">Tipo</th>
+                  <th className="px-4 py-3">Origen</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Teléfono</th>
+                  <th className="px-4 py-3">Validación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibles.map((c) => (
                   <tr key={c.id} className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors">
-                    <td className="px-4 py-3 flex items-center gap-3">
-                      <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
-                        <Building2 size={16} />
-                        {/* Dot indicator (Active/Inactive) */}
-                        <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white ${c.estado === 'ACTIVO' ? 'bg-green-500' : c.estado === 'OCASIONAL' ? 'bg-orange-500' : 'bg-neutral-400'}`} />
-                      </div>
-                      <div className="flex flex-col text-left">
-                        <span className="font-semibold text-text-primary text-body-sm line-clamp-1">
-                          {c.nombre}
-                        </span>
-                        <span className="text-[10px] text-text-secondary font-medium mt-0.2 capitalize">
-                          {c.tipo.toLowerCase()}
-                        </span>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
+                          {c.tipo === 'CONSUMIDOR_FINAL' ? <User size={16} /> : <Building2 size={16} />}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-text-primary line-clamp-1">{c.razonSocial}</span>
+                          {c.nombreComercial && (
+                            <span className="text-[11px] text-text-secondary line-clamp-1">{c.nombreComercial}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-text-primary font-semibold text-body-sm">
-                      {formattedRnc}
+                    <td className="px-4 py-3 font-semibold text-text-primary">{formatRnc(c.rnc)}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={c.tipo === 'CLIENTE' ? 'info' : 'neutral'}>{TIPO_LABEL[c.tipo] ?? c.tipo}</Badge>
                     </td>
-                    <td className="px-4 py-3.5">
-                      {c.validacion === 'VALIDO' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2 py-0.5 text-ui-xs font-semibold text-green-700">
-                          <CheckCircle2 size={11} className="text-green-600" />
-                          Válido
-                        </span>
+                    <td className="px-4 py-3">
+                      <Badge variant={c.origen === 'GHL' ? 'info' : 'neutral'}>
+                        {c.origen === 'GHL' ? 'GoHighLevel' : 'Manual'}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary">{c.email || '—'}</td>
+                    <td className="px-4 py-3 text-text-secondary">{c.telefono || '—'}</td>
+                    <td className="px-4 py-3">
+                      {c.rncValidado ? (
+                        <Badge variant="success"><CheckCircle2 size={12} /> Válido</Badge>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200/50 px-2 py-0.5 text-ui-xs font-semibold text-orange-700">
-                          <AlertTriangle size={11} className="text-orange-600" />
-                          No encontrado
-                        </span>
+                        <Badge variant="warning"><AlertTriangle size={12} /> Sin validar</Badge>
                       )}
-                    </td>
-                    <td className="px-4 py-3.5 text-text-primary font-bold text-body-sm">
-                      {c.totalFacturado === 0 ? '0.00' : formatCurrency(c.totalFacturado)}
-                    </td>
-                    <td className="px-4 py-3.5 text-text-secondary text-body-sm">
-                      {c.fecha}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {c.estado === 'ACTIVO' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-green-700">
-                          <CheckCircle2 size={11} className="text-green-600" />
-                          Activo
-                        </span>
-                      ) : c.estado === 'OCASIONAL' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-orange-700">
-                          <AlertTriangle size={11} className="text-orange-600" />
-                          Ocasional
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 border border-neutral-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-neutral-600">
-                          <XCircle size={11} className="text-neutral-500" />
-                          Inactivo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-right pr-6">
-                      <div className="flex items-center justify-end gap-3.5">
-                        <button
-                          type="button"
-                          title="Enviar correo"
-                          onClick={() => alert('Enviando estado de cuenta...')}
-                          className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
-                        >
-                          <Send size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Opciones"
-                          className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
-                        >
-                          <MoreHorizontal size={15} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
-                )
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-body-sm text-text-secondary">
-                    No se encontraron clientes en tu directorio.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Custom Pagination footer */}
-        <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
-          <p className="text-ui-sm text-text-secondary">{filtered.length} resultados</p>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-ui-sm font-bold text-white shadow-sm shadow-brand-500/10">
-              {page}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
-            >
-              <ChevronRight size={16} />
-            </button>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
+
+        {/* Paginación (server-side) */}
+        {!isLoading && !isError && visibles.length > 0 && (
+          <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
+            <p className="text-ui-sm text-text-secondary">{total} resultados</p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-500 px-2 text-ui-sm font-bold text-white">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <NuevoClienteModal
-        open={openModal}
-        onClose={() => setOpenModal(false)}
-        onSave={crearContacto}
-      />
+      <NuevoClienteModal open={openModal} onClose={() => setOpenModal(false)} onSave={crearContacto} />
     </div>
   )
 }
