@@ -2,12 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import type { JSX } from 'react'
+import Link from 'next/link'
 import {
   Search,
   Plus,
   Building2,
   Mail,
   RotateCw,
+  RefreshCw,
   Download,
   Calendar,
   ChevronRight,
@@ -20,7 +22,9 @@ import {
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { useContactos } from '@/hooks/useContactos'
+import { useGhlSync, type SyncResultado } from '@/hooks/useGhlSync'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { formatCurrency } from '@/lib/comprobantes'
 
@@ -32,6 +36,7 @@ type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO' | 'OCASIONAL'
 export default function ContactosPage(): JSX.Element {
   const { contactos, crearContacto } = useContactos()
   const { globalSearch } = useUI()
+  const { conectado, sincronizar, getErrorMessage } = useGhlSync()
   const [search, setSearch] = useState('')
   const [validationFilter, setValidationFilter] = useState<ValidationFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
@@ -39,6 +44,26 @@ export default function ContactosPage(): JSX.Element {
   const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
+
+  // Estado de la sincronización con GHL (importación GHL → FacturaRD).
+  const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
+  const [syncError, setSyncError] = useState('')
+  const [avisoNoConectado, setAvisoNoConectado] = useState(false)
+
+  async function handleSincronizarGhl(): Promise<void> {
+    if (!conectado) {
+      setAvisoNoConectado(true)
+      return
+    }
+    setSyncError('')
+    setSyncResult(null)
+    try {
+      const res = await sincronizar.mutateAsync()
+      setSyncResult(res)
+    } catch (err) {
+      setSyncError(getErrorMessage(err, 'No pudimos sincronizar con GoHighLevel.'))
+    }
+  }
 
   // Mock initial dataset matching Foto 1 to make it high-fidelity
   const extendedContactos = useMemo(() => {
@@ -136,6 +161,21 @@ export default function ContactosPage(): JSX.Element {
           <Button
             variant="secondary"
             size="md"
+            onClick={handleSincronizarGhl}
+            disabled={sincronizar.isPending}
+            className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
+            title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
+          >
+            {sincronizar.isPending ? (
+              <Spinner size={16} className="mr-1.5" />
+            ) : (
+              <RefreshCw size={16} className="mr-1.5" />
+            )}
+            Sincronizar con GoHighLevel
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
             className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
             title="Exportar"
           >
@@ -153,6 +193,56 @@ export default function ContactosPage(): JSX.Element {
           </Button>
         </div>
       </div>
+
+      {/* Aviso: sin conexión GHL */}
+      {avisoNoConectado && !conectado && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={18} className="shrink-0" />
+            Primero conecta tu cuenta de GoHighLevel en Configuración.
+          </span>
+          <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
+            Ir a Configuración
+          </Link>
+        </div>
+      )}
+
+      {/* Error de sincronización */}
+      {syncError && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-body-sm text-danger-700">
+          <span className="flex items-center gap-2">
+            <XCircle size={18} className="shrink-0" />
+            {syncError} Revisa el token en Configuración.
+          </span>
+          <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
+            Ir a Configuración
+          </Link>
+        </div>
+      )}
+
+      {/* Resultado de sincronización */}
+      {syncResult && (
+        <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3 text-success-800">
+          <div className="flex items-center gap-2 text-body-sm font-semibold text-success-700">
+            <CheckCircle2 size={18} className="shrink-0" />
+            Importados: {syncResult.importados} · Actualizados: {syncResult.actualizados} · Sin RNC: {syncResult.sinRnc}
+          </div>
+          {syncResult.sinRnc > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-text-secondary">
+              <span>
+                {syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.
+              </span>
+              <button
+                type="button"
+                onClick={() => { setValidationFilter('NO_ENCONTRADO'); setPage(1) }}
+                className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
+              >
+                Ver contactos sin RNC
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter Row */}
       <div className="flex flex-wrap items-center gap-3.5 bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm w-full">

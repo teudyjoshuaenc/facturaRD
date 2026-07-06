@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { CertificateDropzone } from '@/components/certificados/certificate-dropzone'
+import { GhlContactosCard } from '@/components/configuracion/GhlContactosCard'
 import { api, getErrorMessage } from '@/lib/api'
 import { useCertificado } from '@/hooks/useCertificado'
 import { formatDate } from '@/lib/comprobantes'
@@ -329,6 +330,9 @@ export default function ConfiguracionPage(): JSX.Element {
           )}
         </CardContent>
       </Card>
+
+      {/* 4. Integración GoHighLevel — importar contactos (una vía) */}
+      <GhlContactosCard />
     </div>
   )
 }

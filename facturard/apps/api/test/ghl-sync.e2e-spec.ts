@@ -12,6 +12,7 @@ describe('GHL sync de contactos (e2e)', () => {
   let tenant: TestTenant
   const buscarPorRNC = jest.fn()
   let fetchSpy: jest.SpyInstance
+  const LOCATION_ID = 'loc-ghl-sync-test'
 
   const page1 = {
     contacts: [
@@ -33,6 +34,8 @@ describe('GHL sync de contactos (e2e)', () => {
     ctx = await createTestApp([{ provide: DgiiContribuyentesService, useValue: { buscarPorRNC } }])
     app = ctx.app
     tenant = await createTenant()
+    // GHL exige locationId → el tenant debe tener un GhlLocation vinculado.
+    await prisma.ghlLocation.create({ data: { locationId: LOCATION_ID, tenantId: tenant.tenant.id } })
   })
 
   afterAll(async () => { await app.close() })
@@ -71,6 +74,18 @@ describe('GHL sync de contactos (e2e)', () => {
     expect(g1.rnc).toBe('131880681')
     expect(g1.rncValidado).toBe(true)
     expect(g1.origen).toBe('GHL')
+  })
+
+  it('la llamada a GHL incluye el locationId del tenant y el header de auth', async () => {
+    await request(app.getHttpServer()).post('/api/v1/contactos/sincronizar-ghl').set(auth()).expect(201)
+
+    // La primera llamada la construye nuestro código: debe llevar ?locationId=<location del tenant>.
+    const primeraUrl = String(fetchSpy.mock.calls[0]?.[0] ?? '')
+    expect(primeraUrl).toContain(`locationId=${LOCATION_ID}`)
+
+    const init = fetchSpy.mock.calls[0]?.[1] as { headers?: Record<string, string> } | undefined
+    expect(init?.headers?.Authorization).toMatch(/^Bearer /)
+    expect(init?.headers?.Version).toBe('2021-07-28')
   })
 
   it('re-ejecutar → todos actualizados, cero duplicados', async () => {

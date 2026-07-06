@@ -39,11 +39,21 @@ export class GhlContactosService {
   ) {}
 
   async configurar(tenantId: string, dto: ConfigurarGhlDto): Promise<{ ok: true }> {
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
+    const nuevoToken = dto.ghlAccessToken?.trim()
+
+    // Se puede actualizar solo el campo RNC sin re-pegar el token: si no llega un
+    // token nuevo se conserva el existente. Pero para CONECTAR por primera vez el
+    // token es obligatorio.
+    if (!nuevoToken && !tenant.ghlAccessToken) {
+      throw new BadRequestException('Falta el Private Integration Token para conectar GoHighLevel.')
+    }
+
     await prisma.tenant.update({
       where: { id: tenantId },
       data: {
-        ghlAccessToken: this.crypto.encryptString(dto.ghlAccessToken),
-        ghlRncFieldKey: dto.ghlRncFieldKey ?? null,
+        ...(nuevoToken ? { ghlAccessToken: this.crypto.encryptString(nuevoToken) } : {}),
+        ghlRncFieldKey: dto.ghlRncFieldKey?.trim() || null,
       },
     })
     return { ok: true }
@@ -57,15 +67,21 @@ export class GhlContactosService {
     const token = this.crypto.decryptString(tenant.ghlAccessToken)
     const rncFieldKey = tenant.ghlRncFieldKey ?? undefined
 
+    // La API v2 de GHL EXIGE el locationId (?locationId=) para /contacts/.
+    // Lo tomamos del vínculo GhlLocation del tenant (guardado en el onboarding),
+    // no del usuario.
+    const loc = await prisma.ghlLocation.findFirst({ where: { tenantId }, orderBy: { createdAt: 'asc' } })
+    if (!loc) {
+      throw new BadRequestException('El tenant no tiene un location de GoHighLevel vinculado.')
+    }
+
     const resultado: SyncResultado = { importados: 0, actualizados: 0, sinRnc: 0 }
-    let url: string | null = `${GHL_CONTACTS_URL}?limit=100`
+    let url: string | null = `${GHL_CONTACTS_URL}?locationId=${encodeURIComponent(loc.locationId)}&limit=100`
 
     while (url) {
       let page: GhlPage
       try {
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}`, Version: GHL_VERSION },
-        })
+        const res = await this.fetchGhl(url, token)
         if (!res.ok) throw new Error(`GHL respondió ${res.status}`)
         page = (await res.json()) as GhlPage
       } catch (err) {
@@ -88,6 +104,20 @@ export class GhlContactosService {
       `[GHL] Sync tenant ${tenantId}: ${resultado.importados} importados, ${resultado.actualizados} actualizados, ${resultado.sinRnc} sin RNC`,
     )
     return resultado
+  }
+
+  /**
+   * Llama a GHL con el token. Los Private Integration Tokens se documentan tanto
+   * con 'Authorization: Bearer <token>' como con 'Authorization: <token>'; se
+   * intenta Bearer y, si devuelve 401/403, se reintenta sin 'Bearer'.
+   */
+  private async fetchGhl(url: string, token: string): Promise<Response> {
+    const headers = (auth: string): Record<string, string> => ({ Authorization: auth, Version: GHL_VERSION })
+    let res = await fetch(url, { headers: headers(`Bearer ${token}`) })
+    if (res.status === 401 || res.status === 403) {
+      res = await fetch(url, { headers: headers(token) })
+    }
+    return res
   }
 
   private async upsertContacto(

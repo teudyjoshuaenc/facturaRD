@@ -266,7 +266,11 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 /dashboard       → métricas del mes + facturas recientes
 /facturas        → lista paginada con filtros por estado y búsqueda
 /nueva-factura   → formulario emitir comprobante (E31/E32)
-/configuracion   → empresa, certificado P12, webhook GHL
+/configuracion   → empresa, certificado P12, webhook GHL (emisión entrante),
+                   y "Integración con GoHighLevel" para IMPORTAR contactos
+                   (PATCH /contactos/configurar-ghl: Private Integration Token + ghlRncFieldKey)
+/contacto        → directorio de contactos + "Sincronizar con GoHighLevel"
+                   (POST /contactos/sincronizar-ghl → resumen importados/actualizados/sinRnc)
 ```
 
 **Comandos:**
@@ -292,6 +296,18 @@ para instalar y construir desde la raíz del workspace, y fija `outputDirectory:
 - Interceptor 401: re-llama GET /ghl/init con el `frd_location_id` guardado para refrescar el token
 - Estado global: AuthContext (token + tenant) + UIContext (sidebar abierto/cerrado)
 - Server state: React Query con queryKey tipados por recurso
+- **Sincronización de contactos GHL (una vía, GHL→FacturaRD):** hook `useGhlSync`
+  (estado conectado desde GET /tenants, `guardarConexion`, `sincronizar`). UI:
+  `GhlContactosCard` en /configuracion (token cifrado + campo RNC + instrucciones) y
+  botón "Sincronizar con GoHighLevel" en /contacto (deshabilitado/aviso si no hay conexión;
+  resumen importados/actualizados/sinRnc; enlace "ver sin RNC"; refresca la lista).
+- **Auth GHL (resuelto):** la sync envía `?locationId=<location del tenant>` (tomado de
+  `ghl_locations`, del onboarding — no se pide al usuario) + `Authorization: Bearer <token>`
+  con fallback automático a `Authorization: <token>` (sin Bearer) si GHL responde 401/403
+  (los Private Integration Token admiten ambos formatos). `Version: 2021-07-28`.
+- **Seguridad:** GET /tenants ya NO devuelve `ghlAccessToken`; expone `ghlConectado: boolean`.
+- `PATCH /contactos/configurar-ghl`: el token es opcional al actualizar (si se omite y ya hay
+  uno guardado, se conserva; solo se actualiza `ghlRncFieldKey`). Obligatorio para conectar.
 
 **Onboarding transaccional (backend `POST /ghl/onboarding`):**
 - Es **multipart/form-data**: `locationId`, `rnc`, `passphrase` y el archivo P12 en `file`.
