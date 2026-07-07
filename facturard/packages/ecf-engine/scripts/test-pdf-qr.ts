@@ -6,7 +6,6 @@
  */
 import { generarRepresentacionImpresa } from '../src/pdf'
 import type { EcfPdfInput } from '../src/pdf'
-import QRCode from 'qrcode'
 import { join } from 'path'
 
 // Reimplementamos buildQrUrl localmente para leer la URL sin escribir PDF

@@ -129,10 +129,67 @@ APP_URL=http://localhost:3000
 7. Frontend Next.js 16.2
 8. Cambiar ENV a producción cuando certifiquen
 
-**Backend roadmap (BACKEND_ROADMAP.md) COMPLETO — Sprints 1-10 + TXT oficial reportes.** 62 tests e2e + 112 ecf-engine, build 0.
+**Backend roadmap (BACKEND_ROADMAP.md) COMPLETO — Sprints 1-10 + TXT oficial reportes.** 65 tests e2e + 112 ecf-engine, build 0.
 TXT reportes 606/607/608 implementado contra los instructivos oficiales DGII (606 feb-2026,
 607 dic-2025, 608 catálogo verificado). Los campos que aún no capturamos por comprobante/compra
 van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos por defecto.
+
+---
+
+## 8bis. FIXES DE CUMPLIMIENTO DGII (auditoría normativa)
+
+- ✅ **FIX 2 — EXENTO → IndicadorFacturacion 4 (ya correcto).** Verificado end-to-end: producto `EXENTO`
+  → string interno `'E'` en `datos` → `mapIndicador('E')` = **4** en el XML; el `'E'` nunca llega al XML
+  y el ítem queda fuera de la base gravada de ITBIS. Sin cambios de código.
+- ✅ **FIX 3 — 606 excluye compras sin NCF.** `reporte606` filtra `tipo !== 'SIN_COMPROBANTE'` y NCF no
+  vacío (el 606 exige NCF en el campo 4). Las SIN_COMPROBANTE siguen visibles en `/compras`, solo se
+  excluyen del TXT/JSON del 606.
+- ✅ **FIX 4 — E32 ≥ RD$250,000 exige identificación del comprador.** `crear()` (emisión) y `emitir()`
+  rechazan con 400 un E32 sobre el umbral sin RNC/Cédula ni identificador extranjero. Umbral en la
+  constante `UMBRAL_IDENTIFICACION_E32` (comprobantes.service.ts). Por debajo del umbral, permitido.
+- ✅ **FIX 1 — IndicadorNotaCredito (regla de 30 días) — APLICADO con el XSD oficial vigente.**
+  - Se **reemplazaron por completo** los XSD del repo de **e-CF 33 y e-CF 34 v.1.0** por los oficiales
+    vigentes de la DGII (fecha oficial 01/04/2026). No fue solo el campo: se adoptó el esquema entero.
+  - `IndicadorNotaCredito` (solo E34) pasó de `enum {1,2}` ("Anulación/Corrección") a **`integer 0..1`
+    OBLIGATORIO** (`minOccurs=1`). Semántica **0/1 por regla de 30 días**: `0` si el e-CF afectado tiene
+    ≤30 días calendario respecto a la fecha de la nota; `1` si >30 (y con `1` la nota **NO rebaja ITBIS** —
+    Ley 11-92 Art. 338 párrafo; Reglamento 293-11 Art. 8).
+  - **Cálculo automático** en `POST /comprobantes/:id/nota` (E34): el servidor compara `fechaEmision` del
+    comprobante fuente con la fecha de la nota (`diasCalendarioEntre`), `>30 → 1`, si no `0`. **La fecha
+    manda**: si el caller envía un valor, se ignora. Cuando es `1`, la respuesta incluye `avisoITBIS`.
+  - **E33 no lleva el campo** (no existe en su XSD) — no se agrega.
+  - Tipo del engine `IdDoc34.indicadorNotaCredito` = `0 | 1`; DTOs (`crear-nota.dto.ts`,
+    `create-comprobante.dto.ts`) actualizados a `0|1` (se eliminó la semántica `1|2`).
+  - Otros cambios adoptados del esquema oficial (no afectan a los generadores actuales, que emiten un
+    subconjunto válido): E34 elimina `FechaVencimientoSecuencia` y las tablas de forma de pago; añade
+    `IdentificadorExtranjero`, `RazonModificacion`, bloque `Mineria`; `Item`/`Pagina` hasta 10000
+    (`Integer4→Integer5`); varios campos pasan a opcionales. E33 mantiene `FechaVencimientoSecuencia` y
+    añade `IndicadorEnvioDiferido`/`IndicadorMontoGravado`/`Mineria`. **E31/E32 no se tocaron** (sus XSD
+    son standalone y siguen usando `Integer4…`).
+  - Verificado: E31/E32/E33/E34 generan XML que **valida contra los XSD nuevos** (ecf-engine 114 tests);
+    `0` y `1` pasan la validación y `2` es rechazado por el XSD (`maxInclusive 1`).
+
+### Comportamiento actual de REINTENTO tras rechazo (investigado, sin modificar — FIX 5)
+- El **e-NCF se asigna al crear/emitir** (`SecuenciasService.siguienteENCF`, atómico) y se persiste
+  antes de que corra el worker.
+- **Error técnico** en el worker (excepción: red/DGII sin trackId) → BullMQ reintenta el **mismo job con
+  el mismo e-NCF** hasta 3× (backoff exponencial); si agota, estado `ERROR`.
+- **Rechazo formal de la DGII** (respuesta "rechazado") es un retorno normal, **no** excepción → **no se
+  reintenta**; `RECHAZADO` es terminal.
+- **No hay endpoint de re-emisión**: `/comprobantes/:id/emitir` solo acepta `DRAFT` (409 en otros estados).
+  Para reintentar tras un rechazo, el usuario **crea un comprobante NUEVO → consume un e-NCF NUEVO**; el
+  e-NCF rechazado queda "quemado" en `RECHAZADO` y **no se reutiliza**.
+- **DECISIÓN ABIERTA (pendiente, no resuelta):** un e-NCF **rechazado queda "quemado"** y **hoy NO se
+  reporta en el 608** (que solo reporta anulados por nota `codigoModificacion=1`). ¿Debe un e-NCF
+  rechazado/quemado reportarse como anulado en el 608? — pregunta abierta para decidir más adelante.
+
+### MANTENIMIENTO RECURRENTE — XSD oficiales DGII
+- **Verificar periódicamente** si la DGII publicó nuevas versiones de los XSD oficiales (portal
+  **Documentación Técnica / XSD**) y compararlas contra las del repo
+  (`packages/ecf-engine/src/xml/schemas/`). Los XSD del repo **deben mantenerse alineados con los
+  oficiales vigentes**.
+- **Última alineación:** e-CF 33 y 34 **v.1.0 con fecha oficial 01/04/2026**. (e-CF 31/32 pendientes de
+  re-verificar contra el portal en la próxima revisión.)
 
 ---
 
@@ -200,11 +257,20 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 **Rutas (App Router, route group `(dashboard)`):**
 ```
 /                → entry point: lee ?location_id, decide onboarding o dashboard
-/onboarding      → 3 pasos: RNC → P12 → éxito
+/onboarding      → wizard 4 pasos + éxito: 1) Negocio (RNC vs DGII) →
+                   2) Certificado (captura .p12/.pfx + passphrase) →
+                   3) Cuenta (POST /ghl/onboarding multipart transaccional, guarda JWT;
+                      un 400 vuelve al paso 2 sin perder el RNC validado) →
+                   4) Secuencias (opcional: POST /secuencias/sincronizar; "Omitir" visible) →
+                   éxito → CTA a /nueva-factura
 /dashboard       → métricas del mes + facturas recientes
 /facturas        → lista paginada con filtros por estado y búsqueda
 /nueva-factura   → formulario emitir comprobante (E31/E32)
-/configuracion   → empresa, certificado P12, webhook GHL
+/configuracion   → empresa, certificado P12, webhook GHL (emisión entrante),
+                   y "Integración con GoHighLevel" para IMPORTAR contactos
+                   (PATCH /contactos/configurar-ghl: Private Integration Token + ghlRncFieldKey)
+/contacto        → directorio de contactos + "Sincronizar con GoHighLevel"
+                   (POST /contactos/sincronizar-ghl → resumen importados/actualizados/sinRnc)
 ```
 
 **Comandos:**
@@ -226,9 +292,28 @@ para instalar y construir desde la raíz del workspace, y fija `outputDirectory:
 **Arquitectura clave:**
 - Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)
 - Sin login propio: el entry point `/` siempre arranca desde GHL con `?location_id`
+- Sin `location_id` → pantalla "Abre FacturaRD desde GoHighLevel" (acceso inválido)
 - Interceptor 401: re-llama GET /ghl/init con el `frd_location_id` guardado para refrescar el token
 - Estado global: AuthContext (token + tenant) + UIContext (sidebar abierto/cerrado)
 - Server state: React Query con queryKey tipados por recurso
+- **Sincronización de contactos GHL (una vía, GHL→FacturaRD):** hook `useGhlSync`
+  (estado conectado desde GET /tenants, `guardarConexion`, `sincronizar`). UI:
+  `GhlContactosCard` en /configuracion (token cifrado + campo RNC + instrucciones) y
+  botón "Sincronizar con GoHighLevel" en /contacto (deshabilitado/aviso si no hay conexión;
+  resumen importados/actualizados/sinRnc; enlace "ver sin RNC"; refresca la lista).
+- **Auth GHL (resuelto):** la sync envía `?locationId=<location del tenant>` (tomado de
+  `ghl_locations`, del onboarding — no se pide al usuario) + `Authorization: Bearer <token>`
+  con fallback automático a `Authorization: <token>` (sin Bearer) si GHL responde 401/403
+  (los Private Integration Token admiten ambos formatos). `Version: 2021-07-28`.
+- **Seguridad:** GET /tenants ya NO devuelve `ghlAccessToken`; expone `ghlConectado: boolean`.
+- `PATCH /contactos/configurar-ghl`: el token es opcional al actualizar (si se omite y ya hay
+  uno guardado, se conserva; solo se actualiza `ghlRncFieldKey`). Obligatorio para conectar.
+
+**Onboarding transaccional (backend `POST /ghl/onboarding`):**
+- Es **multipart/form-data**: `locationId`, `rnc`, `passphrase` y el archivo P12 en `file`.
+- En UNA transacción atómica: valida RNC (DGII) + valida/cifra el P12 (reusa `CertificadosService.buildCertificadoData`, mismo AES-256-GCM que `/certificados/upload`) → crea Tenant + GhlLocation + secuencias base + Certificado. Si algo falla, rollback total (sin tenant ni certificado huérfanos). Devuelve el JWT del tenant nuevo.
+- Passphrase incorrecta o P12 inválido → 400 y NO se crea nada. Location/RNC ya registrados → 409.
+- `POST /certificados/upload` sigue vigente para RE-subir/renovar el certificado de un tenant existente.
 
 ---
 

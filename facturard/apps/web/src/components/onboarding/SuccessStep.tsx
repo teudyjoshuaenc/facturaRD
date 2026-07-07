@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { TenantInfo } from '@/lib/session'
 
@@ -14,22 +14,22 @@ export function SuccessStep({ tenant, onContinue }: Props): JSX.Element {
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success-500/10">
         <CheckCircle2 className="text-success-500" size={40} />
       </div>
-      <div>
-        <h2 className="text-h4 text-text-primary">¡Todo listo!</h2>
-        <p className="text-body-sm text-text-secondary">Tu cuenta ha sido configurada correctamente</p>
+      <div className="flex flex-col gap-1">
+        <h2 className="text-h4 text-text-primary">Cuenta creada</h2>
+        <p className="text-body-sm text-text-secondary">Ya puedes emitir tu primera factura.</p>
       </div>
 
       <div className="w-full rounded-lg border border-border bg-background-canvas p-4 text-left">
         <dl className="flex flex-col gap-2 text-body-sm">
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <dt className="text-text-secondary">Empresa</dt>
-            <dd className="text-text-primary">{tenant.razonSocial}</dd>
+            <dd className="truncate text-text-primary" title={tenant.razonSocial}>{tenant.razonSocial}</dd>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <dt className="text-text-secondary">RNC</dt>
             <dd className="text-text-primary">{tenant.rnc}</dd>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <dt className="text-text-secondary">Plan</dt>
             <dd className="text-text-primary">{tenant.plan}</dd>
           </div>
@@ -37,7 +37,8 @@ export function SuccessStep({ tenant, onContinue }: Props): JSX.Element {
       </div>
 
       <Button variant="primary" size="lg" className="w-full" onClick={onContinue}>
-        Ir al dashboard
+        Emitir mi primera factura
+        <ArrowRight size={18} />
       </Button>
     </div>
   )

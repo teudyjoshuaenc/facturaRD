@@ -13,7 +13,12 @@ function EntryContent(): JSX.Element {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background-canvas px-4 text-center">
         <Logo />
-        <p className="text-body-base text-text-secondary">Acceso solo disponible desde GoHighLevel</p>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-h6 text-text-primary">Abre FacturaRD desde GoHighLevel</h1>
+          <p className="max-w-sm text-body-sm text-text-secondary">
+            FacturaRD funciona dentro de tu cuenta de GoHighLevel. Ábrelo desde ahí para continuar.
+          </p>
+        </div>
       </main>
     )
   }

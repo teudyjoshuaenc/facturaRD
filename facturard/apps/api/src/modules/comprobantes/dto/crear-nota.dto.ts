@@ -29,10 +29,15 @@ export class CrearNotaDto {
   @IsOptional()
   items?: CreateItemDto[]
 
-  @ApiPropertyOptional({ enum: [1, 2], description: 'IndicadorNotaCredito (solo E34): 1=Anulación total, 2=Corrección' })
-  @IsIn([1, 2])
+  @ApiPropertyOptional({
+    enum: [0, 1],
+    description:
+      'IndicadorNotaCredito (solo E34). El servidor lo calcula por la regla de 30 días (0 si el e-CF ' +
+      'afectado tiene <=30 días calendario, 1 si >30). Si se envía, la fecha tiene prioridad.',
+  })
+  @IsIn([0, 1])
   @IsOptional()
-  indicadorNotaCredito?: 1 | 2
+  indicadorNotaCredito?: 0 | 1
 
   @ApiPropertyOptional({ default: true, description: 'true (default) emite de inmediato; false crea un borrador (DRAFT).' })
   @IsBoolean()

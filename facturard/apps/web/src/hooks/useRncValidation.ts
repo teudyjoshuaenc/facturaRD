@@ -11,7 +11,7 @@ interface UseRncValidationResult {
   error: string
 }
 
-export function useRncValidation(rnc: string): UseRncValidationResult {
+export function useRncValidation(rnc: string, retryNonce = 0): UseRncValidationResult {
   const [status, setStatus] = useState<RncStatus>('idle')
   const [razonSocial, setRazonSocial] = useState('')
   const [error, setError] = useState('')
@@ -45,7 +45,7 @@ export function useRncValidation(rnc: string): UseRncValidationResult {
     return () => {
       cancelled = true
     }
-  }, [rnc])
+  }, [rnc, retryNonce])
 
   return { status, razonSocial, error }
 }

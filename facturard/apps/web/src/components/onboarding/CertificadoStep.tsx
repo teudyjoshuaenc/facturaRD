@@ -4,89 +4,65 @@ import { useState } from 'react'
 import type { JSX } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
 import { CertificateDropzone } from '@/components/certificados/certificate-dropzone'
-import { api, getErrorMessage } from '@/lib/api'
-import { useAuth } from '@/lib/context/AuthContext'
-import type { TenantInfo } from '@/lib/session'
 
 interface Props {
-  locationId: string
-  rnc: string
-  onComplete: (tenant: TenantInfo) => void
+  file: File | null
+  passphrase: string
+  onFileChange: (file: File) => void
+  onPassphraseChange: (passphrase: string) => void
+  onNext: () => void
   onBack: () => void
 }
 
-export function CertificadoStep({ locationId, rnc, onComplete, onBack }: Props): JSX.Element {
-  const { setAuth } = useAuth()
-  const [file, setFile] = useState<File | null>(null)
-  const [passphrase, setPassphrase] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+function esP12(name: string): boolean {
+  return /\.(p12|pfx)$/i.test(name)
+}
 
-  async function handleSubmit(): Promise<void> {
-    if (!file || !passphrase || !locationId) return
+export function CertificadoStep({ file, passphrase, onFileChange, onPassphraseChange, onNext, onBack }: Props): JSX.Element {
+  const [fileError, setFileError] = useState('')
 
-    setSubmitting(true)
-    setError('')
-
-    try {
-      const onboardingRes = await api.post<{ token: string; tenant: TenantInfo }>('/ghl/onboarding', {
-        locationId,
-        rnc,
-        passphrase,
-      })
-      const { token, tenant } = onboardingRes.data
-      setAuth(token, tenant)
-
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('passphrase', passphrase)
-      await api.post('/certificados/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-
-      onComplete(tenant)
-    } catch (err) {
-      setError(getErrorMessage(err))
-    } finally {
-      setSubmitting(false)
+  function handleFile(f: File): void {
+    if (!esP12(f.name)) {
+      setFileError('El archivo debe ser un certificado .p12 o .pfx.')
+      return
     }
+    setFileError('')
+    onFileChange(f)
   }
+
+  const puedeContinuar = !!file && passphrase.length >= 4
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-h6 text-text-primary">Sube tu certificado digital</h2>
+      <div className="flex flex-col gap-1">
+        <h2 className="text-h6 text-text-primary">Sube tu certificado</h2>
         <p className="text-body-sm text-text-secondary">
-          El certificado .p12 te lo entregó tu proveedor de firma digital (Digifirma o VIAFIRMA)
+          Es el certificado digital que firma tus facturas ante la DGII. Debe estar a nombre del
+          representante legal de la empresa.
         </p>
       </div>
 
-      <CertificateDropzone file={file} onFileChange={setFile} />
+      <div className="flex flex-col gap-1.5">
+        <CertificateDropzone file={file} onFileChange={handleFile} />
+        {fileError && <p className="text-ui-xs text-danger-600">{fileError}</p>}
+      </div>
 
       <Input
-        label="Contraseña del certificado *"
+        label="Contraseña del certificado"
         type="password"
-        placeholder="Passphrase del .p12"
+        placeholder="La contraseña de tu archivo .p12"
         value={passphrase}
-        onChange={(e) => setPassphrase(e.target.value)}
+        onChange={(e) => onPassphraseChange(e.target.value)}
+        helperText="Te la entregó tu proveedor de firma digital al emitir el certificado."
       />
 
-      {error && <p className="text-ui-sm text-danger-600">{error}</p>}
-
       <div className="flex gap-3">
-        <Button variant="secondary" size="lg" onClick={onBack} disabled={submitting}>
+        <Button variant="secondary" size="lg" onClick={onBack}>
           Atrás
         </Button>
-        <Button
-          variant="primary"
-          size="lg"
-          className="flex-1"
-          disabled={!file || !passphrase || submitting}
-          onClick={handleSubmit}
-        >
-          {submitting ? <Spinner size={18} className="text-white" /> : 'Verificar y continuar'}
+        <Button variant="primary" size="lg" className="flex-1" disabled={!puedeContinuar} onClick={onNext}>
+          Continuar
         </Button>
       </div>
     </div>

@@ -61,7 +61,9 @@ export interface IdDoc34 {
   fechaLimitePago?: string;
   fechaHoraFirma?: string;
   indicadorMontoGravado?: 0 | 1;
-  indicadorNotaCredito?: 1 | 2;
+  // Regla de 30 días (XSD e-CF 34 v.1.0, integer 0..1): 0 si el e-CF afectado
+  // tiene <=30 días calendario respecto a la nota; 1 si >30 (no rebaja ITBIS).
+  indicadorNotaCredito?: 0 | 1;
 }
 
 // ── Input E33 ─────────────────────────────────────────────────────────────────

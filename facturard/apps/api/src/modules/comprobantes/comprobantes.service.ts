@@ -43,9 +43,39 @@ function mapTratamientoITBIS(t: string): string {
   return t === 'EXENTO' ? 'E' : t
 }
 
+// Norma General 10-18 + Formato e-CF v1.0: en E32 de consumo, la identificación
+// del comprador (RNC/Cédula) es obligatoria cuando el monto total >= RD$250,000.
+export const UMBRAL_IDENTIFICACION_E32 = 250_000
+
+/** Lanza 400 si un E32 >= umbral no trae identificación del comprador. */
+function validarIdentificacionE32(dto: CreateComprobanteDto, montoTotal: number): void {
+  if (dto.tipoECF !== 'E32' || montoTotal < UMBRAL_IDENTIFICACION_E32) return
+  const tieneId =
+    (dto.rncComprador !== undefined && dto.rncComprador.trim() !== '') ||
+    (dto.identificadorExtranjero !== undefined && dto.identificadorExtranjero.trim() !== '')
+  if (!tieneId) {
+    throw new BadRequestException(
+      `Falta identificación del comprador (RNC/Cédula) para una Factura de Consumo (E32) con monto total >= RD$${UMBRAL_IDENTIFICACION_E32.toLocaleString('en-US')}.`,
+    )
+  }
+}
+
 function hoyDDMMYYYY(): string {
   const d = new Date()
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
+}
+
+function parseDDMMYYYYtoUTC(s: string): number | null {
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s)
+  return m ? Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null
+}
+
+/** Días calendario entre dos fechas DD-MM-YYYY (hasta - desde). */
+function diasCalendarioEntre(desde: string, hasta: string): number {
+  const a = parseDDMMYYYYtoUTC(desde)
+  const b = parseDDMMYYYYtoUTC(hasta)
+  if (a === null || b === null) return 0
+  return Math.round((b - a) / (24 * 60 * 60 * 1000))
 }
 
 function calcularTotales(items: CreateItemDto[]): {
@@ -119,6 +149,9 @@ export class ComprobantesService {
     }
 
     // emitir=true (default) → comportamiento de producción, sin cambios.
+    // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
+    validarIdentificacionE32(dto, totales.montoTotal)
+
     // 1. Verificar que el tenant tiene certificado activo
     const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
     if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
@@ -268,6 +301,8 @@ export class ComprobantesService {
     if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
 
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
+    // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
+    validarIdentificacionE32(datos, Number(comprobante.montoTotal))
     const eNCF = await this.secuenciasService.siguienteENCF(tenantId, comprobante.tipoECF)
     const dtoConEncf = { ...datos, eNCF }
 
@@ -291,7 +326,11 @@ export class ComprobantesService {
    * del fuente: comprador (contacto + snapshot) y referencia fiscal (ncfModificado,
    * fechaNCFModificado, comprobanteReferenciaId). No reimplementa la emisión.
    */
-  async crearNota(tenantId: string, sourceId: string, dto: CrearNotaDto): Promise<Comprobante> {
+  async crearNota(
+    tenantId: string,
+    sourceId: string,
+    dto: CrearNotaDto,
+  ): Promise<Comprobante & { avisoITBIS?: string }> {
     const source = await this.findOne(tenantId, sourceId) // 404 tenant-scoped
     if (source.estado !== 'ACEPTADO') {
       throw new ConflictException('El comprobante fuente debe estar ACEPTADO para emitir una nota')
@@ -304,10 +343,26 @@ export class ComprobantesService {
     const items = dto.items ?? datosFuente.items
     if (!items || items.length === 0) throw new BadRequestException('La nota no tiene líneas')
 
+    const fechaNota = hoyDDMMYYYY()
+
+    // IndicadorNotaCredito (SOLO E34): regla de 30 días calculada por el servidor.
+    // La fecha manda — se ignora cualquier valor enviado por el caller.
+    let indicadorNotaCredito: 0 | 1 | undefined
+    let avisoITBIS: string | undefined
+    if (dto.tipo === 'E34') {
+      const dias = diasCalendarioEntre(datosFuente.fechaEmision, fechaNota)
+      indicadorNotaCredito = dias > 30 ? 1 : 0
+      if (indicadorNotaCredito === 1) {
+        avisoITBIS =
+          'La nota de crédito se emite a más de 30 días calendario del comprobante afectado: ' +
+          'NO rebaja ITBIS (Ley 11-92 Art. 338 párrafo; Reglamento 293-11 Art. 8).'
+      }
+    }
+
     const notaDto: CreateComprobanteDto = {
       tipoECF: dto.tipo,
       emitir: dto.emitir ?? true,
-      fechaEmision: hoyDDMMYYYY(),
+      fechaEmision: fechaNota,
       items,
       // Referencia fiscal heredada del comprobante fuente
       ncfModificado: source.eNCF,
@@ -322,16 +377,19 @@ export class ComprobantesService {
       ...(datosFuente.fechaVencimiento !== undefined && { fechaVencimiento: datosFuente.fechaVencimiento }),
       ...(source.contactoId !== null && { contactoId: source.contactoId }),
       ...(dto.razonModificacion !== undefined && { razonModificacion: dto.razonModificacion }),
-      ...(dto.indicadorNotaCredito !== undefined && { indicadorNotaCredito: dto.indicadorNotaCredito }),
+      // E33 no lleva el campo (indicadorNotaCredito queda undefined).
+      ...(indicadorNotaCredito !== undefined && { indicadorNotaCredito }),
     }
 
     const nota = await this.crear(tenantId, notaDto)
 
     // Enlace a la factura referenciada.
-    return prisma.comprobante.update({
+    const actualizado = await prisma.comprobante.update({
       where: { id: nota.id },
       data: { comprobanteReferenciaId: source.id },
     })
+
+    return avisoITBIS ? { ...actualizado, avisoITBIS } : actualizado
   }
 
   async findAll(tenantId: string, query: ListComprobantesDto): Promise<PaginatedResponse<Comprobante>> {

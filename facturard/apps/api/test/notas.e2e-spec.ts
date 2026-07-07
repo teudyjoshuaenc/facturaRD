@@ -16,11 +16,17 @@ describe('Notas de crédito/débito (e2e)', () => {
 
   const auth = (t: TestTenant) => ({ Authorization: `Bearer ${t.token}` })
 
+  // DD-MM-YYYY de hace N días calendario (para la regla de 30 días).
+  function haceNDias(n: number): string {
+    const d = new Date(Date.now() - n * 24 * 60 * 60 * 1000)
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
+  }
+
   // Crea un comprobante fuente en el estado dado, con snapshot de comprador e items.
-  async function crearFuente(estado: ComprobanteEstado, over: { eNCF?: string; contactoId?: string } = {}) {
+  async function crearFuente(estado: ComprobanteEstado, over: { eNCF?: string; contactoId?: string; fechaEmision?: string } = {}) {
     const datos = {
       tipoECF: 'E31',
-      fechaEmision: '01-06-2026',
+      fechaEmision: over.fechaEmision ?? '01-06-2026',
       fechaVencimiento: '31-12-2028',
       rncComprador: contactoRnc,
       razonSocialComprador: 'CLIENTE NOTA SRL',
@@ -115,5 +121,69 @@ describe('Notas de crédito/débito (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantB))
       .send({ tipo: 'E34', codigoModificacion: 2 }).expect(404)
+  })
+
+  // ── FIX 1: IndicadorNotaCredito por regla de 30 días (solo E34) ──────────────
+  const indicadorDe = async (id: string): Promise<number | undefined> => {
+    const c = await prisma.comprobante.findUniqueOrThrow({ where: { id } })
+    return (c.datos as { indicadorNotaCredito?: number }).indicadorNotaCredito
+  }
+
+  it('E34 sobre fuente de hace 10 días → IndicadorNotaCredito 0, sin aviso ITBIS', async () => {
+    const src = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(10) })
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantA))
+      .send({ tipo: 'E34', codigoModificacion: 2 }).expect(201)
+    expect(await indicadorDe(res.body.id)).toBe(0)
+    expect(res.body.avisoITBIS).toBeUndefined()
+  })
+
+  it('E34 sobre fuente de hace 45 días → IndicadorNotaCredito 1 + aviso de no-rebaja de ITBIS', async () => {
+    const src = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(45) })
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantA))
+      .send({ tipo: 'E34', codigoModificacion: 2 }).expect(201)
+    expect(await indicadorDe(res.body.id)).toBe(1)
+    expect(typeof res.body.avisoITBIS).toBe('string')
+    expect(res.body.avisoITBIS).toMatch(/ITBIS/i)
+  })
+
+  it('borde: 30 días → 0 ; 31 días → 1', async () => {
+    const s30 = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(30) })
+    const r30 = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${s30.id}/nota`).set(auth(tenantA)).send({ tipo: 'E34', codigoModificacion: 2 }).expect(201)
+    expect(await indicadorDe(r30.body.id)).toBe(0)
+
+    const s31 = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(31) })
+    const r31 = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${s31.id}/nota`).set(auth(tenantA)).send({ tipo: 'E34', codigoModificacion: 2 }).expect(201)
+    expect(await indicadorDe(r31.body.id)).toBe(1)
+  })
+
+  it('el caller envía un valor incorrecto → el servidor recalcula por fecha (gana la fecha)', async () => {
+    const src = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(10) }) // ≤30 → debe ser 0
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantA))
+      .send({ tipo: 'E34', codigoModificacion: 2, indicadorNotaCredito: 1 }) // caller miente
+      .expect(201)
+    expect(await indicadorDe(res.body.id)).toBe(0) // la fecha manda
+  })
+
+  it('E33 no lleva IndicadorNotaCredito (no aplica el campo)', async () => {
+    const src = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(45) })
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantA))
+      .send({ tipo: 'E33', codigoModificacion: 2 }).expect(201)
+    expect(await indicadorDe(res.body.id)).toBeUndefined()
+    expect(res.body.avisoITBIS).toBeUndefined()
+  })
+
+  it('regresión: una E34 normal pasa el pipeline una sola vez', async () => {
+    const src = await crearFuente('ACEPTADO', { fechaEmision: haceNDias(5) })
+    ctx.queueAdd.mockClear()
+    await request(app.getHttpServer())
+      .post(`/api/v1/comprobantes/${src.id}/nota`).set(auth(tenantA))
+      .send({ tipo: 'E34', codigoModificacion: 2 }).expect(201)
+    expect(ctx.queueAdd).toHaveBeenCalledTimes(1)
   })
 })

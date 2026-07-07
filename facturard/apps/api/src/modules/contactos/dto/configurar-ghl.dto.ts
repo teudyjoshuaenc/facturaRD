@@ -2,9 +2,14 @@ import { IsString, IsOptional } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class ConfigurarGhlDto {
-  @ApiProperty({ description: 'Access token de GHL (se guarda cifrado AES-256-GCM)' })
+  @ApiPropertyOptional({
+    description:
+      'Private Integration Token de GHL (se guarda cifrado AES-256-GCM). Opcional al actualizar: ' +
+      'si se omite y ya hay un token guardado, se conserva. Obligatorio para conectar por primera vez.',
+  })
   @IsString()
-  ghlAccessToken!: string
+  @IsOptional()
+  ghlAccessToken?: string
 
   @ApiPropertyOptional({ description: 'Key/ID del custom field de GHL donde el cliente guarda el RNC' })
   @IsString()
