@@ -53,18 +53,23 @@ export function FacturaFilters({
       </div>
 
       {/* Tipo Dropdown */}
-      <div className="relative shrink-0 w-[126px] h-[44px]">
+      <div className="relative shrink-0 w-[180px] h-[44px]">
         <select
           value={tipoFilter}
           onChange={(e) => onTipoFilterChange(e.target.value)}
           className="h-full w-full rounded-[10px] border border-[#e2e8f0] bg-white pl-[13px] pr-8 text-[13px] font-semibold text-[#333333] focus:outline-none focus:border-[#0379d5] appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
         >
           <option value="todos">Tipo</option>
-          <option value="E31">E31 (Crédito Fiscal)</option>
-          <option value="E32">E32 (Consumo)</option>
-          <option value="E33">E33 (Nota de Débito)</option>
-          <option value="E34">E34 (Nota de Crédito)</option>
-          <option value="E43">E43 (Gastos Menores)</option>
+          <option value="E31">E31 – Crédito Fiscal</option>
+          <option value="E32">E32 – Consumo</option>
+          <option value="E33">E33 – Nota de Débito</option>
+          <option value="E34">E34 – Nota de Crédito</option>
+          <option value="E41">E41 – Compras</option>
+          <option value="E43">E43 – Gastos Menores</option>
+          <option value="E44">E44 – Reg. Especiales</option>
+          <option value="E45">E45 – Gubernamental</option>
+          <option value="E46">E46 – Exportaciones</option>
+          <option value="E47">E47 – Pagos al Exterior</option>
         </select>
         <ChevronDown
           size={14}

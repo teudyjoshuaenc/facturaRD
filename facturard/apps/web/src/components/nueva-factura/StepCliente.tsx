@@ -4,12 +4,13 @@ import { useState } from 'react'
 import type { JSX } from 'react'
 import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ClienteCard } from './ClienteCard'
 import { NuevoClienteModal } from './NuevoClienteModal'
 import { useContactos } from '@/hooks/useContactos'
 import type { Contacto, NuevoContactoData } from '@/hooks/useContactos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
+
+
 
 const TIPOS_ECF: { value: TipoECF; label: string }[] = [
   { value: 'E31', label: 'Factura de Crédito Fiscal Electrónica (E31)' },
@@ -47,6 +48,11 @@ interface StepClienteProps {
   onCodigoModificacionChange: (val: string) => void
   indicadorNotaCredito: string
   onIndicadorNotaCreditoChange: (val: string) => void
+  identificadorExtranjero: string
+  onIdentificadorExtranjeroChange: (val: string) => void
+  paisComprador: string
+  onPaisCompradorChange: (val: string) => void
+  total: number
   onNext: () => void
   isQuickMode?: boolean
 }
@@ -74,10 +80,16 @@ export function StepCliente({
   onCodigoModificacionChange,
   indicadorNotaCredito,
   onIndicadorNotaCreditoChange,
+  identificadorExtranjero,
+  onIdentificadorExtranjeroChange,
+  paisComprador,
+  onPaisCompradorChange,
+  total,
   onNext,
   isQuickMode,
 }: StepClienteProps): JSX.Element {
-  const { contactos, frecuentes, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const contactos: Contacto[] = rawContactos as any
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
   const [showNcfDropdown, setShowNcfDropdown] = useState(false)
 
@@ -99,8 +111,20 @@ export function StepCliente({
       codigoModificacion !== '' &&
       (tipoECF !== 'E34' || indicadorNotaCredito !== ''))
 
+  const isE32UnderLimit = tipoECF === 'E32' && total < 250000
+  const isE32OverLimit = tipoECF === 'E32' && total >= 250000
+
+  const isRncRequired = tipoECF === 'E31' || tipoECF === 'E41' || tipoECF === 'E45' || isE32OverLimit
+  const isRncValid = !isRncRequired || (selectedCliente !== null && selectedCliente.rnc.trim() !== '')
+
+  const isForeignerType = tipoECF === 'E46' || tipoECF === 'E47'
+  const isIdentificadorExtranjeroValid = !isForeignerType || identificadorExtranjero.trim() !== ''
+
+  const isPaisCompradorRequired = tipoECF === 'E47'
+  const isPaisCompradorValid = !isPaisCompradorRequired || paisComprador.trim() !== ''
+
   const canProceed =
-    (skipCliente || selectedCliente !== null) &&
+    (skipCliente || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
     tipoPago &&
     isTipoIngresoValid &&
     isFechaLimiteValid &&
@@ -125,6 +149,20 @@ export function StepCliente({
           <div className="flex flex-col gap-4 w-[904px]">
             <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Seleccionar Cliente</h3>
 
+            {isE32OverLimit && !selectedCliente && (
+              <p className="text-[12px] font-semibold text-danger-600 text-left animate-in fade-in-50 mb-2">
+                La factura de consumo (E32) supera el límite de RD$250,000. Debe seleccionar un cliente con RNC o cédula.
+              </p>
+            )}
+
+            {isRncRequired && selectedCliente && selectedCliente.rnc.trim() === '' && (
+              <p className="text-[12px] font-semibold text-danger-600 animate-in fade-in-50 text-left mt-1 mb-2">
+                {tipoECF === 'E32'
+                  ? 'El RNC o cédula es obligatorio para comprobantes de consumo (E32) de RD$250,000 o más.'
+                  : 'El RNC es obligatorio para comprobantes E31, E41 y E45.'} Por favor, edite o seleccione otro cliente.
+              </p>
+            )}
+
             {/* Search and Button horizontally */}
             <div className="flex gap-[12px] h-[44px] items-center">
               <div className="relative flex-1">
@@ -140,7 +178,7 @@ export function StepCliente({
                 {/* Search dropdown (Limit to 5) */}
                 {showSearch && (
                   <div className="absolute z-50 mt-1.5 max-h-[337px] w-full md:w-[742px] overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
-                    {contactos.slice(0, 5).map((c) => {
+                    {contactos.slice(0, 5).map((c: Contacto) => {
                       const isSelected = selectedCliente?.id === c.id
                       return (
                         <button
@@ -198,6 +236,56 @@ export function StepCliente({
                 <span>Nuevo Cliente</span>
               </Button>
             </div>
+
+            {selectedCliente && isForeignerType && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full text-left mt-2 animate-in fade-in-50">
+                <div className="flex flex-col gap-[8px] items-start w-full">
+                  <div className="flex justify-between items-center w-full">
+                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                      Identificador Extranjero *
+                    </label>
+                    {!identificadorExtranjero && (
+                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                        Requerido
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ej: ID-987654"
+                    value={identificadorExtranjero}
+                    onChange={(e) => onIdentificadorExtranjeroChange(e.target.value)}
+                    className={cn(
+                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                      !identificadorExtranjero ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-[8px] items-start w-full">
+                  <div className="flex justify-between items-center w-full">
+                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                      País del Comprador {isPaisCompradorRequired ? '*' : '(Opcional)'}
+                    </label>
+                    {isPaisCompradorRequired && !paisComprador && (
+                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                        Requerido
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ej: US, ES, FR"
+                    value={paisComprador}
+                    onChange={(e) => onPaisCompradorChange(e.target.value)}
+                    className={cn(
+                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                      isPaisCompradorRequired && !paisComprador ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -289,6 +377,8 @@ export function StepCliente({
                 </div>
               )}
             </div>
+
+
 
             {/* Tipo de Pago */}
             <div className="flex flex-col gap-[8px] items-start w-full">

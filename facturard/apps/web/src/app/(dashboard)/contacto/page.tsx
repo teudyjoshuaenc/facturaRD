@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import type { JSX } from 'react'
+import Image from 'next/image'
 import {
   Search,
   Plus,
@@ -23,22 +24,27 @@ import { Button } from '@/components/ui/button'
 import { useContactos } from '@/hooks/useContactos'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { formatCurrency } from '@/lib/comprobantes'
-
 import { useUI } from '@/lib/context/UIContext'
+import { DetailPanel } from '@/components/contacto/DetailPanel'
 
 type ValidationFilter = 'todos' | 'VALIDO' | 'NO_ENCONTRADO'
 type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO' | 'OCASIONAL'
+type TipoFilter = 'todos' | 'EMPRESA' | 'PERSONA'
+type TipoFiscalFilter = 'todos' | 'RNC' | 'CEDULA'
 
 export default function ContactosPage(): JSX.Element {
   const { contactos, crearContacto } = useContactos()
   const { globalSearch } = useUI()
   const [search, setSearch] = useState('')
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos')
+  const [tipoFiscalFilter, setTipoFiscalFilter] = useState<TipoFiscalFilter>('todos')
   const [validationFilter, setValidationFilter] = useState<ValidationFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
+  const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
 
   // Mock initial dataset matching Foto 1 to make it high-fidelity
   const extendedContactos = useMemo(() => {
@@ -84,6 +90,17 @@ export default function ContactosPage(): JSX.Element {
       )
     }
 
+    if (tipoFilter !== 'todos') {
+      list = list.filter((c) => c.tipo === tipoFilter)
+    }
+
+    if (tipoFiscalFilter !== 'todos') {
+      list = list.filter((c) => {
+        const cleanRnc = c.rnc.replace(/-/g, '')
+        return tipoFiscalFilter === 'RNC' ? cleanRnc.length === 9 : cleanRnc.length === 11
+      })
+    }
+
     if (validationFilter !== 'todos') {
       list = list.filter((c) => c.validacion === validationFilter)
     }
@@ -104,7 +121,7 @@ export default function ContactosPage(): JSX.Element {
     }
 
     return list
-  }, [extendedContactos, search, globalSearch, validationFilter, estadoFilter, startDate, endDate])
+  }, [extendedContactos, search, globalSearch, tipoFilter, tipoFiscalFilter, validationFilter, estadoFilter, startDate, endDate])
 
   const paginated = useMemo(() => {
     const offset = (page - 1) * 10
@@ -118,47 +135,59 @@ export default function ContactosPage(): JSX.Element {
       {/* Header and CTA */}
       <div className="flex items-center justify-between border-b border-neutral-100 pb-5">
         <div className="flex flex-col gap-1">
-          <h2 className="text-h4 font-bold text-text-primary">Contactos</h2>
-          <p className="text-body-sm text-text-secondary">
+          <h2 className="text-h4 font-semibold text-[#333] text-[24px]">Contactos</h2>
+          <p className="text-[14px] text-[#64748b] leading-[21px]">
             {filtered.length} entidades fiscales · 2 con incidencias
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="md"
+        <div className="flex items-center gap-2">
+          {/* Refresh Button */}
+          <button
             onClick={() => window.location.reload()}
-            className="h-10 w-10 p-0 flex items-center justify-center border border-neutral-200 hover:bg-neutral-50"
+            className="bg-white border border-[#d0d5dd] rounded-[10px] w-11 h-11 flex items-center justify-center hover:bg-neutral-50 transition-colors"
             title="Refrescar"
           >
-            <RotateCw size={16} className="text-text-secondary" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="md"
-            className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
+            <Image src="/icons/refresh.svg" alt="Refrescar" width={16} height={16} />
+          </button>
+          
+          {/* Import Button */}
+          <button
+            onClick={() => alert('Importando contactos...')}
+            className="bg-white border border-[#d0d5dd] rounded-[10px] h-11 px-4 flex items-center gap-2 hover:bg-neutral-50 transition-colors"
+            title="Importar"
+          >
+            <Image src="/icons/import.svg" alt="Importar" width={16} height={16} />
+            <span className="text-[#64748b] text-[14px] font-normal">Importar</span>
+          </button>
+
+          {/* Export Button */}
+          <button
+            onClick={() => alert('Exportando contactos...')}
+            className="bg-white border border-[#d0d5dd] rounded-[10px] h-11 px-4 flex items-center gap-2 hover:bg-neutral-50 transition-colors"
             title="Exportar"
           >
-            <Download size={16} className="mr-1.5" />
-            Exportar
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
+            <Image src="/icons/export.svg" alt="Exportar" width={16} height={16} />
+            <span className="text-[#64748b] text-[14px] font-normal">Exportar</span>
+          </button>
+
+          {/* Nuevo Contacto Button */}
+          <button
             onClick={() => setOpenModal(true)}
-            className="h-10 px-4 bg-brand-500 text-white font-semibold"
+            className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2.5 transition-colors"
           >
-            <Plus size={16} className="mr-1.5" />
-            Nuevo contacto
-          </Button>
+            <Image src="/icons/plus.svg" alt="Nuevo" width={16} height={16} />
+            <span className="font-['Montserrat'] font-semibold text-[14px] text-white">
+              Nuevo contacto
+            </span>
+          </button>
         </div>
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap items-center gap-3.5 bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm w-full">
+      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+        <div className="relative border border-[#e2e8f0] bg-neutral-50 rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] w-[240px]">
+          <Image src="/icons/search.svg" alt="Buscar" width={16} height={16} />
           <input
             type="text"
             placeholder="Buscar por cliente, RNC o e-NCF..."
@@ -167,83 +196,129 @@ export default function ContactosPage(): JSX.Element {
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
+            className="flex-1 font-['Open_Sans'] font-normal leading-[normal] text-text-primary text-[14px] placeholder-[#99a1af] bg-transparent focus:outline-none"
           />
         </div>
 
-        {/* Validacion Selector */}
-        <div className="relative">
+        {/* Tipo Selector */}
+        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[84px] flex items-center justify-between px-[13px]">
+          <select
+            value={tipoFilter}
+            onChange={(e) => {
+              setTipoFilter(e.target.value as TipoFilter)
+              setPage(1)
+            }}
+            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
+          >
+            <option value="todos">Tipo</option>
+            <option value="EMPRESA">Empresa</option>
+            <option value="PERSONA">Persona</option>
+          </select>
+          <div className="absolute right-[13px] pointer-events-none w-[14px] h-[14px] flex items-center justify-center">
+            <Image src="/icons/chevron_down.svg" alt="select" width={10} height={10} />
+          </div>
+        </div>
+
+        {/* Tipo Fiscal Selector */}
+        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[126px] flex items-center justify-between px-[13px]">
+          <select
+            value={tipoFiscalFilter}
+            onChange={(e) => {
+              setTipoFiscalFilter(e.target.value as TipoFiscalFilter)
+              setPage(1)
+            }}
+            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
+          >
+            <option value="todos">Tipo fiscal</option>
+            <option value="RNC">RNC</option>
+            <option value="CEDULA">Cédula</option>
+          </select>
+          <div className="absolute right-[13px] pointer-events-none w-[14px] h-[14px] flex items-center justify-center">
+            <Image src="/icons/chevron_down.svg" alt="select" width={10} height={10} />
+          </div>
+        </div>
+
+        {/* Validacion DGII Selector */}
+        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[182px] flex items-center justify-between px-[13px]">
           <select
             value={validationFilter}
             onChange={(e) => {
               setValidationFilter(e.target.value as ValidationFilter)
               setPage(1)
             }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
+            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
           >
-            <option value="todos">Validacion</option>
+            <option value="todos">Validación DGII</option>
             <option value="VALIDO">Válido</option>
             <option value="NO_ENCONTRADO">No encontrado</option>
           </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+          <div className="absolute right-[13px] pointer-events-none w-[14px] h-[14px] flex items-center justify-center">
+            <Image src="/icons/chevron_down.svg" alt="select" width={10} height={10} />
+          </div>
         </div>
 
         {/* Estado Selector */}
-        <div className="relative">
+        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[126px] flex items-center justify-between px-[13px]">
           <select
             value={estadoFilter}
             onChange={(e) => {
               setEstadoFilter(e.target.value as EstadoFilter)
               setPage(1)
             }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
+            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
           >
             <option value="todos">Estado</option>
             <option value="ACTIVO">Activo</option>
             <option value="INACTIVO">Inactivo</option>
             <option value="OCASIONAL">Ocasional</option>
           </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+          <div className="absolute right-[13px] pointer-events-none w-[14px] h-[14px] flex items-center justify-center">
+            <Image src="/icons/chevron_down.svg" alt="select" width={10} height={10} />
+          </div>
         </div>
 
-        {/* Date Picker Group */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 h-10 min-w-[260px]">
-          <Calendar size={14} className="text-text-tertiary flex-shrink-0" />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value)
-              setPage(1)
-            }}
-            className="text-body-sm text-text-primary bg-transparent focus:outline-none w-full placeholder:text-text-tertiary"
-          />
-          <span className="text-text-tertiary px-1 font-medium">-</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value)
-              setPage(1)
-            }}
-            className="text-body-sm text-text-primary bg-transparent focus:outline-none w-full placeholder:text-text-tertiary"
-          />
+        {/* Date Range Picker Container */}
+        <div className="flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
+          <div className="flex items-center gap-[10px] w-full">
+            <Image src="/icons/calendar.svg" alt="Calendario" width={14} height={14} />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value)
+                setPage(1)
+              }}
+              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
+            />
+            <span className="text-[#99a1af] font-['Open_Sans'] font-normal text-[16px] leading-[24px]">–</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value)
+                setPage(1)
+              }}
+              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
+            />
+          </div>
         </div>
       </div>
 
       {/* Directory Table */}
-      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden font-sans">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-body-sm">
+          <table className="w-full text-left text-body-sm min-w-[1200px]">
             <thead>
-              <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
-                <th className="px-4 py-3 font-semibold">Nombre / Razón social</th>
-                <th className="px-4 py-3 font-semibold">RNC / Cédula</th>
-                <th className="px-4 py-3 font-semibold">Validación</th>
-                <th className="px-4 py-3 font-semibold">Total facturado</th>
-                <th className="px-4 py-3 font-semibold">Última actividad</th>
-                <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold text-right pr-6">Acciones</th>
+              <tr className="border-b border-[#f1f5f9] bg-neutral-50/50 text-[13px] font-semibold text-text-secondary h-10">
+                <th className="px-4 py-2 font-semibold">Nombre / Razón social</th>
+                <th className="px-4 py-2 font-semibold">Tipo</th>
+                <th className="px-4 py-2 font-semibold">Tipo fiscal</th>
+                <th className="px-4 py-2 font-semibold">RNC / Cédula</th>
+                <th className="px-4 py-2 font-semibold">Validación</th>
+                <th className="px-4 py-2 font-semibold">e-CF</th>
+                <th className="px-4 py-2 font-semibold">Última actividad</th>
+                <th className="px-4 py-2 font-semibold">Estado</th>
+                <th className="px-4 py-2 font-semibold text-right pr-6">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -252,78 +327,110 @@ export default function ContactosPage(): JSX.Element {
                 const formattedRnc = c.rnc.length === 9
                   ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
                   : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+                
+                const isRnc = c.rnc.replace(/-/g, '').length === 9
 
                 return (
-                  <tr key={c.id} className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors">
-                    <td className="px-4 py-3 flex items-center gap-3">
-                      <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
-                        <Building2 size={16} />
+                  <tr 
+                    key={c.id} 
+                    onClick={() => setSelectedContacto(selectedContacto?.id === c.id ? null : c)}
+                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-neutral-50/30 transition-colors cursor-pointer ${selectedContacto?.id === c.id ? 'bg-neutral-50' : ''}`}
+                  >
+                    {/* Nombre / Razon social */}
+                    <td className="px-4 py-3.5 flex items-center gap-2">
+                      <div className="relative flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#eff4ff] text-text-secondary flex-shrink-0">
+                        <Image src="/icons/building.svg" alt="Building" width={16} height={16} />
                         {/* Dot indicator (Active/Inactive) */}
-                        <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white ${c.estado === 'ACTIVO' ? 'bg-green-500' : c.estado === 'OCASIONAL' ? 'bg-orange-500' : 'bg-neutral-400'}`} />
+                        <span className={`absolute bottom-[-1px] right-[-1px] h-3 w-3 rounded-full border-2 border-white ${c.estado === 'ACTIVO' ? 'bg-[#067647]' : c.estado === 'OCASIONAL' ? 'bg-orange-500' : 'bg-neutral-400'}`} />
                       </div>
                       <div className="flex flex-col text-left">
-                        <span className="font-semibold text-text-primary text-body-sm line-clamp-1">
+                        <span className="font-semibold text-text-primary text-[12px] leading-tight line-clamp-1 w-[150px]">
                           {c.nombre}
                         </span>
-                        <span className="text-[10px] text-text-secondary font-medium mt-0.2 capitalize">
-                          {c.tipo.toLowerCase()}
+                        <span className="text-[12px] text-[#64748b] leading-tight">
+                          {c.tipo === 'EMPRESA' ? 'Cliente' : 'Contacto'}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-text-primary font-semibold text-body-sm">
+
+                    {/* Tipo */}
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center bg-[rgba(100,116,139,0.1)] text-[#64748b] text-[12px] font-normal px-2.5 py-1 rounded-[10px]">
+                        {c.tipo === 'EMPRESA' ? 'Cliente' : 'Contacto'}
+                      </span>
+                    </td>
+
+                    {/* Tipo fiscal */}
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center bg-[rgba(6,118,71,0.1)] text-[#067647] text-[12px] font-normal px-2.5 py-1 rounded-[10px]">
+                        {isRnc ? 'RNC' : 'ID extranjero'}
+                      </span>
+                    </td>
+
+                    {/* RNC / Cedula */}
+                    <td className="px-4 py-3.5 text-text-primary font-normal text-[12px] tracking-[1.2px]">
                       {formattedRnc}
                     </td>
+
+                    {/* Validacion */}
                     <td className="px-4 py-3.5">
                       {c.validacion === 'VALIDO' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2 py-0.5 text-ui-xs font-semibold text-green-700">
-                          <CheckCircle2 size={11} className="text-green-600" />
+                        <span className="inline-flex items-center gap-1.5 text-[#067647] text-[12px] font-normal">
+                          <CheckCircle2 size={14} className="text-[#067647]" />
                           Válido
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200/50 px-2 py-0.5 text-ui-xs font-semibold text-orange-700">
-                          <AlertTriangle size={11} className="text-orange-600" />
+                        <span className="inline-flex items-center gap-1.5 text-orange-700 text-[12px] font-normal">
+                          <AlertTriangle size={14} className="text-orange-600" />
                           No encontrado
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-text-primary font-bold text-body-sm">
-                      {c.totalFacturado === 0 ? '0.00' : formatCurrency(c.totalFacturado)}
+
+                    {/* e-CF */}
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center bg-[rgba(100,116,139,0.1)] text-[#64748b] text-[12px] px-2.5 py-1 rounded-[10px]">
+                        {c.tipo === 'EMPRESA' ? 'E31' : 'E32'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3.5 text-text-secondary text-body-sm">
+
+                    {/* Ultima actividad */}
+                    <td className="px-4 py-3.5 text-[#64748b] text-[12px]">
                       {c.fecha}
                     </td>
+
+                    {/* Estado */}
                     <td className="px-4 py-3.5">
                       {c.estado === 'ACTIVO' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-green-700">
-                          <CheckCircle2 size={11} className="text-green-600" />
+                        <span className="inline-flex items-center bg-[rgba(6,118,71,0.1)] text-[#067647] text-[12px] font-normal px-2.5 py-1 rounded-[10px]">
                           Activo
                         </span>
                       ) : c.estado === 'OCASIONAL' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-orange-700">
-                          <AlertTriangle size={11} className="text-orange-600" />
+                        <span className="inline-flex items-center bg-orange-50 text-orange-700 text-[12px] font-normal px-2.5 py-1 rounded-[10px]">
                           Ocasional
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 border border-neutral-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-neutral-600">
-                          <XCircle size={11} className="text-neutral-500" />
+                        <span className="inline-flex items-center bg-neutral-50 text-neutral-600 text-[12px] font-normal px-2.5 py-1 rounded-[10px]">
                           Inactivo
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right pr-6">
-                      <div className="flex items-center justify-end gap-3.5">
+
+                    {/* Acciones */}
+                    <td className="px-4 py-3.5 text-right pr-6" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-3">
                         <button
                           type="button"
                           title="Enviar correo"
                           onClick={() => alert('Enviando estado de cuenta...')}
-                          className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                          className="text-text-secondary hover:text-[#0379d5] transition-colors focus:outline-none"
                         >
                           <Send size={15} />
                         </button>
                         <button
                           type="button"
                           title="Opciones"
-                          className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                          className="text-text-secondary hover:text-[#0379d5] transition-colors focus:outline-none"
                         >
                           <MoreHorizontal size={15} />
                         </button>
@@ -334,7 +441,7 @@ export default function ContactosPage(): JSX.Element {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-body-sm text-text-secondary">
+                  <td colSpan={9} className="px-4 py-12 text-center text-body-sm text-text-secondary">
                     No se encontraron clientes en tu directorio.
                   </td>
                 </tr>
@@ -374,6 +481,14 @@ export default function ContactosPage(): JSX.Element {
         open={openModal}
         onClose={() => setOpenModal(false)}
         onSave={crearContacto}
+      />
+
+      <DetailPanel
+        contacto={selectedContacto}
+        onClose={() => setSelectedContacto(null)}
+        onEmitirFactura={(c) => alert(`Emitiendo factura para ${c.nombre}`)}
+        onCrearCotizacion={(c) => alert(`Creando cotización para ${c.nombre}`)}
+        onRegistrarCompra={(c) => alert(`Registrando compra para ${c.nombre}`)}
       />
     </div>
   )

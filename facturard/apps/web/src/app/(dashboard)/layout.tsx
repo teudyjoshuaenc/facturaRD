@@ -14,6 +14,8 @@ import { useCertificadoStatus } from '@/hooks/useCertificado'
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: 'Resumen de tu operación del mes' },
   '/facturas': { title: 'Facturas', subtitle: 'Historial de comprobantes fiscales electrónicos' },
+  '/cotizaciones': { title: 'Cotizaciones', subtitle: 'Presupuestos y cotizaciones de clientes' },
+  '/compras': { title: 'Recepción y Compras', subtitle: 'Gastos y comprobantes recibidos de proveedores' },
   '/nueva-factura': {
     title: 'Emitir Factura',
     subtitle: 'Crea y emite comprobantes fiscales electrónicos',
@@ -97,7 +99,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background-canvas md:flex-row">
+    <div className="flex h-screen w-screen overflow-hidden flex-col bg-background-canvas md:flex-row">
       <MobileHeader onMenuOpen={() => setSidebarOpen(true)} tenant={tenant} />
       <Sidebar tenant={tenant} activeRoute={pathname} />
       <div className="flex flex-1 flex-col overflow-hidden">
