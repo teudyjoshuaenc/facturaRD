@@ -87,6 +87,18 @@ function calcularMontoItem(item: CreateItemDto): number {
   return r2(bruto - r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100)))
 }
 
+// FechaVencimientoSecuencia: el servicio ya la resuelve (payload → secuencia →
+// error) antes de encolar. Aquí es la última barrera: NUNCA se emite con un
+// default silencioso — si faltara, se falla con un mensaje claro (error 145 DGII).
+function requireFechaVenc(datos: CreateComprobanteDto): string {
+  if (!datos.fechaVencimiento) {
+    throw new Error(
+      `Falta FechaVencimientoSecuencia para ${datos.tipoECF}; configúrala en Empresa/Secuencias.`,
+    )
+  }
+  return datos.fechaVencimiento
+}
+
 function buildReferencia(datos: CreateComprobanteDto): InformacionReferencia | undefined {
   if (!datos.ncfModificado || !datos.fechaNCFModificado || !datos.codigoModificacion) return undefined
   return {
@@ -335,7 +347,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF31Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         tipoPago: (datos.tipoPago ?? 1) as TipoPago,
         tipoIngresos: (datos.tipoIngresos ?? '01') as TipoIngresos,
         indicadorMontoGravado: 0,
@@ -383,7 +395,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF33Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         tipoPago: (datos.tipoPago ?? 1) as TipoPago,
         tipoIngresos: (datos.tipoIngresos ?? '01') as TipoIngresos,
       },
@@ -424,7 +436,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF41Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),
@@ -443,7 +455,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF43Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),
@@ -458,7 +470,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF44Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
         ...(datos.tipoIngresos !== undefined ? { tipoIngresos: datos.tipoIngresos as TipoIngresos } : {}),
       },
@@ -478,7 +490,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF45Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
         ...(datos.tipoIngresos !== undefined ? { tipoIngresos: datos.tipoIngresos as TipoIngresos } : {}),
       },
@@ -498,7 +510,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF46Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
         ...(datos.tipoIngresos !== undefined ? { tipoIngresos: datos.tipoIngresos as TipoIngresos } : {}),
       },
@@ -521,7 +533,7 @@ export class EcfEmissionProcessor extends WorkerHost {
     const input: ECF47Input = {
       idDoc: {
         eNCF,
-        fechaVencimientoSecuencia: datos.fechaVencimiento ?? '31-12-2028',
+        fechaVencimientoSecuencia: requireFechaVenc(datos),
         ...(datos.tipoPago !== undefined ? { tipoPago: datos.tipoPago } : {}),
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),

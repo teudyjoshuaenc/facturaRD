@@ -28,7 +28,12 @@ export interface InicializarSecuenciaDto {
 
 @Injectable()
 export class SecuenciasService {
-  async siguienteENCF(tenantId: string, tipoECF: TipoECF): Promise<string> {
+  // Devuelve el siguiente e-NCF y la fecha de vencimiento del rango (para que el
+  // generador la coloque en <FechaVencimientoSecuencia>).
+  async siguienteENCF(
+    tenantId: string,
+    tipoECF: TipoECF,
+  ): Promise<{ eNCF: string; fechaVencimiento: Date | null }> {
     return prisma.$transaction(async (tx) => {
       const seq = await tx.secuencia.findUnique({
         where: { tenantId_tipoECF: { tenantId, tipoECF } },
@@ -56,8 +61,14 @@ export class SecuenciasService {
         data: { ultimaSecuencia: { increment: 1 } },
       })
 
-      return formatENCF(tipoECF, updated.ultimaSecuencia)
+      return { eNCF: formatENCF(tipoECF, updated.ultimaSecuencia), fechaVencimiento: updated.fechaVencimiento }
     })
+  }
+
+  /** Fecha de vencimiento del rango para un tipo (sin consumir secuencia). */
+  async getFechaVencimiento(tenantId: string, tipoECF: TipoECF): Promise<Date | null> {
+    const seq = await prisma.secuencia.findUnique({ where: { tenantId_tipoECF: { tenantId, tipoECF } } })
+    return seq?.fechaVencimiento ?? null
   }
 
   /**
@@ -70,11 +81,11 @@ export class SecuenciasService {
    */
   async sincronizar(
     tenantId: string,
-    entries: { tipoECF: TipoECF; ultimaSecuencia: number }[],
+    entries: { tipoECF: TipoECF; ultimaSecuencia: number; fechaVencimiento?: Date }[],
   ): Promise<Secuencia[]> {
     return prisma.$transaction(async (tx) => {
       const results: Secuencia[] = []
-      for (const { tipoECF, ultimaSecuencia } of entries) {
+      for (const { tipoECF, ultimaSecuencia, fechaVencimiento } of entries) {
         const seq = await tx.secuencia.findUnique({
           where: { tenantId_tipoECF: { tenantId, tipoECF } },
         })
@@ -93,8 +104,13 @@ export class SecuenciasService {
             prefijo: `E${TIPO_PREFIJO[tipoECF]}`,
             ultimaSecuencia,
             activo: true,
+            ...(fechaVencimiento !== undefined && { fechaVencimiento }),
           },
-          update: { ultimaSecuencia },
+          // La fecha solo se actualiza si viene; no se borra una existente.
+          update: {
+            ultimaSecuencia,
+            ...(fechaVencimiento !== undefined && { fechaVencimiento }),
+          },
         })
         results.push(upserted)
       }

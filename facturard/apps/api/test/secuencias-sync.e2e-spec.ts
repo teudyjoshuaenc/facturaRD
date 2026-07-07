@@ -26,8 +26,8 @@ describe('Secuencias sync (e2e)', () => {
       .post('/api/v1/secuencias/sincronizar').set(auth(t))
       .send([{ tipoECF: 'E31', ultimaSecuencia: 100 }]).expect(201)
 
-    const encf = await secuencias.siguienteENCF(t.tenant.id, 'E31')
-    expect(encf).toBe('E310000000101')
+    const { eNCF } = await secuencias.siguienteENCF(t.tenant.id, 'E31')
+    expect(eNCF).toBe('E310000000101')
   })
 
   it('intentar retroceder una secuencia → 409', async () => {
@@ -41,13 +41,13 @@ describe('Secuencias sync (e2e)', () => {
       .send([{ tipoECF: 'E31', ultimaSecuencia: 50 }]).expect(409)
 
     // el valor no se movió: próximo sigue siendo 101
-    expect(await secuencias.siguienteENCF(t.tenant.id, 'E31')).toBe('E310000000101')
+    expect((await secuencias.siguienteENCF(t.tenant.id, 'E31')).eNCF).toBe('E310000000101')
   })
 
   it('cliente nuevo sin sync → arranca en 1', async () => {
     const t = await createTenant()
     await initSequences(t.tenant.id) // onboarding inicializa en 0
-    expect(await secuencias.siguienteENCF(t.tenant.id, 'E31')).toBe('E310000000001')
+    expect((await secuencias.siguienteENCF(t.tenant.id, 'E31')).eNCF).toBe('E310000000001')
   })
 
   it('asignación concurrente tras sync → e-NCFs distintos y consecutivos', async () => {
@@ -57,7 +57,9 @@ describe('Secuencias sync (e2e)', () => {
       .send([{ tipoECF: 'E32', ultimaSecuencia: 200 }]).expect(201)
 
     const N = 12
-    const encfs = await Promise.all(Array.from({ length: N }, () => secuencias.siguienteENCF(t.tenant.id, 'E32')))
+    const encfs = (
+      await Promise.all(Array.from({ length: N }, () => secuencias.siguienteENCF(t.tenant.id, 'E32')))
+    ).map((r) => r.eNCF)
     expect(new Set(encfs).size).toBe(N) // sin colisiones
 
     const nums = encfs.map((e) => Number(e.slice(3))).sort((a, b) => a - b)
@@ -74,7 +76,36 @@ describe('Secuencias sync (e2e)', () => {
         { tipoECF: 'E34', ultimaSecuencia: 5 },
       ]).expect(201)
     expect(res.body).toHaveLength(2)
-    expect(await secuencias.siguienteENCF(t.tenant.id, 'E31')).toBe('E310000000011')
-    expect(await secuencias.siguienteENCF(t.tenant.id, 'E34')).toBe('E340000000006')
+    expect((await secuencias.siguienteENCF(t.tenant.id, 'E31')).eNCF).toBe('E310000000011')
+    expect((await secuencias.siguienteENCF(t.tenant.id, 'E34')).eNCF).toBe('E340000000006')
+  })
+
+  it('sincroniza guardando la fechaVencimiento por tipo → siguienteENCF la expone', async () => {
+    const t = await createTenant()
+    await request(app.getHttpServer())
+      .post('/api/v1/secuencias/sincronizar').set(auth(t))
+      .send([{ tipoECF: 'E31', ultimaSecuencia: 8, fechaVencimiento: '2026-12-31' }]).expect(201)
+
+    // La fecha se persiste por tipo y queda disponible sin consumir secuencia...
+    const fecha = await secuencias.getFechaVencimiento(t.tenant.id, 'E31')
+    expect(fecha?.toISOString().slice(0, 10)).toBe('2026-12-31')
+
+    // ...y también viene en el retorno de siguienteENCF (para el generador).
+    const { eNCF, fechaVencimiento } = await secuencias.siguienteENCF(t.tenant.id, 'E31')
+    expect(eNCF).toBe('E310000000009')
+    expect(fechaVencimiento?.toISOString().slice(0, 10)).toBe('2026-12-31')
+  })
+
+  it('actualizar sólo el número no borra la fechaVencimiento ya guardada', async () => {
+    const t = await createTenant()
+    await request(app.getHttpServer())
+      .post('/api/v1/secuencias/sincronizar').set(auth(t))
+      .send([{ tipoECF: 'E31', ultimaSecuencia: 8, fechaVencimiento: '2026-12-31' }]).expect(201)
+    await request(app.getHttpServer())
+      .post('/api/v1/secuencias/sincronizar').set(auth(t))
+      .send([{ tipoECF: 'E31', ultimaSecuencia: 20 }]).expect(201) // sin fecha
+
+    const fecha = await secuencias.getFechaVencimiento(t.tenant.id, 'E31')
+    expect(fecha?.toISOString().slice(0, 10)).toBe('2026-12-31')
   })
 })

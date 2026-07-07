@@ -48,9 +48,14 @@ export async function initSequences(tenantId: string): Promise<void> {
     E31: '31', E32: '32', E33: '33', E34: '34', E41: '41',
     E43: '43', E44: '44', E45: '45', E46: '46', E47: '47',
   }
+  // Fecha de vencimiento del rango, como la tendría un tenant real tras el
+  // onboarding/sync. Sin ella, los tipos que exigen FechaVencimientoSecuencia
+  // (E31, E33, E41...) fallarían al emitir (comportamiento correcto: sin fecha
+  // no se emite). Mediodía UTC para que el día no se corra por zona horaria.
+  const fechaVencimiento = new Date('2028-12-31T12:00:00.000Z')
   for (const tipoECF of tipos) {
     await prisma.secuencia.create({
-      data: { tenantId, tipoECF, prefijo: `E${prefijo[tipoECF]}`, ultimaSecuencia: 0, activo: true },
+      data: { tenantId, tipoECF, prefijo: `E${prefijo[tipoECF]}`, ultimaSecuencia: 0, activo: true, fechaVencimiento },
     })
   }
 }
