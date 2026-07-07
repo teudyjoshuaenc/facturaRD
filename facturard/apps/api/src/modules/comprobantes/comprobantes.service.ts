@@ -65,6 +65,16 @@ function hoyDDMMYYYY(): string {
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
 }
 
+// La fecha de vencimiento de secuencia se guarda a mediodía UTC (ver
+// secuencias.controller). getUTC* evita que el día se corra por zona horaria.
+function fechaVencToDDMMYYYY(d: Date): string {
+  return `${String(d.getUTCDate()).padStart(2, '0')}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${d.getUTCFullYear()}`
+}
+
+// Tipos de e-CF cuya norma EXIGE <FechaVencimientoSecuencia> (CLAUDE.md §14).
+// E32 y E34 NO la llevan → deben emitir sin exigirla.
+const TIPOS_REQUIEREN_FECHAVENC = new Set(['E31', 'E33', 'E41', 'E43', 'E44', 'E45', 'E46', 'E47'])
+
 function parseDDMMYYYYtoUTC(s: string): number | null {
   const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s)
   return m ? Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null
@@ -125,6 +135,28 @@ export class ComprobantesService {
     return calcularTotales(items)
   }
 
+  /**
+   * Resuelve la FechaVencimientoSecuencia (DD-MM-YYYY) que irá en el e-CF:
+   *  1) payloadFecha  — override manual explícito del emisor, si viene.
+   *  2) secuenciaFecha — la fecha del rango autorizado por la DGII para ese tipo.
+   *  3) si el tipo la EXIGE y no hay ninguna → error claro (NUNCA un default silencioso).
+   * Tipos que por norma no la llevan (E32, E34) devuelven undefined sin error.
+   */
+  private resolverFechaVencimiento(
+    tipoECF: string,
+    payloadFecha: string | undefined,
+    secuenciaFecha: Date | null,
+  ): string | undefined {
+    if (payloadFecha) return payloadFecha
+    if (secuenciaFecha) return fechaVencToDDMMYYYY(secuenciaFecha)
+    if (TIPOS_REQUIEREN_FECHAVENC.has(tipoECF)) {
+      throw new BadRequestException(
+        `Falta la fecha de vencimiento de la secuencia para el tipo ${tipoECF}; configúrala en Empresa/Secuencias.`,
+      )
+    }
+    return undefined
+  }
+
   async crear(tenantId: string, dtoOriginal: CreateComprobanteDto): Promise<Comprobante> {
     // Resuelve snapshots de producto (items) y del comprador (contacto) ANTES de
     // calcular totales y persistir, para que el documento sea inmutable.
@@ -156,11 +188,16 @@ export class ComprobantesService {
     const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
     if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
 
-    // 2. Obtener siguiente eNCF de la secuencia (atómico)
-    const eNCF = await this.secuenciasService.siguienteENCF(tenantId, dto.tipoECF)
+    // 2. Resolver FechaVencimientoSecuencia ANTES de consumir la secuencia
+    //    (si falta y el tipo la exige, se lanza error sin gastar un e-NCF).
+    const secuenciaFecha = await this.secuenciasService.getFechaVencimiento(tenantId, dto.tipoECF)
+    const fechaVencimiento = this.resolverFechaVencimiento(dto.tipoECF, dto.fechaVencimiento, secuenciaFecha)
 
-    // 3. Crear en DB con estado PENDIENTE + datos originales para el worker
-    const dtoConEncf = { ...dto, eNCF }
+    // 3. Obtener siguiente eNCF de la secuencia (atómico)
+    const { eNCF } = await this.secuenciasService.siguienteENCF(tenantId, dto.tipoECF)
+
+    // 4. Crear en DB con estado PENDIENTE + datos originales para el worker
+    const dtoConEncf = { ...dto, eNCF, ...(fechaVencimiento !== undefined && { fechaVencimiento }) }
     const comprobante = await prisma.comprobante.create({
       data: {
         tenantId,
@@ -303,8 +340,13 @@ export class ComprobantesService {
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(datos, Number(comprobante.montoTotal))
-    const eNCF = await this.secuenciasService.siguienteENCF(tenantId, comprobante.tipoECF)
-    const dtoConEncf = { ...datos, eNCF }
+
+    // Resolver FechaVencimientoSecuencia antes de consumir la secuencia.
+    const secuenciaFecha = await this.secuenciasService.getFechaVencimiento(tenantId, comprobante.tipoECF)
+    const fechaVencimiento = this.resolverFechaVencimiento(comprobante.tipoECF, datos.fechaVencimiento, secuenciaFecha)
+
+    const { eNCF } = await this.secuenciasService.siguienteENCF(tenantId, comprobante.tipoECF)
+    const dtoConEncf = { ...datos, eNCF, ...(fechaVencimiento !== undefined && { fechaVencimiento }) }
 
     const actualizado = await prisma.comprobante.update({
       where: { id },
@@ -374,7 +416,9 @@ export class ComprobantesService {
       ...(datosFuente.direccionComprador !== undefined && { direccionComprador: datosFuente.direccionComprador }),
       ...(datosFuente.identificadorExtranjero !== undefined && { identificadorExtranjero: datosFuente.identificadorExtranjero }),
       ...(datosFuente.paisComprador !== undefined && { paisComprador: datosFuente.paisComprador }),
-      ...(datosFuente.fechaVencimiento !== undefined && { fechaVencimiento: datosFuente.fechaVencimiento }),
+      // NO se hereda fechaVencimiento del fuente: la nota (E33) usa su PROPIA
+      // secuencia, con su propia fecha de vencimiento autorizada por la DGII.
+      // crear() la resuelve desde la secuencia de E33 (E34 no la lleva).
       ...(source.contactoId !== null && { contactoId: source.contactoId }),
       ...(dto.razonModificacion !== undefined && { razonModificacion: dto.razonModificacion }),
       // E33 no lleva el campo (indicadorNotaCredito queda undefined).
