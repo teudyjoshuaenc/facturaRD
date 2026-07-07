@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, useMemo } from 'react'
+import { useCallback, useEffect, useId, useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
 import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle } from 'lucide-react'
 import { StepWizard } from './StepWizard'
@@ -15,6 +15,7 @@ import type { Contacto } from '@/hooks/useContactos'
 import { useContactos } from '@/hooks/useContactos'
 import { useUI } from '@/lib/context/UIContext'
 import { cn } from '@/lib/utils'
+import { Select } from '@/components/ui/select'
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Cliente' },
@@ -47,16 +48,9 @@ function formatDateSpanish(isoDate: string): string {
   if (!isoDate) return ''
   const parts = isoDate.split('-')
   if (parts.length !== 3) return isoDate
-  const partYear = parts[0]
-  const partMonth = parts[1]
-  const partDay = parts[2]
-  if (!partYear || !partMonth || !partDay) return isoDate
-  const day = parseInt(partDay, 10)
-  const monthIndex = parseInt(partMonth, 10) - 1
-  const year = partYear
-  const spanishMonths = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  const month = spanishMonths[monthIndex] ?? ''
-  return `${day} ${month} de ${year}`
+  const [year, month, day] = parts
+  if (!year || !month || !day) return isoDate
+  return `${day}-${month}-${year}`
 }
 
 function todayISO(): string {
@@ -73,6 +67,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const baseId = useId()
   const { facturacionMode } = useUI()
   const { contactos } = useContactos()
+  const emisionRef = useRef<HTMLInputElement>(null)
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
@@ -109,8 +104,24 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   // Popover states for quick mode
   const [showClientDropdown, setShowClientDropdown] = useState(false)
-  const [showNcfDropdown, setShowNcfDropdown] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+
+  const tipoECFOptions = useMemo(() => {
+    return Object.entries(TIPO_ECF_LABELS).map(([key, label]) => {
+      const displayLabel = label
+        .replace('Factura de Crédito Fiscal Electrónica', 'Crédito Fiscal Electrónica')
+        .replace('Factura de Consumo Electrónica', 'Consumidor Final Electrónica')
+        .replace('Nota de Débito Electrónica', 'Nota de Débito Electrónica')
+        .replace('Nota de Crédito Electrónica', 'Nota de Crédito Electrónica')
+        .replace('Comprobante de Compras Electrónico', 'Compras Electrónico')
+        .replace('Gastos Menores Electrónico', 'Gastos Menores Electrónico')
+        .replace('Regímenes Especiales Electrónico', 'Régimen Especial Electrónico')
+        .replace('Gubernamental Electrónico', 'Gubernamental Electrónico')
+        .replace('Exportaciones Electrónico', 'Exportaciones Electrónico')
+        .replace('Pagos al Exterior Electrónico', 'Pagos al Exterior Electrónico')
+      return { value: key, label: displayLabel }
+    })
+  }, [])
 
   // Submit state
   const [submitting, setSubmitting] = useState(false)
@@ -397,7 +408,6 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     type="button"
                     onClick={() => {
                       setShowClientDropdown(!showClientDropdown)
-                      setShowNcfDropdown(false)
                     }}
                     className="flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[11px] font-bold text-text-primary cursor-pointer hover:border-brand-500 transition-colors justify-between min-w-0 h-10 select-none shadow-sm animate-in fade-in-50 duration-150"
                   >
@@ -491,66 +501,27 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
                 {/* NCF Selector */}
                 <div className="relative flex-1 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNcfDropdown(!showNcfDropdown)
-                      setShowClientDropdown(false)
-                    }}
-                    className="flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[11px] font-bold text-text-primary cursor-pointer hover:border-brand-500 transition-colors justify-between min-w-0 h-10 select-none shadow-sm animate-in fade-in-50 duration-150"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <FileText size={14} className="text-text-secondary flex-shrink-0" />
-                      <span className="truncate">
-                        {tipoECF ? TIPO_ECF_LABELS[tipoECF].split(' - ')[0] : 'Tipo NCF'}
-                      </span>
-                    </div>
-                    <ChevronDown size={12} className="text-text-secondary flex-shrink-0" />
-                  </button>
-                  {showNcfDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setShowNcfDropdown(false)} />
-                      <div className="absolute left-0 mt-1.5 max-h-[220px] w-[320px] overflow-y-auto rounded-[14px] border border-[#F3F4F6] bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] z-40 py-0 animate-in fade-in-50 duration-150">
-                        {Object.entries(TIPO_ECF_LABELS).map(([key, label]) => {
-                          const isSelected = tipoECF === key
-                          const displayLabel = label
-                            .replace('Factura de Crédito Fiscal Electrónica', 'Crédito Fiscal Electrónica')
-                            .replace('Factura de Consumo Electrónica', 'Consumidor Final Electrónica')
-                            .replace('Nota de Débito Electrónica', 'Nota de Débito Electrónica')
-                            .replace('Nota de Crédito Electrónica', 'Nota de Crédito Electrónica')
-                            .replace('Comprobante de Compras Electrónico', 'Compras Electrónico')
-                            .replace('Gastos Menores Electrónico', 'Gastos Menores Electrónico')
-                            .replace('Regímenes Especiales Electrónico', 'Régimen Especial Electrónico')
-                            .replace('Gubernamental Electrónico', 'Gubernamental Electrónico')
-                            .replace('Exportaciones Electrónico', 'Exportaciones Electrónico')
-                            .replace('Pagos al Exterior Electrónico', 'Pagos al Exterior Electrónico')
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => {
-                                setTipoECF(key as TipoECF)
-                                setShowNcfDropdown(false)
-                              }}
-                              className={cn(
-                                "flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[44px]",
-                                isSelected ? "bg-[#F0F5FF] text-brand-600 font-semibold" : "text-[#333333] hover:bg-[#F0F5FF]/50"
-                              )}
-                            >
-                              <span className="text-[12px] font-semibold text-[#333333] truncate leading-6">{displayLabel}</span>
-                              {isSelected && (
-                                <Check size={16} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </>
-                  )}
+                  <Select
+                    value={tipoECF}
+                    onChange={(val) => setTipoECF(val as TipoECF)}
+                    options={tipoECFOptions}
+                    placeholder="Tipo NCF"
+                    triggerClassName="h-10 border-neutral-200 bg-white px-2.5 text-[11px] font-bold text-text-primary hover:border-brand-500"
+                    dropdownClassName="w-[320px]"
+                  />
                 </div>
 
                 {/* Date Selector */}
-                <div className="relative flex-1 min-w-0 select-none">
+                <div
+                  onClick={() => {
+                    try {
+                      emisionRef.current?.showPicker()
+                    } catch (e) {
+                      emisionRef.current?.focus()
+                    }
+                  }}
+                  className="relative flex-1 min-w-0 select-none cursor-pointer"
+                >
                   <div className="flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[11px] font-bold text-text-primary hover:border-brand-500 transition-colors justify-between min-w-0 h-10 shadow-sm animate-in fade-in-50 duration-150">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <Calendar size={14} className="text-text-secondary flex-shrink-0" />
@@ -558,10 +529,11 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     </div>
                   </div>
                   <input
+                    ref={emisionRef}
                     type="date"
                     value={fechaEmision}
                     onChange={(e) => setFechaEmision(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    className="absolute -z-10 opacity-0 invisible w-0 h-0"
                   />
                 </div>
               </div>
@@ -639,7 +611,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               {/* Date */}
               <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans">
                 <Calendar size={16} className="text-[#64748B] flex-shrink-0" />
-                <span className="leading-[19.5px]">{fechaEmision}</span>
+                <span className="leading-[19.5px]">{formatDateSpanish(fechaEmision)}</span>
               </div>
               
               {/* Payment Condition */}

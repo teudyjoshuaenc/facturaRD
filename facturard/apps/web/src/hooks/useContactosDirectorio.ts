@@ -17,6 +17,9 @@ export interface ContactoDir {
   origen: 'MANUAL' | 'GHL'
   rncValidado: boolean
   activo: boolean
+  createdAt?: string
+  updatedAt?: string
+  identificadorExtranjero?: string | null
 }
 
 export interface ContactosDirParams {

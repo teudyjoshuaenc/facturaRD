@@ -47,7 +47,7 @@ function formatDateSpanish(isoDate: string): string {
   const parts = isoDate.split('-')
   if (parts.length !== 3) return isoDate
   const [year, month, day] = parts
-  return `${day}/${month}/${year}`
+  return `${day}-${month}-${year}`
 }
 
 export function StepResumen({

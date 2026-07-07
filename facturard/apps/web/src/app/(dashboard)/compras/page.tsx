@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
 import {
   Search,
@@ -23,7 +23,22 @@ import {
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/comprobantes'
+import { Select } from '@/components/ui/select'
+
+const tipoGastoOptions = [
+  { value: 'todos', label: 'Tipo de gasto' },
+  { value: 'RECEPCION_DGII', label: 'e-CF Recibido (DGII)' },
+  { value: 'GASTO_MENOR', label: 'Gasto Menor' },
+  { value: 'SIN_COMPROBANTE', label: 'Sin Comprobante' },
+]
+
+const estadoAprobacionOptions = [
+  { value: 'todos', label: 'Estado Aprobación' },
+  { value: 'APROBADO_COMERCIAL', label: 'Aprobado Comercial' },
+  { value: 'PENDIENTE', label: 'Pendiente' },
+  { value: 'RECHAZADO', label: 'Rechazado' },
+]
+import { formatCurrency, formatDate } from '@/lib/comprobantes'
 
 type EstadoAprobacion = 'todos' | 'APROBADO_COMERCIAL' | 'PENDIENTE' | 'RECHAZADO'
 type TipoCompra = 'todos' | 'RECEPCION_DGII' | 'GASTO_MENOR' | 'SIN_COMPROBANTE'
@@ -49,6 +64,9 @@ const MOCK_COMPRAS: Compra[] = [
 ]
 
 export default function ComprasPage(): JSX.Element {
+  const startDateRef = useRef<HTMLInputElement>(null)
+  const endDateRef = useRef<HTMLInputElement>(null)
+
   const [search, setSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<EstadoAprobacion>('todos')
   const [tipoFilter, setTipoFilter] = useState<TipoCompra>('todos')
@@ -198,61 +216,84 @@ export default function ComprasPage(): JSX.Element {
         </div>
 
         {/* Tipo de Documento Selector */}
-        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[160px] flex items-center justify-between px-[13px]">
-          <select
-            value={tipoFilter}
-            onChange={(e) => {
-              setTipoFilter(e.target.value as TipoCompra)
-              setPage(1)
-            }}
-            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
-          >
-            <option value="todos">Tipo de gasto</option>
-            <option value="RECEPCION_DGII">e-CF Recibido (DGII)</option>
-            <option value="GASTO_MENOR">Gasto Menor</option>
-            <option value="SIN_COMPROBANTE">Sin Comprobante</option>
-          </select>
-        </div>
+        <Select
+          value={tipoFilter}
+          onChange={(val) => {
+            setTipoFilter(val as TipoCompra)
+            setPage(1)
+          }}
+          options={tipoGastoOptions}
+          className="w-[160px]"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
+        />
 
         {/* Estado Selector */}
-        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[180px] flex items-center justify-between px-[13px]">
-          <select
-            value={estadoFilter}
-            onChange={(e) => {
-              setEstadoFilter(e.target.value as EstadoAprobacion)
-              setPage(1)
-            }}
-            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
-          >
-            <option value="todos">Estado Aprobación</option>
-            <option value="APROBADO_COMERCIAL">Aprobado Comercial</option>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="RECHAZADO">Rechazado</option>
-          </select>
-        </div>
+        <Select
+          value={estadoFilter}
+          onChange={(val) => {
+            setEstadoFilter(val as EstadoAprobacion)
+            setPage(1)
+          }}
+          options={estadoAprobacionOptions}
+          className="w-[180px]"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
+        />
 
         {/* Date Range Picker */}
-        <div className="flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
-          <div className="flex items-center gap-[10px] w-full">
-            <Calendar size={14} className="text-[#99a1af]" />
+        <div className="relative flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
+          {/* Visual Display */}
+          <div className="flex items-center gap-[10px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none">
+            <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
+            <span className={startDate ? "text-[#333333]" : "text-[#99a1af]"}>
+              {startDate ? formatDate(startDate) : 'DD/MM/AAAA'}
+            </span>
+            <span className="text-[#99a1af] font-normal text-[16px]">–</span>
+            <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
+              {endDate ? formatDate(endDate) : 'DD/MM/AAAA'}
+            </span>
+          </div>
+
+          {/* Invisible inputs on top */}
+          <div className="absolute inset-0 flex">
+            <div
+              onClick={() => {
+                try {
+                  startDateRef.current?.showPicker()
+                } catch (e) {
+                  startDateRef.current?.focus()
+                }
+              }}
+              className="w-1/2 h-full cursor-pointer"
+            />
+            <div
+              onClick={() => {
+                try {
+                  endDateRef.current?.showPicker()
+                } catch (e) {
+                  endDateRef.current?.focus()
+                }
+              }}
+              className="w-1/2 h-full cursor-pointer"
+            />
             <input
+              ref={startDateRef}
               type="date"
               value={startDate}
               onChange={(e) => {
                 setStartDate(e.target.value)
                 setPage(1)
               }}
-              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
+              className="absolute -z-10 opacity-0 invisible w-0 h-0"
             />
-            <span className="text-[#99a1af] font-['Open_Sans'] font-normal text-[16px] leading-[24px]">–</span>
             <input
+              ref={endDateRef}
               type="date"
               value={endDate}
               onChange={(e) => {
                 setEndDate(e.target.value)
                 setPage(1)
               }}
-              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
+              className="absolute -z-10 opacity-0 invisible w-0 h-0"
             />
           </div>
         </div>
@@ -295,7 +336,7 @@ export default function ComprasPage(): JSX.Element {
                       {formattedRnc}
                     </td>
                     <td className="px-4 py-3.5 text-text-secondary text-[12px]">
-                      {c.fecha}
+                      {formatDate(c.fecha)}
                     </td>
                     <td className="px-4 py-3.5 font-bold text-text-primary text-[13px]">
                       {formatCurrency(c.monto)}

@@ -8,6 +8,7 @@ export type ComprobanteEstado =
   | 'ACEPTADO_CONDICIONAL'
   | 'RECHAZADO'
   | 'ERROR'
+  | 'DRAFT'
 
 export interface Comprobante {
   id: string
@@ -23,6 +24,7 @@ export interface Comprobante {
   mensajeDGII: string | null
   createdAt: string
   updatedAt: string
+  datos?: any
 }
 
 export interface PaginatedResponse<T> {
@@ -41,6 +43,7 @@ export const ESTADO_LABELS: Record<ComprobanteEstado, string> = {
   ACEPTADO_CONDICIONAL: 'Aceptado c/obs.',
   RECHAZADO: 'Rechazado',
   ERROR: 'Error',
+  DRAFT: 'Borrador',
 }
 
 export const ESTADO_BADGE_VARIANT: Record<ComprobanteEstado, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -51,6 +54,7 @@ export const ESTADO_BADGE_VARIANT: Record<ComprobanteEstado, 'success' | 'warnin
   ACEPTADO_CONDICIONAL: 'warning',
   RECHAZADO: 'danger',
   ERROR: 'danger',
+  DRAFT: 'neutral',
 }
 
 export const TIPO_ECF_LABELS: Record<TipoECF, string> = {
@@ -87,7 +91,18 @@ export function formatCurrencyCompact(value: string | number): string {
 }
 
 export function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+  if (!value) return ''
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match && match[1] && match[2] && match[3]) {
+    return `${match[3]}-${match[2]}-${match[1]}`
+  }
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return value
+  const hasTime = value.includes('T') || value.includes(' ')
+  const day = String(hasTime ? date.getDate() : date.getUTCDate()).padStart(2, '0')
+  const month = String((hasTime ? date.getMonth() : date.getUTCMonth()) + 1).padStart(2, '0')
+  const year = hasTime ? date.getFullYear() : date.getUTCFullYear()
+  return `${day}-${month}-${year}`
 }
 
 export async function downloadComprobantePdf(

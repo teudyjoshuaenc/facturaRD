@@ -22,7 +22,17 @@ import {
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/comprobantes'
+import { Select } from '@/components/ui/select'
+
+const estadoOptions = [
+  { value: 'todos', label: 'Todos los estados' },
+  { value: 'BORRADOR', label: 'Borrador' },
+  { value: 'ENVIADA', label: 'Enviada' },
+  { value: 'ACEPTADA', label: 'Aceptada' },
+  { value: 'RECHAZADA', label: 'Rechazada' },
+  { value: 'VENCIDA', label: 'Vencida' },
+]
+import { formatCurrency, formatDate } from '@/lib/comprobantes'
 
 type EstadoFilter = 'todos' | 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'VENCIDA'
 
@@ -178,9 +188,9 @@ export default function CotizacionesPage(): JSX.Element {
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
+      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans justify-between">
         {/* Search Input */}
-        <div className="relative border border-[#e2e8f0] bg-neutral-50 rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] w-[280px]">
+        <div className="relative border border-[#e2e8f0] bg-white rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] flex-1 min-w-[280px]">
           <Search size={16} className="text-[#99a1af]" />
           <input
             type="text"
@@ -195,49 +205,16 @@ export default function CotizacionesPage(): JSX.Element {
         </div>
 
         {/* Estado Selector */}
-        <div className="relative bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] w-[140px] flex items-center justify-between px-[13px]">
-          <select
-            value={estadoFilter}
-            onChange={(e) => {
-              setEstadoFilter(e.target.value as EstadoFilter)
-              setPage(1)
-            }}
-            className="w-full h-full bg-transparent font-['Open_Sans'] font-semibold text-[13px] text-[#333] focus:outline-none appearance-none cursor-pointer pr-4"
-          >
-            <option value="todos">Estado</option>
-            <option value="BORRADOR">Borrador</option>
-            <option value="ENVIADA">Enviada</option>
-            <option value="ACEPTADA">Aceptada</option>
-            <option value="RECHAZADA">Rechazada</option>
-            <option value="VENCIDA">Vencida</option>
-          </select>
-        </div>
-
-        {/* Date Range Picker */}
-        <div className="flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
-          <div className="flex items-center gap-[10px] w-full">
-            <Calendar size={14} className="text-[#99a1af]" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value)
-                setPage(1)
-              }}
-              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
-            />
-            <span className="text-[#99a1af] font-['Open_Sans'] font-normal text-[16px] leading-[24px]">–</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value)
-                setPage(1)
-              }}
-              className="text-[12px] font-['Open_Sans'] font-normal leading-[19.5px] text-[#99a1af] bg-transparent focus:outline-none w-full"
-            />
-          </div>
-        </div>
+        <Select
+          value={estadoFilter}
+          onChange={(val) => {
+            setEstadoFilter(val as EstadoFilter)
+            setPage(1)
+          }}
+          options={estadoOptions}
+          className="w-[180px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
+        />
       </div>
 
       {/* Table */}
@@ -277,10 +254,10 @@ export default function CotizacionesPage(): JSX.Element {
                       {formattedRnc}
                     </td>
                     <td className="px-4 py-3.5 text-text-secondary text-[12px]">
-                      {c.fecha}
+                      {formatDate(c.fecha)}
                     </td>
                     <td className="px-4 py-3.5 text-text-secondary text-[12px]">
-                      {c.vencimiento}
+                      {formatDate(c.vencimiento)}
                     </td>
                     <td className="px-4 py-3.5 font-bold text-text-primary text-[13px]">
                       {formatCurrency(c.monto)}

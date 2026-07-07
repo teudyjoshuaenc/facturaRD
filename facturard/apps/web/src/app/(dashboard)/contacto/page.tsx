@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
 import {
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Calendar,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,8 +24,37 @@ import { EmptyState } from '@/components/dashboard/EmptyState'
 import { useContactosDirectorio } from '@/hooks/useContactosDirectorio'
 import { useContactos } from '@/hooks/useContactos'
 import { useGhlSync, type SyncResultado } from '@/hooks/useGhlSync'
+import { Select } from '@/components/ui/select'
+
+const tipoOptions = [
+  { value: 'todos', label: 'Tipo' },
+  { value: 'CLIENTE', label: 'Cliente' },
+  { value: 'PROVEEDOR', label: 'Proveedor' },
+  { value: 'CONSUMIDOR_FINAL', label: 'Consumidor final' },
+]
+
+const tipoFiscalOptions = [
+  { value: 'todos', label: 'Tipo fiscal' },
+  { value: 'RNC', label: 'RNC' },
+  { value: 'CEDULA', label: 'Cédula' },
+  { value: 'CF', label: 'CF' },
+  { value: 'EXTRANJERO', label: 'ID extranjero' },
+]
+
+const validacionOptions = [
+  { value: 'todos', label: 'Validación DGII' },
+  { value: 'VALIDO', label: 'Válido' },
+  { value: 'SIN_VALIDAR', label: 'Sin validar' },
+]
+
+const estadoOptions = [
+  { value: 'todos', label: 'Estado' },
+  { value: 'ACTIVO', label: 'Activo' },
+  { value: 'INACTIVO', label: 'Inactivo' },
+]
 import { useUI } from '@/lib/context/UIContext'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
+import { formatDate } from '@/lib/comprobantes'
 
 type TipoFilter = 'todos' | 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
 type OrigenFilter = 'todos' | 'MANUAL' | 'GHL'
@@ -47,9 +77,16 @@ export default function ContactosPage(): JSX.Element {
   const { crearContacto } = useContactos()
   const { conectado, sincronizar, getErrorMessage } = useGhlSync()
 
+  const startDateRef = useRef<HTMLInputElement>(null)
+  const endDateRef = useRef<HTMLInputElement>(null)
+
   const [search, setSearch] = useState('')
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos')
-  const [origenFilter, setOrigenFilter] = useState<OrigenFilter>('todos')
+  const [tipoFiscalFilter, setTipoFiscalFilter] = useState('todos')
+  const [validacionFilter, setValidacionFilter] = useState('todos')
+  const [estadoFilter, setEstadoFilter] = useState('todos')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [soloSinRnc, setSoloSinRnc] = useState(false)
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
@@ -64,16 +101,58 @@ export default function ContactosPage(): JSX.Element {
   const { contactos, total, totalPages, isLoading, isError, refetch } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
-    origen: origenFilter === 'todos' ? undefined : origenFilter,
     page,
     limit: 10,
   })
 
-  // "Sin RNC" se filtra sobre la página cargada (el backend no tiene ese filtro).
-  const visibles = useMemo(
-    () => (soloSinRnc ? contactos.filter((c) => !c.rnc) : contactos),
-    [contactos, soloSinRnc],
-  )
+  // "Sin RNC" y demás filtros se filtran sobre la página cargada
+  const visibles = useMemo(() => {
+    let list = [...contactos]
+
+    if (soloSinRnc) {
+      list = list.filter((c) => !c.rnc)
+    }
+
+    if (tipoFiscalFilter !== 'todos') {
+      list = list.filter((c) => {
+        if (c.identificadorExtranjero) return tipoFiscalFilter === 'EXTRANJERO'
+        if (!c.rnc) return tipoFiscalFilter === 'CF'
+        const clean = c.rnc.replace(/\D/g, '')
+        if (clean.length === 9) return tipoFiscalFilter === 'RNC'
+        if (clean.length === 11) return tipoFiscalFilter === 'CEDULA'
+        return tipoFiscalFilter === 'CF'
+      })
+    }
+
+    if (validacionFilter !== 'todos') {
+      list = list.filter((c) => {
+        const isValid = !!c.rncValidado
+        return validacionFilter === 'VALIDO' ? isValid : !isValid
+      })
+    }
+
+    if (estadoFilter !== 'todos') {
+      list = list.filter((c) => {
+        const isActivo = !!c.activo
+        return estadoFilter === 'ACTIVO' ? isActivo : !isActivo
+      })
+    }
+
+    if (startDate) {
+      list = list.filter((c) => {
+        const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
+        return dateStr >= startDate
+      })
+    }
+    if (endDate) {
+      list = list.filter((c) => {
+        const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
+        return dateStr <= endDate
+      })
+    }
+
+    return list
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, estadoFilter, startDate, endDate])
 
   async function handleSincronizarGhl(): Promise<void> {
     if (!conectado) {
@@ -172,7 +251,7 @@ export default function ContactosPage(): JSX.Element {
               <span>{syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
               <button
                 type="button"
-                onClick={() => { setOrigenFilter('GHL'); setSoloSinRnc(true); setPage(1) }}
+                onClick={() => { setSoloSinRnc(true); setPage(1) }}
                 className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
               >
                 Ver contactos sin RNC
@@ -182,39 +261,114 @@ export default function ContactosPage(): JSX.Element {
         </div>
       )}
 
-      {/* Filtros (server-side: search, tipo, origen) */}
-      <div className="flex flex-wrap items-center gap-3.5 bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm w-full">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
+        {/* Search Input */}
+        <div className="relative border border-[#e2e8f0] bg-white rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] w-[240px] shrink-0">
+          <Search size={16} className="text-[#99a1af]" />
           <input
             type="text"
-            placeholder="Buscar por razón social, RNC o email..."
+            placeholder="Buscar por cliente, RNC o e-NCF..."
             value={search}
             onChange={(e) => resetPage(setSearch)(e.target.value)}
-            className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
+            className="flex-1 font-['Open_Sans'] font-normal leading-[normal] text-text-primary text-[14px] placeholder-[#99a1af] bg-transparent focus:outline-none"
           />
         </div>
 
-        <select
+        {/* Tipo Selector */}
+        <Select
           value={tipoFilter}
-          onChange={(e) => resetPage(setTipoFilter)(e.target.value as TipoFilter)}
-          className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer hover:bg-neutral-50 transition-colors"
-        >
-          <option value="todos">Todos los tipos</option>
-          <option value="CLIENTE">Cliente</option>
-          <option value="PROVEEDOR">Proveedor</option>
-          <option value="CONSUMIDOR_FINAL">Consumidor final</option>
-        </select>
+          onChange={(val) => resetPage(setTipoFilter)(val as any)}
+          options={tipoOptions}
+          className="w-[84px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
 
-        <select
-          value={origenFilter}
-          onChange={(e) => { resetPage(setOrigenFilter)(e.target.value as OrigenFilter); setSoloSinRnc(false) }}
-          className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer hover:bg-neutral-50 transition-colors"
-        >
-          <option value="todos">Todos los orígenes</option>
-          <option value="MANUAL">Manual</option>
-          <option value="GHL">GoHighLevel</option>
-        </select>
+        {/* Tipo Fiscal Selector */}
+        <Select
+          value={tipoFiscalFilter}
+          onChange={(val) => resetPage(setTipoFiscalFilter)(val)}
+          options={tipoFiscalOptions}
+          className="w-[126px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
+
+        {/* Validación DGII Selector */}
+        <Select
+          value={validacionFilter}
+          onChange={(val) => resetPage(setValidacionFilter)(val)}
+          options={validacionOptions}
+          className="w-[182px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
+
+        {/* Estado Selector */}
+        <Select
+          value={estadoFilter}
+          onChange={(val) => resetPage(setEstadoFilter)(val)}
+          options={estadoOptions}
+          className="w-[126px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
+
+        {/* Date Range Picker */}
+        <div className="relative flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
+          {/* Visual Display */}
+          <div className="flex items-center gap-[10px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none">
+            <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
+            <span className={startDate ? "text-[#333333]" : "text-[#99a1af]"}>
+              {startDate ? formatDate(startDate) : 'DD/MM/AAAA'}
+            </span>
+            <span className="text-[#99a1af] font-normal text-[16px]">–</span>
+            <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
+              {endDate ? formatDate(endDate) : 'DD/MM/AAAA'}
+            </span>
+          </div>
+
+          {/* Invisible inputs on top */}
+          <div className="absolute inset-0 flex">
+            <div
+              onClick={() => {
+                try {
+                  startDateRef.current?.showPicker()
+                } catch (e) {
+                  startDateRef.current?.focus()
+                }
+              }}
+              className="w-1/2 h-full cursor-pointer"
+            />
+            <div
+              onClick={() => {
+                try {
+                  endDateRef.current?.showPicker()
+                } catch (e) {
+                  endDateRef.current?.focus()
+                }
+              }}
+              className="w-1/2 h-full cursor-pointer"
+            />
+            <input
+              ref={startDateRef}
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value)
+                setPage(1)
+              }}
+              className="absolute -z-10 opacity-0 invisible w-0 h-0"
+            />
+            <input
+              ref={endDateRef}
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value)
+                setPage(1)
+              }}
+              className="absolute -z-10 opacity-0 invisible w-0 h-0"
+            />
+          </div>
+        </div>
 
         {soloSinRnc && (
           <Badge variant="warning" className="h-10">
@@ -240,7 +394,7 @@ export default function ContactosPage(): JSX.Element {
           <EmptyState
             title=""
             description={
-              activeSearch || tipoFilter !== 'todos' || origenFilter !== 'todos' || soloSinRnc
+              activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || estadoFilter !== 'todos' || startDate || endDate || soloSinRnc
                 ? 'No hay contactos que coincidan con los filtros.'
                 : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
             }

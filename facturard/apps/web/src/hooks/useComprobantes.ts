@@ -10,7 +10,7 @@ import {
 } from '@/lib/comprobantes'
 import { useUI } from '@/lib/context/UIContext'
 
-export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO'
+export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT'
 
 const PAGE_SIZE = 10
 

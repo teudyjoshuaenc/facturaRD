@@ -16,6 +16,18 @@ import {
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/context/AuthContext'
+import { Select } from '@/components/ui/select'
+
+const monedaOptions = [
+  { value: 'DOP', label: 'DOP - Peso Dominicano' },
+  { value: 'USD', label: 'USD - Dólar Estadounidense' },
+]
+
+const tasaOptions = [
+  { value: '18', label: '18% Tasa General' },
+  { value: '16', label: '16% Tasa Reducida' },
+  { value: '0', label: '0% Tasa Cero' },
+]
 
 export default function EmpresaPage(): JSX.Element {
   const { tenant } = useAuth()
@@ -23,6 +35,8 @@ export default function EmpresaPage(): JSX.Element {
   // Form states
   const [rnc, setRnc] = useState('131793916')
   const [razonSocial, setRazonSocial] = useState('DMAIA Distribuidora SRL')
+  const [moneda, setMoneda] = useState('DOP')
+  const [tasaItbis, setTasaItbis] = useState('18')
   const [nombreComercial, setNombreComercial] = useState('DMAIA.SRL')
   const [actividadEcon, setActividadEcon] = useState('Venta al por mayor de alimentos y bebidas')
   const [direccion, setDireccion] = useState('Av. Winston Churchill 123, Piantini, Santo Domingo')
@@ -350,20 +364,23 @@ export default function EmpresaPage(): JSX.Element {
               {/* Moneda */}
               <div className="flex flex-col gap-1.5 text-left">
                 <label className="text-ui-xs font-bold text-text-secondary uppercase">Moneda por defecto</label>
-                <select className="h-10 rounded-lg border border-neutral-200 bg-white px-3.5 text-body-sm font-semibold text-text-primary focus:outline-none cursor-pointer">
-                  <option value="DOP">DOP - Peso Dominicano</option>
-                  <option value="USD">USD - Dólar Estadounidense</option>
-                </select>
+                <Select
+                  value={moneda}
+                  onChange={setMoneda}
+                  options={monedaOptions}
+                  triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+                />
               </div>
 
               {/* Tasa ITBIS */}
               <div className="flex flex-col gap-1.5 text-left">
                 <label className="text-ui-xs font-bold text-text-secondary uppercase">Tasa general ITBIS</label>
-                <select className="h-10 rounded-lg border border-neutral-200 bg-white px-3.5 text-body-sm font-semibold text-text-primary focus:outline-none cursor-pointer">
-                  <option value="18">18% Tasa General</option>
-                  <option value="16">16% Tasa Reducida</option>
-                  <option value="0">0% Tasa Cero</option>
-                </select>
+                <Select
+                  value={tasaItbis}
+                  onChange={setTasaItbis}
+                  options={tasaOptions}
+                  triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+                />
               </div>
             </div>
 

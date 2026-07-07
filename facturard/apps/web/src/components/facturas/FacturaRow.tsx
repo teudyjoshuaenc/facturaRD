@@ -9,6 +9,7 @@ import {
   XCircle,
   RefreshCw,
   AlertTriangle,
+  FileText,
 } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import {
@@ -22,6 +23,7 @@ interface Props {
   downloadingId: string | null
   onDownload: (c: Comprobante) => void
   onViewDetail: (id: string) => void
+  selected?: boolean
 }
 
 function getStatusBadge(estado: string): JSX.Element {
@@ -49,6 +51,14 @@ function getStatusBadge(estado: string): JSX.Element {
       </span>
     )
   }
+  if (estado === 'DRAFT') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
+        <FileText size={14} className="text-[#64748b] flex-shrink-0" />
+        Borrador
+      </span>
+    )
+  }
   // En proceso / Pendiente
   return (
     <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#f1f5f9] px-[10px] py-[5px] text-[12px] font-normal text-[#64748b] font-sans">
@@ -63,6 +73,7 @@ const FacturaRow = React.memo(function FacturaRow({
   downloadingId,
   onDownload,
   onViewDetail,
+  selected = false,
 }: Props): JSX.Element {
   const itbis = Number(c.montoTotal) * 18 / 118
 
@@ -74,18 +85,53 @@ const FacturaRow = React.memo(function FacturaRow({
     : '—'
 
   return (
-    <tr className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px]">
-      <td className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle">{c.eNCF}</td>
-      <td className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left align-middle">
-        <div className="w-[120px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
+    <tr className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px] ${
+      selected ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : 'bg-white'
+    }`}>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+      >
+        {c.eNCF || <span className="text-[#64748b]/60 italic font-normal">Borrador</span>}
+      </td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[150px] min-w-[150px] text-left align-middle cursor-pointer"
+      >
+        <div className="w-[150px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
           {c.razonSocial}
         </div>
       </td>
-      <td className="px-[16px] py-[16px] w-[70px] min-w-[70px] text-left text-[#333] font-semibold text-[12px] align-middle">{formattedRnc}</td>
-      <td className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#333] font-semibold text-[12px] align-middle">{formatCurrency(c.montoTotal)}</td>
-      <td className="px-[16px] py-[16px] w-[81px] min-w-[81px] text-left text-[#64748b] font-normal text-[12px] align-middle">{formatCurrency(itbis)}</td>
-      <td className="px-[16px] py-[16px] w-[80px] min-w-[80px] text-left text-[#64748b] font-normal text-[12px] align-middle">{formatDate(c.createdAt)}</td>
-      <td className="px-[16px] py-[16px] w-[105.63px] min-w-[105.63px] text-left align-middle">{getStatusBadge(c.estado)}</td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+      >
+        {formattedRnc}
+      </td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+      >
+        {formatCurrency(c.montoTotal)}
+      </td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+      >
+        {formatCurrency(itbis)}
+      </td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[80px] min-w-[80px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+      >
+        {formatDate(c.createdAt)}
+      </td>
+      <td
+        onClick={() => onViewDetail(c.id)}
+        className="px-[16px] py-[16px] w-[100px] min-w-[100px] text-left align-middle cursor-pointer whitespace-nowrap"
+      >
+        {getStatusBadge(c.estado)}
+      </td>
       <td className="px-[16px] py-[16px] w-[112px] min-w-[112px] text-left align-middle">
         <div className="flex items-center gap-[4px] w-[112px]">
           <button
@@ -96,7 +142,7 @@ const FacturaRow = React.memo(function FacturaRow({
           >
             <Eye size={16} />
           </button>
-          
+
           <button
             type="button"
             title="Descargar PDF"
