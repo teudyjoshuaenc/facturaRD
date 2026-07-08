@@ -1,11 +1,12 @@
 'use client'
 
-import type { JSX } from 'react'
+import { Suspense, type JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ComprobanteForm } from '@/components/nueva-factura/ComprobanteForm'
 import { useNuevaFactura } from '@/hooks/useNuevaFactura'
 import type { ComprobanteFormData } from '@/hooks/useNuevaFactura'
+import { Spinner } from '@/components/ui/spinner'
 
 export default function NuevaFacturaPage(): JSX.Element {
   const router = useRouter()
@@ -27,9 +28,15 @@ export default function NuevaFacturaPage(): JSX.Element {
   }
 
   return (
-    <ComprobanteForm
-      onSubmit={handleSubmit}
-      onError={(msg) => toast.error('Error al emitir', { description: msg })}
-    />
+    <Suspense fallback={
+      <div className="flex h-64 items-center justify-center">
+        <Spinner size={32} />
+      </div>
+    }>
+      <ComprobanteForm
+        onSubmit={handleSubmit}
+        onError={(msg) => toast.error('Error al emitir', { description: msg })}
+      />
+    </Suspense>
   )
 }

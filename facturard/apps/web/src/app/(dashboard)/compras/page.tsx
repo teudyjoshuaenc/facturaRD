@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Search,
   Plus,
@@ -24,6 +25,7 @@ import {
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
+import { RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
 
 const tipoGastoOptions = [
   { value: 'todos', label: 'Tipo de gasto' },
@@ -67,12 +69,23 @@ export default function ComprasPage(): JSX.Element {
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
 
-  const [search, setSearch] = useState('')
+  const searchParams = useSearchParams()
+  const initialSearch = searchParams.get('search') || ''
+
+  const [search, setSearch] = useState(initialSearch)
   const [estadoFilter, setEstadoFilter] = useState<EstadoAprobacion>('todos')
   const [tipoFilter, setTipoFilter] = useState<TipoCompra>('todos')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    setTimeout(() => {
+      setIsRefreshing(false)
+    }, 500)
+  }
 
   // Filtered list
   const filtered = useMemo(() => {
@@ -136,23 +149,18 @@ export default function ComprasPage(): JSX.Element {
         </div>
         <div className="flex items-center gap-2">
           {/* Refresh Button */}
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-white border border-[#d0d5dd] rounded-[10px] w-11 h-11 flex items-center justify-center hover:bg-neutral-50 transition-colors"
-            title="Refrescar"
-          >
-            <RotateCw size={16} className="text-[#64748b]" />
-          </button>
+          <RefreshActionButton
+            onClick={handleRefresh}
+            isLoading={isRefreshing}
+            className="w-11 h-11 border-[#d0d5dd]"
+          />
 
           {/* Export Button */}
-          <button
+          <ExportActionButton
             onClick={() => alert('Exportando compras...')}
-            className="bg-white border border-[#d0d5dd] rounded-[10px] h-11 px-4 flex items-center gap-2 hover:bg-neutral-50 transition-colors"
             title="Exportar"
-          >
-            <Download size={16} className="text-[#64748b]" />
-            <span className="text-[#64748b] text-[14px] font-normal">Exportar</span>
-          </button>
+            className="h-11 border-[#d0d5dd]"
+          />
 
           {/* Registrar Gasto Button */}
           <button

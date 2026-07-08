@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Search,
   Plus,
@@ -16,6 +17,9 @@ import {
   AlertTriangle,
   XCircle,
   Calendar,
+  MoreHorizontal,
+  Send,
+  Edit2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +29,20 @@ import { useContactosDirectorio } from '@/hooks/useContactosDirectorio'
 import { useContactos } from '@/hooks/useContactos'
 import { useGhlSync, type SyncResultado } from '@/hooks/useGhlSync'
 import { Select } from '@/components/ui/select'
+import { useUI } from '@/lib/context/UIContext'
+import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
+import { EditarClienteModal } from '@/components/contacto/EditarClienteModal'
+import { formatDate } from '@/lib/comprobantes'
+import { cn } from '@/lib/utils'
+import { DetailPanel } from '@/components/contacto/DetailPanel'
+import { toast } from 'sonner'
+
+import {
+  RefreshActionButton,
+  ImportActionButton,
+  ExportActionButton,
+  NewActionButton
+} from '@/components/ui/table-actions'
 
 const tipoOptions = [
   { value: 'todos', label: 'Tipo' },
@@ -52,29 +70,21 @@ const estadoOptions = [
   { value: 'ACTIVO', label: 'Activo' },
   { value: 'INACTIVO', label: 'Inactivo' },
 ]
-import { useUI } from '@/lib/context/UIContext'
-import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
-import { formatDate } from '@/lib/comprobantes'
 
 type TipoFilter = 'todos' | 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
-type OrigenFilter = 'todos' | 'MANUAL' | 'GHL'
-
-const TIPO_LABEL: Record<string, string> = {
-  CLIENTE: 'Cliente',
-  PROVEEDOR: 'Proveedor',
-  CONSUMIDOR_FINAL: 'Consumidor final',
-}
 
 function formatRnc(rnc: string | null): string {
   if (!rnc) return '—'
-  if (rnc.length === 9) return rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-  if (rnc.length === 11) return rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+  const clean = rnc.replace(/\D/g, '')
+  if (clean.length === 9) return clean.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+  if (clean.length === 11) return clean.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
   return rnc
 }
 
 export default function ContactosPage(): JSX.Element {
+  const router = useRouter()
   const { globalSearch } = useUI()
-  const { crearContacto } = useContactos()
+  const { crearContacto, actualizarContacto } = useContactos()
   const { conectado, sincronizar, getErrorMessage } = useGhlSync()
 
   const startDateRef = useRef<HTMLInputElement>(null)
@@ -91,6 +101,7 @@ export default function ContactosPage(): JSX.Element {
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
   const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
+  const [editingContacto, setEditingContacto] = useState<any | null>(null)
 
   const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
   const [syncError, setSyncError] = useState('')
@@ -98,16 +109,27 @@ export default function ContactosPage(): JSX.Element {
 
   const activeSearch = (search.trim() ? search : globalSearch).trim()
 
-  const { contactos, total, totalPages, isLoading, isError, refetch } = useContactosDirectorio({
+  const { contactos, total, totalPages, isLoading, isError, refetch, isFetching } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
     page,
     limit: 10,
   })
 
-  // "Sin RNC" y demás filtros se filtran sobre la página cargada
+  // Local state overrides for toggle active/inactive status quickly
+  const [localStatusOverrides, setLocalStatusOverrides] = useState<Record<string, boolean>>({})
+
+  // Apply filters on page loaded contacts
   const visibles = useMemo(() => {
     let list = [...contactos]
+
+    // Apply local status overrides
+    list = list.map(c => {
+      return {
+        ...c,
+        activo: localStatusOverrides[c.id] !== undefined ? !!localStatusOverrides[c.id] : c.activo
+      }
+    })
 
     if (soloSinRnc) {
       list = list.filter((c) => !c.rnc)
@@ -152,7 +174,7 @@ export default function ContactosPage(): JSX.Element {
     }
 
     return list
-  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, estadoFilter, startDate, endDate])
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, estadoFilter, startDate, endDate, localStatusOverrides])
 
   async function handleSincronizarGhl(): Promise<void> {
     if (!conectado) {
@@ -177,8 +199,86 @@ export default function ContactosPage(): JSX.Element {
     }
   }
 
+  // Toggles contact status Active / Inactive
+  async function handleToggleStatus(c: any): Promise<void> {
+    const nextStatus = !c.activo
+    setLocalStatusOverrides(prev => ({ ...prev, [c.id]: nextStatus }))
+    try {
+      await actualizarContacto.mutateAsync({ id: c.id, data: { activo: nextStatus } })
+      toast.success(`Estado de ${c.razonSocial} actualizado`)
+    } catch (err) {
+      // Revert in case of error
+      setLocalStatusOverrides(prev => ({ ...prev, [c.id]: !nextStatus }))
+      toast.error('Ocurrió un error al actualizar el estado')
+    }
+  }
+
+  async function handleEditSave(id: string, data: any) {
+    try {
+      const cleanPhone = data.telefono.replace(/\D/g, '')
+      const cleanRnc = (data.rnc || '').replace(/\D/g, '')
+
+      const orig = contactos.find(c => c.id === id)
+      let resolvedTipo = orig?.tipo || 'CONSUMIDOR_FINAL'
+      if (resolvedTipo !== 'PROVEEDOR') {
+        resolvedTipo = (cleanRnc.length === 9 || cleanRnc.length === 11) ? 'CLIENTE' : 'CONSUMIDOR_FINAL'
+      }
+
+      await actualizarContacto.mutateAsync({
+        id,
+        data: {
+          tipo: resolvedTipo,
+          rnc: cleanRnc || undefined,
+          razonSocial: data.nombre,
+          nombreComercial: data.nombreComercial || undefined,
+          email: data.email || undefined,
+          telefono: cleanPhone || undefined,
+          direccion: data.direccion || undefined,
+          identificadorExtranjero: data.idExtranjero || undefined,
+        }
+      })
+      toast.success('Contacto actualizado correctamente')
+      if (selectedContacto && selectedContacto.id === id) {
+        setSelectedContacto((prev: any) => ({
+          ...prev,
+          tipo: resolvedTipo,
+          rnc: cleanRnc || null,
+          razonSocial: data.nombre,
+          email: data.email || null,
+          telefono: cleanPhone || null,
+          direccion: data.direccion || null,
+          identificadorExtranjero: data.idExtranjero || null,
+        }))
+      }
+    } catch (err) {
+      toast.error('Error al actualizar el contacto')
+    }
+  }
+
+  const mappedSelectedContacto = useMemo(() => {
+    if (!selectedContacto) return null
+    // Read local override status if present
+    const isActivo = localStatusOverrides[selectedContacto.id] !== undefined
+      ? localStatusOverrides[selectedContacto.id]
+      : !!selectedContacto.activo
+
+    return {
+      id: selectedContacto.id,
+      nombre: selectedContacto.razonSocial || 'Sin nombre',
+      rnc: selectedContacto.rnc || '',
+      email: selectedContacto.email || '',
+      telefono: selectedContacto.telefono || '',
+      tipo: selectedContacto.tipo === 'CONSUMIDOR_FINAL' ? ('PERSONA' as const) : ('EMPRESA' as const),
+      idExtranjero: selectedContacto.identificadorExtranjero || '',
+      validacion: selectedContacto.rncValidado ? ('VALIDO' as const) : ('NO_ENCONTRADO' as const),
+      totalFacturado: 0,
+      fecha: new Date(selectedContacto.updatedAt || selectedContacto.createdAt || Date.now()).toISOString().split('T')[0] ?? '',
+      estado: (isActivo ? 'ACTIVO' : 'INACTIVO') as any,
+    }
+  }, [selectedContacto, localStatusOverrides])
+
   return (
-    <div className="flex flex-col gap-6 text-left">
+    <div className="flex flex-col gap-6 text-left w-full">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-100 pb-5">
         <div className="flex flex-col gap-1">
@@ -186,304 +286,467 @@ export default function ContactosPage(): JSX.Element {
           <p className="text-body-sm text-text-secondary">{total} contactos en tu directorio</p>
         </div>
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="md"
+          <RefreshActionButton
             onClick={() => refetch()}
-            className="h-10 w-10 p-0 flex items-center justify-center border border-neutral-200 hover:bg-neutral-50"
-            title="Refrescar"
-          >
-            <RotateCw size={16} className="text-text-secondary" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="md"
+            isLoading={isFetching}
+            className="h-10 w-10 border-neutral-200"
+          />
+          <ImportActionButton
             onClick={handleSincronizarGhl}
-            disabled={sincronizar.isPending}
-            className="h-10 border border-neutral-200 hover:bg-neutral-50 px-4"
+            isLoading={sincronizar.isPending}
+            label="Sincronizar con GoHighLevel"
             title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
-          >
-            {sincronizar.isPending ? <Spinner size={16} className="mr-1.5" /> : <RefreshCw size={16} className="mr-1.5" />}
-            Sincronizar con GoHighLevel
-          </Button>
-          <Button variant="primary" size="md" onClick={() => setOpenModal(true)} className="h-10 px-4 font-semibold">
-            <Plus size={16} className="mr-1.5" />
-            Nuevo contacto
-          </Button>
+            className="h-10 border-neutral-200"
+          />
+          <ExportActionButton
+            onClick={() => alert('Exportando contactos...')}
+            title="Exportar"
+            className="h-10 border-neutral-200"
+          />
+          <NewActionButton
+            onClick={() => setOpenModal(true)}
+            label="Nuevo contacto"
+            className="h-10"
+          />
         </div>
       </div>
 
-      {/* Aviso: sin conexión GHL */}
-      {avisoNoConectado && !conectado && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
-          <span className="flex items-center gap-2">
-            <AlertTriangle size={18} className="shrink-0" />
-            Primero conecta tu cuenta de GoHighLevel en Configuración.
-          </span>
-          <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
-            Ir a Configuración
-          </Link>
-        </div>
-      )}
-
-      {/* Error de sincronización */}
-      {syncError && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-body-sm text-danger-700">
-          <span className="flex items-center gap-2">
-            <XCircle size={18} className="shrink-0" />
-            {syncError} Revisa el token en Configuración.
-          </span>
-          <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
-            Ir a Configuración
-          </Link>
-        </div>
-      )}
-
-      {/* Resultado de sincronización */}
-      {syncResult && (
-        <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3">
-          <div className="flex items-center gap-2 text-body-sm font-semibold text-success-700">
-            <CheckCircle2 size={18} className="shrink-0" />
-            Importados: {syncResult.importados} · Actualizados: {syncResult.actualizados} · Sin RNC: {syncResult.sinRnc}
-          </div>
-          {syncResult.sinRnc > 0 && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-text-secondary">
-              <span>{syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
-              <button
-                type="button"
-                onClick={() => { setSoloSinRnc(true); setPage(1) }}
-                className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
-              >
-                Ver contactos sin RNC
-              </button>
+      <div className={cn("flex items-start w-full transition-all duration-300 ease-in-out", selectedContacto ? 'gap-[24px]' : 'gap-0')}>
+        <div className="flex-1 flex flex-col gap-6 transition-all duration-300 min-w-0">
+          {/* Aviso: sin conexión GHL */}
+          {avisoNoConectado && !conectado && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
+              <span className="flex items-center gap-2">
+                <AlertTriangle size={18} className="shrink-0" />
+                Primero conecta tu cuenta de GoHighLevel en Configuración.
+              </span>
+              <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
+                Ir a Configuración
+              </Link>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
-        {/* Search Input */}
-        <div className="relative border border-[#e2e8f0] bg-white rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] w-[240px] shrink-0">
-          <Search size={16} className="text-[#99a1af]" />
-          <input
-            type="text"
-            placeholder="Buscar por cliente, RNC o e-NCF..."
-            value={search}
-            onChange={(e) => resetPage(setSearch)(e.target.value)}
-            className="flex-1 font-['Open_Sans'] font-normal leading-[normal] text-text-primary text-[14px] placeholder-[#99a1af] bg-transparent focus:outline-none"
-          />
-        </div>
-
-        {/* Tipo Selector */}
-        <Select
-          value={tipoFilter}
-          onChange={(val) => resetPage(setTipoFilter)(val as any)}
-          options={tipoOptions}
-          className="w-[84px] shrink-0"
-          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
-        />
-
-        {/* Tipo Fiscal Selector */}
-        <Select
-          value={tipoFiscalFilter}
-          onChange={(val) => resetPage(setTipoFiscalFilter)(val)}
-          options={tipoFiscalOptions}
-          className="w-[126px] shrink-0"
-          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
-        />
-
-        {/* Validación DGII Selector */}
-        <Select
-          value={validacionFilter}
-          onChange={(val) => resetPage(setValidacionFilter)(val)}
-          options={validacionOptions}
-          className="w-[182px] shrink-0"
-          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
-        />
-
-        {/* Estado Selector */}
-        <Select
-          value={estadoFilter}
-          onChange={(val) => resetPage(setEstadoFilter)(val)}
-          options={estadoOptions}
-          className="w-[126px] shrink-0"
-          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
-        />
-
-        {/* Date Range Picker */}
-        <div className="relative flex-1 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[13px] justify-between gap-2 min-w-[260px]">
-          {/* Visual Display */}
-          <div className="flex items-center gap-[10px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none">
-            <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
-            <span className={startDate ? "text-[#333333]" : "text-[#99a1af]"}>
-              {startDate ? formatDate(startDate) : 'DD/MM/AAAA'}
-            </span>
-            <span className="text-[#99a1af] font-normal text-[16px]">–</span>
-            <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
-              {endDate ? formatDate(endDate) : 'DD/MM/AAAA'}
-            </span>
-          </div>
-
-          {/* Invisible inputs on top */}
-          <div className="absolute inset-0 flex">
-            <div
-              onClick={() => {
-                try {
-                  startDateRef.current?.showPicker()
-                } catch (e) {
-                  startDateRef.current?.focus()
-                }
-              }}
-              className="w-1/2 h-full cursor-pointer"
-            />
-            <div
-              onClick={() => {
-                try {
-                  endDateRef.current?.showPicker()
-                } catch (e) {
-                  endDateRef.current?.focus()
-                }
-              }}
-              className="w-1/2 h-full cursor-pointer"
-            />
-            <input
-              ref={startDateRef}
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value)
-                setPage(1)
-              }}
-              className="absolute -z-10 opacity-0 invisible w-0 h-0"
-            />
-            <input
-              ref={endDateRef}
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value)
-                setPage(1)
-              }}
-              className="absolute -z-10 opacity-0 invisible w-0 h-0"
-            />
-          </div>
-        </div>
-
-        {soloSinRnc && (
-          <Badge variant="warning" className="h-10">
-            Solo sin RNC
-            <button type="button" onClick={() => setSoloSinRnc(false)} className="ml-1 focus:outline-none" title="Quitar filtro">
-              <XCircle size={14} />
-            </button>
-          </Badge>
-        )}
-      </div>
-
-      {/* Tabla */}
-      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-16">
-            <Spinner size={28} />
-          </div>
-        ) : isError ? (
-          <div className="p-12 text-center text-body-sm text-danger-600">
-            No pudimos cargar los contactos. Intenta refrescar.
-          </div>
-        ) : visibles.length === 0 ? (
-          <EmptyState
-            title=""
-            description={
-              activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || estadoFilter !== 'todos' || startDate || endDate || soloSinRnc
-                ? 'No hay contactos que coincidan con los filtros.'
-                : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-body-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
-                  <th className="px-4 py-3">Nombre / Razón social</th>
-                  <th className="px-4 py-3">RNC / Cédula</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Origen</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Teléfono</th>
-                  <th className="px-4 py-3">Validación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.map((c) => (
-                  <tr key={c.id} className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
-                          {c.tipo === 'CONSUMIDOR_FINAL' ? <User size={16} /> : <Building2 size={16} />}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-text-primary line-clamp-1">{c.razonSocial}</span>
-                          {c.nombreComercial && (
-                            <span className="text-[11px] text-text-secondary line-clamp-1">{c.nombreComercial}</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-text-primary">{formatRnc(c.rnc)}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={c.tipo === 'CLIENTE' ? 'info' : 'neutral'}>{TIPO_LABEL[c.tipo] ?? c.tipo}</Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={c.origen === 'GHL' ? 'info' : 'neutral'}>
-                        {c.origen === 'GHL' ? 'GoHighLevel' : 'Manual'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">{c.email || '—'}</td>
-                    <td className="px-4 py-3 text-text-secondary">{c.telefono || '—'}</td>
-                    <td className="px-4 py-3">
-                      {c.rncValidado ? (
-                        <Badge variant="success"><CheckCircle2 size={12} /> Válido</Badge>
-                      ) : (
-                        <Badge variant="warning"><AlertTriangle size={12} /> Sin validar</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Paginación (server-side) */}
-        {!isLoading && !isError && visibles.length > 0 && (
-          <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
-            <p className="text-ui-sm text-text-secondary">{total} resultados</p>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-500 px-2 text-ui-sm font-bold text-white">
-                {page} / {totalPages}
+          {/* Error de sincronización */}
+          {syncError && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-body-sm text-danger-700">
+              <span className="flex items-center gap-2">
+                <XCircle size={18} className="shrink-0" />
+                {syncError} Revisa el token en Configuración.
               </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
-              >
-                <ChevronRight size={16} />
-              </button>
+              <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
+                Ir a Configuración
+              </Link>
             </div>
+          )}
+
+          {/* Resultado de sincronización */}
+          {syncResult && (
+            <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3">
+              <div className="flex items-center gap-2 text-body-sm font-semibold text-success-700">
+                <CheckCircle2 size={18} className="shrink-0" />
+                Importados: {syncResult.importados} · Actualizados: {syncResult.actualizados} · Sin RNC: {syncResult.sinRnc}
+              </div>
+              {syncResult.sinRnc > 0 && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-text-secondary">
+                  <span>{syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
+                  <button
+                    type="button"
+                    onClick={() => { setSoloSinRnc(true); setPage(1) }}
+                    className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
+                  >
+                    Ver contactos sin RNC
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
+            {/* Search Input */}
+            <div className="relative border border-[#e2e8f0] bg-white rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] flex-1 min-w-[150px]">
+              <Search size={16} className="text-[#99a1af]" />
+              <input
+                type="text"
+                placeholder="Buscar por cliente, RNC o e-NCF..."
+                value={search}
+                onChange={(e) => resetPage(setSearch)(e.target.value)}
+                className="flex-1 font-['Open_Sans'] font-normal leading-[normal] text-text-primary text-[14px] placeholder-[#99a1af] bg-transparent focus:outline-none"
+              />
+            </div>
+
+            {/* Tipo Selector */}
+            <Select
+              value={tipoFilter}
+              onChange={(val) => resetPage(setTipoFilter)(val as any)}
+              options={tipoOptions}
+              className="w-[84px] shrink-0"
+              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+            />
+
+            {/* Tipo Fiscal Selector */}
+            <Select
+              value={tipoFiscalFilter}
+              onChange={(val) => resetPage(setTipoFiscalFilter)(val)}
+              options={tipoFiscalOptions}
+              className="w-[105px] shrink-0"
+              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+            />
+
+            {/* Validación DGII Selector */}
+            <Select
+              value={validacionFilter}
+              onChange={(val) => resetPage(setValidacionFilter)(val)}
+              options={validacionOptions}
+              className="w-[145px] shrink-0"
+              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+            />
+
+            {/* Estado Selector */}
+            <Select
+              value={estadoFilter}
+              onChange={(val) => resetPage(setEstadoFilter)(val)}
+              options={estadoOptions}
+              className="w-[95px] shrink-0"
+              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+            />
+
+            {/* Date Range Picker */}
+            <div className="relative w-[210px] shrink-0 bg-white border border-[#e2e8f0] rounded-[10px] h-[44px] flex items-center px-[10px]">
+              {/* Visual Display */}
+              <div className="flex items-center justify-between w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none whitespace-nowrap">
+                <div className="flex items-center gap-[6px]">
+                  <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
+                  <span className={startDate ? "text-[#333333]" : "text-[#99a1af]"}>
+                    {startDate ? formatDate(startDate) : 'dd/mm/aaaa'}
+                  </span>
+                </div>
+                <span className="text-[#99a1af] font-normal text-[16px]">–</span>
+                <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
+                  {endDate ? formatDate(endDate) : 'dd/mm/aaaa'}
+                </span>
+              </div>
+
+              {/* Invisible inputs on top */}
+              <div className="absolute inset-0 flex">
+                <div
+                  onClick={() => {
+                    try {
+                      startDateRef.current?.showPicker()
+                    } catch (e) {
+                      startDateRef.current?.focus()
+                    }
+                  }}
+                  className="w-1/2 h-full cursor-pointer"
+                />
+                <div
+                  onClick={() => {
+                    try {
+                      endDateRef.current?.showPicker()
+                    } catch (e) {
+                      endDateRef.current?.focus()
+                    }
+                  }}
+                  className="w-1/2 h-full cursor-pointer"
+                />
+                <input
+                  ref={startDateRef}
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className="absolute -z-10 opacity-0 invisible w-0 h-0"
+                />
+                <input
+                  ref={endDateRef}
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className="absolute -z-10 opacity-0 invisible w-0 h-0"
+                />
+              </div>
+            </div>
+
+            {soloSinRnc && (
+              <Badge variant="warning" className="h-10">
+                Solo sin RNC
+                <button type="button" onClick={() => setSoloSinRnc(false)} className="ml-1 focus:outline-none" title="Quitar filtro">
+                  <XCircle size={14} />
+                </button>
+              </Badge>
+            )}
           </div>
-        )}
+
+          {/* Tabla */}
+          <div className="rounded-xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
+            {isLoading ? (
+              <div className="flex items-center justify-center p-16">
+                <Spinner size={28} />
+              </div>
+            ) : isError ? (
+              <div className="p-12 text-center text-body-sm text-danger-600">
+                No pudimos cargar los contactos. Intenta refrescar.
+              </div>
+            ) : visibles.length === 0 ? (
+              <EmptyState
+                title=""
+                description={
+                  activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || estadoFilter !== 'todos' || startDate || endDate || soloSinRnc
+                    ? 'No hay contactos que coincidan con los filtros.'
+                    : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
+                }
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-body-sm table-auto border-collapse">
+                  <thead>
+                    <tr className="border-b border-neutral-200 bg-[#f8fafc] text-ui-sm font-semibold text-text-secondary h-10 select-none">
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[240px] min-w-[240px]">Nombre / Razón social</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[80px]">Tipo</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">Tipo fiscal</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Identificacion</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Validación</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">e-CF sugerido</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Ultima actividad</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-center w-[100px]">Estado</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-right pr-6 w-[110px]">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibles.map((c) => {
+                      // Determine tax type label and styling
+                      let taxTypeLabel = 'CF'
+                      let taxTypeClass = 'bg-[#fdf2f8] text-[#9d174d] border-[#fbcfe8]'
+                      if (c.identificadorExtranjero) {
+                        taxTypeLabel = 'ID extranjero'
+                        taxTypeClass = 'bg-[#ecfdf5] text-[#065f46] border-[#a7f3d0]'
+                      } else if (c.rnc) {
+                        const cleanRnc = c.rnc.replace(/\D/g, '')
+                        if (cleanRnc.length === 9) {
+                          taxTypeLabel = 'RNC'
+                          taxTypeClass = 'bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]'
+                        } else if (cleanRnc.length === 11) {
+                          taxTypeLabel = 'Cédula'
+                          taxTypeClass = 'bg-neutral-50 text-neutral-800 border-neutral-200'
+                        }
+                      }
+
+                      // Determine type label and styling
+                      let typeLabel = 'Cliente'
+                      let typeClass = 'bg-neutral-50 text-neutral-800 border-neutral-200'
+                      if (c.tipo === 'PROVEEDOR') {
+                        typeLabel = 'Proveedor'
+                        typeClass = 'bg-[#fdf2f8] text-[#9d174d] border-[#fbcfe8]'
+                      } else if (c.tipo === 'CONSUMIDOR_FINAL') {
+                        typeLabel = 'Ocasional'
+                        typeClass = 'bg-[#f5f3ff] text-[#5b21b6] border-[#ddd6fe]'
+                      }
+
+                      // Determine suggested e-CF
+                      let suggestedEcf = 'E31'
+                      if (c.tipo === 'PROVEEDOR') {
+                        suggestedEcf = taxTypeLabel === 'RNC' ? 'E41' : 'E42'
+                      } else {
+                        if (taxTypeLabel === 'CF' || taxTypeLabel === 'Cédula') {
+                          suggestedEcf = 'E32'
+                        } else if (taxTypeLabel === 'ID extranjero') {
+                          suggestedEcf = 'E47'
+                        }
+                      }
+
+                      // Format activity date
+                      const activityDate = c.updatedAt || c.createdAt || new Date().toISOString()
+                      const formattedActivity = formatDate(activityDate)
+
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => setSelectedContacto(c)}
+                          className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors h-[72px] cursor-pointer"
+                        >
+                          <td className="px-4 py-3 w-[240px] min-w-[240px]">
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
+                                  {c.tipo === 'CONSUMIDOR_FINAL' ? <User size={16} /> : <Building2 size={16} />}
+                                </div>
+                                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-[#0f973d] ring-2 ring-white" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-text-primary line-clamp-1">{c.razonSocial}</span>
+                                <span className="text-[11px] text-text-secondary line-clamp-1">{c.tipo === 'CONSUMIDOR_FINAL' ? 'Cliente' : 'Empresa'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 w-[80px] font-semibold">
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] font-medium border", typeClass)}>
+                              {typeLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[95px]">
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] font-medium border", taxTypeClass)}>
+                              {taxTypeLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[110px] font-semibold text-text-primary">
+                            {formatRnc(c.rnc)}
+                          </td>
+                          <td className="px-4 py-3 w-[110px]">
+                            {c.rncValidado ? (
+                              <div className="flex items-center gap-1.5 text-green-700 font-semibold text-[13px]">
+                                <CheckCircle2 size={14} className="text-green-600" />
+                                <span>Válido</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-amber-700 font-semibold text-[13px]">
+                                <AlertTriangle size={14} className="text-amber-500" />
+                                <span>No encontrado</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 w-[95px]">
+                            <span className="inline-block bg-[rgba(100,116,139,0.1)] text-[#64748b] text-[12px] font-semibold px-2.5 py-1 rounded-[10px]">
+                              {suggestedEcf}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[110px] text-text-secondary">
+                            {formattedActivity}
+                          </td>
+                          <td className="px-4 py-3 text-center w-[100px]">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleStatus(c)
+                              }}
+                              className="focus:outline-none"
+                            >
+                              {c.activo ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-green-700 hover:bg-green-100 transition-colors">
+                                  <CheckCircle2 size={11} className="text-green-600" />
+                                  Activo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 border border-neutral-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
+                                  <XCircle size={11} className="text-neutral-500" />
+                                  Inactivo
+                                </span>
+                              )}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3.5 text-right pr-6 w-[110px]">
+                            <div className="flex items-center justify-end gap-3.5">
+                              <button
+                                type="button"
+                                title="Emitir Factura"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!c.rnc && !c.identificadorExtranjero) {
+                                    toast.error("Error: El RNC/Cédula es requerido para emitir factura. Por favor actualice los datos del contacto.")
+                                    return
+                                  }
+                                  router.push(`/nueva-factura?clienteId=${c.id}`)
+                                }}
+                                className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                              >
+                                <Send size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Editar"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingContacto(c)
+                                }}
+                                className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Acciones"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedContacto(c)
+                                }}
+                                className="p-1.5 hover:bg-neutral-100 rounded-lg text-[#64748b] transition-colors focus:outline-none"
+                              >
+                                <MoreHorizontal size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Paginación (server-side) */}
+            {!isLoading && !isError && visibles.length > 0 && (
+              <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
+                <p className="text-ui-sm text-text-secondary">{total} resultados</p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-500 px-2 text-ui-sm font-bold text-white">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0",
+            selectedContacto ? 'w-[400px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+          )}
+        >
+          {selectedContacto && (
+            <DetailPanel
+              contacto={mappedSelectedContacto}
+              onClose={() => setSelectedContacto(null)}
+              onEmitirFactura={(c) => router.push(`/nueva-factura?clienteId=${c.id}`)}
+              onCrearCotizacion={(c) => router.push(`/cotizaciones?clienteId=${c.id}`)}
+              onRegistrarCompra={(c) => alert(`Registrar compra para ${c.nombre} (Próximamente)`)}
+              onEditar={(c) => {
+                const orig = visibles.find(v => v.id === c.id)
+                setEditingContacto(orig || selectedContacto)
+              }}
+            />
+          )}
+        </div>
       </div>
 
       <NuevoClienteModal open={openModal} onClose={() => setOpenModal(false)} onSave={crearContacto} />
+      <EditarClienteModal
+        open={!!editingContacto}
+        contacto={editingContacto}
+        onClose={() => setEditingContacto(null)}
+        onSave={handleEditSave}
+      />
     </div>
   )
 }

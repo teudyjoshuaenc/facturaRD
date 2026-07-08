@@ -34,7 +34,7 @@ export function useContactosDirectorio(params: ContactosDirParams) {
   const queryClient = useQueryClient()
   const { search, tipo, origen, page = 1, limit = 10 } = params
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching } = useQuery({
     // La key empieza con 'contactos' → la invalida la sync GHL y crearContacto.
     queryKey: ['contactos', 'directorio', { search, tipo, origen, page, limit }],
     queryFn: () =>
@@ -57,6 +57,7 @@ export function useContactosDirectorio(params: ContactosDirParams) {
     totalPages: data?.totalPages ?? 1,
     isLoading,
     isError,
+    isFetching,
     refetch: () => queryClient.invalidateQueries({ queryKey: ['contactos'] }),
   }
 }

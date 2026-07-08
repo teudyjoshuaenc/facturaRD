@@ -13,6 +13,7 @@ export interface Producto {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  activo?: boolean
   unidadMedida?: number
   descuento?: number
   itbisRetenido?: number
@@ -34,16 +35,22 @@ export interface NuevoProductoData {
   aplicarPropinaLegal?: boolean
 }
 
-export function useProductos() {
+export interface UseProductosParams {
+  activo?: boolean
+}
+
+export function useProductos(params?: UseProductosParams) {
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
+  const activo = params?.activo
 
-  const { data: productos = [], isLoading } = useQuery({
-    queryKey: ['productos', searchQuery],
+  const { data: productos = [], isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['productos', searchQuery, activo],
     queryFn: async () => {
       const res = await api.get('/productos', {
         params: {
           search: searchQuery.trim() || undefined,
+          activo: activo,
           limit: 100,
         },
       })
@@ -57,6 +64,7 @@ export function useProductos() {
           precio: Number(p.precioUnitario),
           indicadorFacturacion: p.tratamientoITBIS === 'EXENTO' ? 'E' : (p.tratamientoITBIS || 'I1'),
           precioIncluyeItbis: false,
+          activo: p.activo !== false,
         }
         if (p.unidadMedida) {
           item.unidadMedida = Number(p.unidadMedida)
@@ -100,6 +108,7 @@ export function useProductos() {
         precio: Number(result.precioUnitario),
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
         precioIncluyeItbis: false,
+        activo: result.activo !== false,
       }
       if (result.unidadMedida) {
         p.unidadMedida = Number(result.unidadMedida)
@@ -109,12 +118,86 @@ export function useProductos() {
     [crearProductoMutation],
   )
 
+  const actualizarProductoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<NuevoProductoData> & { activo?: boolean } }) => {
+      const body = {
+        ...(data.tipo !== undefined && { tipo: data.tipo }),
+        ...(data.nombre !== undefined && { nombre: data.nombre }),
+        ...(data.precio !== undefined && { precioUnitario: data.precio }),
+        ...(data.indicadorFacturacion !== undefined && {
+          tratamientoITBIS: data.indicadorFacturacion === 'E' || data.indicadorFacturacion === 'I4' ? 'EXENTO' : data.indicadorFacturacion,
+        }),
+        ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida ? String(data.unidadMedida) : null }),
+        ...(data.codigo !== undefined && { codigo: data.codigo || null }),
+        ...(data.activo !== undefined && { activo: data.activo }),
+      }
+      const res = await api.patch(`/productos/${id}`, body)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productos'] })
+      toast.success('Producto actualizado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al actualizar el producto', { description: msg })
+    },
+  })
+
+  const actualizarProducto = useCallback(
+    async (id: string, data: Partial<NuevoProductoData> & { activo?: boolean }): Promise<Producto> => {
+      const result = await actualizarProductoMutation.mutateAsync({ id, data })
+      const p: Producto = {
+        id: result.id,
+        nombre: result.nombre,
+        tipo: result.tipo as 'BIEN' | 'SERVICIO',
+        codigo: result.codigo || '',
+        precio: Number(result.precioUnitario),
+        indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
+        precioIncluyeItbis: false,
+        activo: result.activo !== false,
+      }
+      if (result.unidadMedida) {
+        p.unidadMedida = Number(result.unidadMedida)
+      }
+      return p
+    },
+    [actualizarProductoMutation],
+  )
+
+  const eliminarProductoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/productos/${id}`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productos'] })
+      toast.success('Producto eliminado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al eliminar el producto', { description: msg })
+    },
+  })
+
+  const eliminarProducto = useCallback(
+    async (id: string): Promise<void> => {
+      await eliminarProductoMutation.mutateAsync(id)
+    },
+    [eliminarProductoMutation],
+  )
+
   return {
     productos,
     allProductos: productos,
     searchQuery,
     setSearchQuery,
     crearProducto,
+    actualizarProducto,
+    eliminarProducto,
     isLoading,
+    isFetching,
+    refetch,
   }
 }
+

@@ -3,6 +3,11 @@
 import React from 'react'
 import Image from 'next/image'
 import type { JSX } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { useRouter } from 'next/navigation'
+import { Edit2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Contacto {
   id: string
@@ -18,6 +23,7 @@ interface Contacto {
   tipoFiscal?: string
   ecfSugerido?: string
   productosFrecuentes?: string[]
+  identificadorExtranjero?: string | null
   historial?: {
     facturas: number
     cotizaciones: string
@@ -31,6 +37,7 @@ interface DetailPanelProps {
   onEmitirFactura?: (contacto: Contacto) => void
   onCrearCotizacion?: (contacto: Contacto) => void
   onRegistrarCompra?: (contacto: Contacto) => void
+  onEditar?: (contacto: Contacto) => void
 }
 
 export function DetailPanel({
@@ -39,8 +46,20 @@ export function DetailPanel({
   onEmitirFactura,
   onCrearCotizacion,
   onRegistrarCompra,
+  onEditar,
 }: DetailPanelProps): JSX.Element | null {
   if (!contacto) return null
+
+  const router = useRouter()
+  const currentContacto = contacto
+
+  function validateRnc(actionName: string, proceed: () => void) {
+    if (!currentContacto.rnc && !currentContacto.identificadorExtranjero) {
+      toast.error(`Error: El NIF/RNC/Cédula es requerido para ${actionName}. Por favor actualice los datos del contacto.`)
+      return
+    }
+    proceed()
+  }
 
   // Format RNC for display
   const formattedRnc = contacto.rnc.length === 9
@@ -53,16 +72,54 @@ export function DetailPanel({
   const ecfSugeridoVal = contacto.ecfSugerido || (contacto.tipo === 'EMPRESA' ? 'E31' : 'E32')
   const emailVal = contacto.email || 'contabilidad@lopez.com.do'
   const productosFrecuentesVal = contacto.productosFrecuentes || ['Consultoria', 'Consultoria', 'Mantenimiento']
-  const historialVal = contacto.historial || {
-    facturas: 24,
-    cotizaciones: '21 abr 2026',
-    compras: 2,
+
+  // Query actual invoices count
+  const { data: facturasCount = 0 } = useQuery({
+    queryKey: ['comprobantes-count', contacto.id, contacto.nombre, contacto.rnc],
+    queryFn: async () => {
+      const searchVal = contacto.rnc || contacto.nombre
+      const res = await api.get('/comprobantes', {
+        params: { search: searchVal, limit: 1 }
+      })
+      return res.data?.total ?? 0
+    },
+    enabled: !!contacto,
+  })
+
+  // Query actual quotes count
+  const { data: cotizacionesCount = 0 } = useQuery({
+    queryKey: ['cotizaciones-count', contacto.id],
+    queryFn: async () => {
+      const res = await api.get('/cotizaciones', {
+        params: { contactoId: contacto.id, limit: 1 }
+      })
+      return res.data?.total ?? 0
+    },
+    enabled: !!contacto,
+  })
+
+  // Query actual purchases count
+  const { data: comprasCount = 0 } = useQuery({
+    queryKey: ['compras-count', contacto.id, contacto.nombre, contacto.rnc],
+    queryFn: async () => {
+      const searchVal = contacto.rnc || contacto.nombre
+      const res = await api.get('/compras', {
+        params: { search: searchVal, limit: 1 }
+      })
+      return res.data?.total ?? 0
+    },
+    enabled: !!contacto,
+  })
+
+  const historialVal = {
+    facturas: facturasCount,
+    cotizaciones: cotizacionesCount > 0 ? `${cotizacionesCount}` : '—',
+    compras: comprasCount,
   }
 
   return (
     <div 
-      className="fixed inset-y-0 right-0 z-40 w-[400px] bg-white border-l border-neutral-200 shadow-2xl flex flex-col justify-between transform transition-transform duration-300 ease-in-out"
-      style={{ top: '68px', height: 'calc(100vh - 68px)' }}
+      className="w-[400px] bg-white border border-[#e4e7ec] rounded-[16px] shadow-sm flex flex-col justify-between shrink-0 transform transition-transform duration-300 ease-in-out self-start sticky top-[24px]"
     >
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto">
@@ -189,16 +246,28 @@ export function DetailPanel({
             <span className="text-[#64748b] text-[10px] font-bold tracking-[0.44px] uppercase">
               historial
             </span>
-            <div className="flex gap-2">
-              <div className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1">
+            <div className="flex gap-2 select-none">
+              <div
+                onClick={() => router.push(`/facturas?search=${contacto.rnc || contacto.nombre}`)}
+                className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1 cursor-pointer hover:bg-neutral-50 hover:border-neutral-200 transition-all"
+                title="Ver facturas de este cliente"
+              >
                 <span className="text-[#64748b] text-[12px] leading-tight">Facturas</span>
                 <span className="text-[#0379d5] text-[14px] font-bold">{historialVal.facturas}</span>
               </div>
-              <div className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1">
+              <div
+                onClick={() => router.push(`/cotizaciones?search=${contacto.rnc || contacto.nombre}`)}
+                className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1 cursor-pointer hover:bg-neutral-50 hover:border-neutral-200 transition-all"
+                title="Ver cotizaciones de este cliente"
+              >
                 <span className="text-[#64748b] text-[12px] leading-tight">Cotizaciones</span>
                 <span className="text-[#0379d5] text-[14px] font-bold whitespace-nowrap">{historialVal.cotizaciones}</span>
               </div>
-              <div className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1">
+              <div
+                onClick={() => router.push(`/compras?search=${contacto.rnc || contacto.nombre}`)}
+                className="flex-1 bg-[#f8fafc] p-3 rounded-[10px] border border-neutral-100 flex flex-col gap-1 cursor-pointer hover:bg-neutral-50 hover:border-neutral-200 transition-all"
+                title="Ver compras de este cliente"
+              >
                 <span className="text-[#64748b] text-[12px] leading-tight">Compras</span>
                 <span className="text-[#0379d5] text-[14px] font-bold">{historialVal.compras}</span>
               </div>
@@ -210,7 +279,7 @@ export function DetailPanel({
       {/* Footer Actions */}
       <div className="border-t border-[#e4e7ec] p-5 flex flex-col gap-2">
         <button
-          onClick={() => onEmitirFactura?.(contacto)}
+          onClick={() => validateRnc("emitir factura", () => onEmitirFactura?.(contacto))}
           className="bg-[#0379d5] hover:bg-[#0262ad] text-white rounded-[10px] py-2.5 px-4 font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors w-full"
         >
           <Image src="/icons/emit_invoice.svg" alt="Emit" width={12} height={12} />
@@ -219,20 +288,27 @@ export function DetailPanel({
 
         <div className="flex gap-2.5">
           <button
-            onClick={() => onCrearCotizacion?.(contacto)}
+            onClick={() => validateRnc("crear cotización", () => onCrearCotizacion?.(contacto))}
             className="flex-1 border border-[#e2e8f0] hover:bg-neutral-50 text-[#333] rounded-[10px] py-2 px-3 text-[12px] flex items-center justify-center gap-2 transition-colors"
           >
             <Image src="/icons/create_quote.svg" alt="Quote" width={12} height={12} />
             Crear cotización
           </button>
           <button
-            onClick={() => onRegistrarCompra?.(contacto)}
+            onClick={() => validateRnc("registrar compra", () => onRegistrarCompra?.(contacto))}
             className="flex-1 border border-[#e2e8f0] hover:bg-neutral-50 text-[#333] rounded-[10px] py-2 px-3 text-[12px] flex items-center justify-center gap-2 transition-colors"
           >
             <div className="w-3 h-3 flex items-center justify-center">
               <Image src="/icons/register_purchase.svg" alt="Purchase" width={12} height={12} />
             </div>
             Registrar Compra
+          </button>
+          <button
+            onClick={() => onEditar?.(contacto)}
+            className="border border-[#e2e8f0] hover:bg-neutral-50 text-[#333] rounded-[10px] p-2 flex-shrink-0 w-9 h-9 flex items-center justify-center gap-2 transition-colors"
+            title="Editar contacto"
+          >
+            <Edit2 size={13} className="text-[#64748b]" />
           </button>
         </div>
       </div>

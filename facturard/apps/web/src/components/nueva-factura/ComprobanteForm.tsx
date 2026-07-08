@@ -16,6 +16,7 @@ import { useContactos } from '@/hooks/useContactos'
 import { useUI } from '@/lib/context/UIContext'
 import { cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
+import { useSearchParams } from 'next/navigation'
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Cliente' },
@@ -69,12 +70,25 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const { contactos } = useContactos()
   const emisionRef = useRef<HTMLInputElement>(null)
 
+  const searchParams = useSearchParams()
+  const clienteIdParam = searchParams.get('clienteId')
+
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
 
   // Form state
   const [tipoECF, setTipoECF] = useState<TipoECF>('E31')
   const [selectedCliente, setSelectedCliente] = useState<Contacto | null>(null)
+
+  // Auto select client from query param
+  useEffect(() => {
+    if (clienteIdParam && contactos.length > 0 && !selectedCliente) {
+      const match = contactos.find((c) => c.id === clienteIdParam)
+      if (match) {
+        setSelectedCliente(match)
+      }
+    }
+  }, [clienteIdParam, contactos, selectedCliente])
   const [tipoPago, setTipoPago] = useState<'CONTADO' | 'CREDITO' | 'GRATUITO'>('CONTADO')
   const [tipoIngreso, setTipoIngreso] = useState<string>('')
   const [terminoPago, setTerminoPago] = useState<string>('')

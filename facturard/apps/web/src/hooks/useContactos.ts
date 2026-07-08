@@ -124,12 +124,23 @@ export function useContactos() {
     [crearContactoMutation],
   )
 
+  const actualizarContactoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await api.patch(`/contactos/${id}`, data)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactos'] })
+    },
+  })
+
   return {
     contactos,
     frecuentes,
     searchQuery,
     setSearchQuery,
     crearContacto,
+    actualizarContacto: actualizarContactoMutation,
     isLoading,
   }
 }

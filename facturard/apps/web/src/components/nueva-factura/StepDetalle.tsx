@@ -50,7 +50,7 @@ export function StepDetalle({
   tipoECF,
 }: StepDetalleProps): JSX.Element {
   const baseId = useId()
-  const { allProductos, crearProducto } = useProductos()
+  const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
   const [productSearch, setProductSearch] = useState('')
 
