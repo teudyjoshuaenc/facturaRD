@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { JSX } from 'react'
 import { X, Download, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
@@ -8,6 +9,8 @@ import { DetailPanel } from '@/components/facturas/DetailPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { ReenviarModal } from '@/components/facturas/ReenviarModal'
+import { Comprobante } from '@/lib/comprobantes'
 import { useComprobantes } from '@/hooks/useComprobantes'
 import {
   ESTADO_LABELS,
@@ -46,6 +49,8 @@ export default function FacturasPage(): JSX.Element {
     handleDownload,
   } = useComprobantes()
 
+  const [reenviarComprobante, setReenviarComprobante] = useState<Comprobante | null>(null)
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header row: count + actions */}
@@ -65,15 +70,8 @@ export default function FacturasPage(): JSX.Element {
             className="h-[44px] w-[44px] p-0 flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] transition-colors"
             title="Editar"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g clipPath="url(#clip_pencil)">
-                <path d="M14.116 4.54133C14.4685 4.18895 14.6665 3.71098 14.6666 3.21257C14.6667 2.71416 14.4687 2.23614 14.1163 1.88367C13.7639 1.53119 13.286 1.33314 12.7876 1.33308C12.2892 1.33302 11.8111 1.53095 11.4587 1.88333L2.56133 10.7827C2.40655 10.937 2.29208 11.127 2.228 11.336L1.34733 14.2373C1.3301 14.295 1.3288 14.3562 1.34357 14.4146C1.35833 14.4729 1.38861 14.5262 1.4312 14.5687C1.47378 14.6112 1.52708 14.6414 1.58544 14.6561C1.6438 14.6707 1.70504 14.6693 1.76267 14.652L4.66467 13.772C4.87345 13.7085 5.06345 13.5947 5.218 13.4407L14.116 4.54133Z" stroke="#64748B" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-              </g>
-              <defs>
-                <clipPath id="clip_pencil">
-                  <rect width="16" height="16" fill="white" />
-                </clipPath>
-              </defs>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+              <path d="M14.116 4.54133C14.4685 4.18895 14.6665 3.71098 14.6666 3.21257C14.6667 2.71416 14.4687 2.23614 14.1163 1.88367C13.7639 1.53119 13.286 1.33314 12.7876 1.33308C12.2892 1.33302 11.8111 1.53095 11.4587 1.88333L2.56133 10.7827C2.40655 10.937 2.29208 11.127 2.228 11.336L1.34733 14.2373C1.3301 14.295 1.3288 14.3562 1.34357 14.4146C1.35833 14.4729 1.38861 14.5262 1.4312 14.5687C1.47378 14.6112 1.52708 14.6414 1.58544 14.6561C1.6438 14.6707 1.70504 14.6693 1.76267 14.652L4.66467 13.772C4.87345 13.7085 5.06345 13.5947 5.218 13.4407L14.116 4.54133Z" stroke="#64748B" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Button>
           {/* Refresh button */}
@@ -83,7 +81,7 @@ export default function FacturasPage(): JSX.Element {
             className="h-[44px] w-[44px] p-0 flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] transition-colors"
             title="Refrescar"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
               <path d="M2 8C2 6.4087 2.63214 4.88258 3.75736 3.75736C4.88258 2.63214 6.4087 2 8 2C9.67737 2.00631 11.2874 2.66082 12.4933 3.82667L14 5.33333" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M14 2V5.33333H10.6667" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M14 8C14 9.5913 13.3679 11.1174 12.2426 12.2426C11.1174 13.3679 9.5913 14 8 14C6.32263 13.9937 4.71265 13.3392 3.50667 12.1733L2 10.6667" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
@@ -93,22 +91,22 @@ export default function FacturasPage(): JSX.Element {
           {/* Export button */}
           <Button
             variant="secondary"
-            className="h-[44px] px-[16px] flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] font-normal text-[14px] transition-colors font-sans gap-2"
+            className="h-[44px] w-[115px] flex items-center justify-start pl-[17px] pr-[17px] gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 transition-colors font-sans"
             title="Exportar comprobantes"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
               <path d="M10 1.33333H4C3.64638 1.33333 3.30724 1.47381 3.05719 1.72386C2.80714 1.97391 2.66667 2.31304 2.66667 2.66667V13.3333C2.66667 13.687 2.80714 14.0261 3.05719 14.2761C3.30724 14.5262 3.64638 14.6667 4 14.6667H12C12.3536 14.6667 12.6928 14.5262 12.9428 14.2761C13.1929 14.0261 13.3333 13.687 13.3333 13.3333V4.66667L10 1.33333Z" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M9.33333 1.33333V4C9.33333 4.35362 9.47381 4.69276 9.72386 4.94281C9.97391 5.19286 10.313 5.33333 10.6667 5.33333H13.3333" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M8 12V8" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M6 10L8 12L10 10" stroke="#64748B" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span>Exportar</span>
+            <span className="font-normal text-[#64748b] text-[14px] leading-[21px]">Exportar</span>
           </Button>
         </div>
       </div>
 
       {/* Main split layout grid */}
-      <div className="flex gap-[24px] items-start w-full">
+      <div className={`flex items-start w-full transition-all duration-300 ease-in-out ${selectedId ? 'gap-[24px]' : 'gap-0'}`}>
         {/* Left Side: Filters + Table */}
         <div className="flex-1 min-w-0 flex flex-col gap-6">
           <FacturaFilters
@@ -143,12 +141,12 @@ export default function FacturasPage(): JSX.Element {
                   <thead>
                     <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px]">
                       <th className="px-[16px] py-[10px] w-[90px] min-w-[90px] font-normal">e-NCF</th>
-                      <th className="px-[16px] py-[10px] w-[150px] min-w-[150px] font-normal">Cliente</th>
-                      <th className="px-[16px] py-[10px] w-[95px] min-w-[95px] font-normal">RNC</th>
-                      <th className="px-[16px] py-[10px] w-[95px] min-w-[95px] font-normal">Total</th>
-                      <th className="px-[16px] py-[10px] w-[85px] min-w-[85px] font-normal">ITBIS</th>
+                      <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">Cliente</th>
+                      <th className="px-[16px] py-[10px] w-[70px] min-w-[70px] font-normal">RNC</th>
+                      <th className="px-[16px] py-[10px] w-[85px] min-w-[85px] font-normal">Total</th>
+                      <th className="px-[16px] py-[10px] w-[81px] min-w-[81px] font-normal">ITBIS</th>
                       <th className="px-[16px] py-[10px] w-[80px] min-w-[80px] font-normal">Fecha</th>
-                      <th className="px-[16px] py-[10px] w-[100px] min-w-[100px] font-normal">Estado DGII</th>
+                      <th className="px-[16px] py-[10px] w-[106px] min-w-[106px] font-normal">Estado DGII</th>
                       <th className="px-[16px] py-[10px] w-[112px] min-w-[112px] font-normal">Acciones</th>
                     </tr>
                   </thead>
@@ -161,6 +159,7 @@ export default function FacturasPage(): JSX.Element {
                         onDownload={handleDownload}
                         onViewDetail={setSelectedId}
                         selected={selectedId === c.id}
+                        onReenviar={setReenviarComprobante}
                       />
                     ))}
                   </tbody>
@@ -212,9 +211,22 @@ export default function FacturasPage(): JSX.Element {
             loading={detailLoading}
             onDownload={handleDownload}
             downloading={!!downloadingId}
+            onReenviar={setReenviarComprobante}
           />
         </div>
       </div>
+
+      {reenviarComprobante && (
+        <ReenviarModal
+          isOpen={!!reenviarComprobante}
+          onClose={() => setReenviarComprobante(null)}
+          defaultEmail={reenviarComprobante.datos?.receptor?.email || ''}
+          onSend={async (data) => {
+            await new Promise((r) => setTimeout(r, 1000))
+            alert(`Comprobante reenviado exitosamente a: ${data.para}`)
+          }}
+        />
+      )}
     </div>
   )
 }

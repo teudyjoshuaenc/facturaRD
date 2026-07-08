@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   X,
   FileText,
@@ -31,6 +32,7 @@ interface DetailPanelProps {
   loading: boolean
   onDownload: (c: Comprobante) => void
   downloading: boolean
+  onReenviar?: (c: Comprobante) => void
 }
 
 // Convert ISO date (YYYY-MM-DD or full timestamp) to DD/MM/YYYY HH:MM
@@ -53,7 +55,9 @@ export function DetailPanel({
   loading,
   onDownload,
   downloading,
+  onReenviar,
 }: DetailPanelProps): JSX.Element | null {
+  const router = useRouter()
   const [shouldRender, setShouldRender] = useState(open)
   const [animate, setAnimate] = useState(false)
 
@@ -233,18 +237,18 @@ export function DetailPanel({
             {items.length > 0 && (
               <div className="flex flex-col gap-[8px] items-start text-left w-full">
                 <span className="text-[10px] font-semibold text-[#64748b] tracking-[0.44px] leading-[16.5px] uppercase">DETALLE</span>
-                <div className="bg-[#f8fafc] rounded-[10px] p-[12px] flex flex-col divide-y divide-[#e2e8f0] w-full">
+                <div className="flex flex-col gap-2 w-full">
                   {items.map((it: any, index: number) => (
-                    <div key={index} className="flex items-start justify-between py-1.5 first:pt-0 last:pb-0">
-                      <div className="flex flex-col items-start min-w-0">
-                        <span className="text-[13px] font-normal text-[#333] leading-[19.5px] truncate">
+                    <div key={index} className="bg-[#f8fafc] rounded-[10px] p-[12px] flex items-center justify-between w-full">
+                      <div className="flex flex-col items-start min-w-0 max-w-[143px]">
+                        <span className="text-[13px] font-normal text-[#333] leading-[19.5px] line-clamp-2 break-words">
                           {it.nombreItem}
                         </span>
-                        <span className="text-[12px] font-normal text-[#64748b] leading-[18px]">
+                        <span className="text-[12px] font-normal text-[#64748b] leading-[18px] whitespace-nowrap">
                           Cant {it.cantidad} · {formatCurrency(it.precioUnitarioItem)}
                         </span>
                       </div>
-                      <span className="text-[13px] font-semibold text-[#333] leading-[19.5px] shrink-0">
+                      <span className="text-[13px] font-semibold text-[#333] leading-[19.5px] shrink-0 ml-4">
                         {formatCurrency(it.cantidad * it.precioUnitarioItem - (it.descuento || 0))}
                       </span>
                     </div>
@@ -288,7 +292,7 @@ export function DetailPanel({
                     <span className="text-[12.5px] font-semibold text-[#333] leading-[17px]">{ev.title}</span>
                     <span className="text-[12px] font-normal text-[#333] leading-[18px]">{ev.description}</span>
                     <div className="flex items-center gap-[4px] h-[17px]">
-                      <Clock size={9} className="text-[#64748b]" />
+                      <Clock size={9} className="text-[#64748b] w-[9px] h-[9px] shrink-0" />
                       <span className="text-[11px] font-normal text-[#64748b] leading-[16.5px] font-mono">{ev.date}</span>
                     </div>
                   </div>
@@ -305,7 +309,7 @@ export function DetailPanel({
           {/* "Ver ficha completa": Figma h=40, w=full, rounded-10, bg-blue */}
           <button
             type="button"
-            onClick={() => alert('Redirigiendo a la ficha detallada...')}
+            onClick={() => router.push(`/facturas/${comprobante.id}`)}
             className="w-full h-[40px] bg-[#0379d5] hover:bg-[#0379d5]/90 text-white rounded-[10px] flex items-center justify-center text-[13px] font-semibold leading-[19.5px] transition-all"
           >
             Ver ficha completa
@@ -324,7 +328,7 @@ export function DetailPanel({
             </button>
             <button
               type="button"
-              onClick={() => alert('Enviando comprobante por correo...')}
+              onClick={() => onReenviar && onReenviar(comprobante)}
               className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#333] hover:bg-neutral-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all"
             >
               <Send size={12} />

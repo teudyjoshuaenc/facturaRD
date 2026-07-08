@@ -1,5 +1,6 @@
 import React from 'react'
 import type { JSX } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Download,
   Eye,
@@ -24,6 +25,7 @@ interface Props {
   onDownload: (c: Comprobante) => void
   onViewDetail: (id: string) => void
   selected?: boolean
+  onReenviar?: (c: Comprobante) => void
 }
 
 function getStatusBadge(estado: string): JSX.Element {
@@ -74,7 +76,9 @@ const FacturaRow = React.memo(function FacturaRow({
   onDownload,
   onViewDetail,
   selected = false,
+  onReenviar,
 }: Props): JSX.Element {
+  const router = useRouter()
   const itbis = Number(c.montoTotal) * 18 / 118
 
   // Format RNC nicely: e.g. 130-87456-2
@@ -96,27 +100,27 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={() => onViewDetail(c.id)}
-        className="px-[16px] py-[16px] w-[150px] min-w-[150px] text-left align-middle cursor-pointer"
+        className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left align-middle cursor-pointer"
       >
-        <div className="w-[150px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
+        <div className="w-[120px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
           {c.razonSocial}
         </div>
       </td>
       <td
         onClick={() => onViewDetail(c.id)}
-        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[70px] min-w-[70px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formattedRnc}
       </td>
       <td
         onClick={() => onViewDetail(c.id)}
-        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(c.montoTotal)}
       </td>
       <td
         onClick={() => onViewDetail(c.id)}
-        className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[81px] min-w-[81px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(itbis)}
       </td>
@@ -128,7 +132,7 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={() => onViewDetail(c.id)}
-        className="px-[16px] py-[16px] w-[100px] min-w-[100px] text-left align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[106px] min-w-[106px] text-left align-middle cursor-pointer whitespace-nowrap"
       >
         {getStatusBadge(c.estado)}
       </td>
@@ -137,12 +141,15 @@ const FacturaRow = React.memo(function FacturaRow({
           <button
             type="button"
             title="Ver detalle"
-            onClick={() => onViewDetail(c.id)}
+            onClick={() => router.push('/facturas/' + c.id)}
             className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
           >
-            <Eye size={16} />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+              <path d="M2 8C2 8 4.5 3.5 8 3.5C11.5 3.5 14 8 14 8C14 8 11.5 12.5 8 12.5C4.5 12.5 2 8 2 8Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-
+ 
           <button
             type="button"
             title="Descargar PDF"
@@ -150,25 +157,39 @@ const FacturaRow = React.memo(function FacturaRow({
             onClick={() => onDownload(c)}
             className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] disabled:opacity-50 transition-colors focus:outline-none flex-shrink-0"
           >
-            {downloadingId === c.id ? <Spinner size={14} /> : <Download size={16} />}
+            {downloadingId === c.id ? (
+              <Spinner size={14} />
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+                <path d="M14 10V12.6667C14 13.403 13.403 14 12.6667 14H3.33333C2.597 14 2 13.403 2 12.6667V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M8 2V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.66666 6.66667L8 10L11.3333 6.66667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
           </button>
-
+ 
           <button
             type="button"
             title="Enviar correo"
-            onClick={() => alert('Enviando factura por correo...')}
+            onClick={() => onReenviar && onReenviar(c)}
             className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
           >
-            <Send size={16} />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+              <path d="M14.5 1.5L6.5 9.5" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14.5 1.5L9.83333 14.8333L7.16667 8.83333L1.16667 6.16667L14.5 1.5Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-
+ 
           <button
             type="button"
             title="Anular factura"
             onClick={() => alert('Anulando comprobante fiscal...')}
             className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#b42318] hover:bg-red-50 hover:text-red-700 transition-colors focus:outline-none flex-shrink-0"
           >
-            <Ban size={16} />
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+              <circle cx="8" cy="8" r="6.66667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3.29291 3.29289L12.7071 12.7071" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </div>
       </td>

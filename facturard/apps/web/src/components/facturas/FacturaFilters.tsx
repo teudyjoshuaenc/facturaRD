@@ -63,7 +63,7 @@ export function FacturaFilters({
   const endDateRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="flex flex-col gap-0 bg-white p-[17px] pb-px rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
+    <div className="flex flex-col gap-0 bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
       <div className="flex items-center gap-[12px] w-full">
         {/* Search Input */}
         <div className="relative flex-[1_0_0] min-w-0 h-[44px]">

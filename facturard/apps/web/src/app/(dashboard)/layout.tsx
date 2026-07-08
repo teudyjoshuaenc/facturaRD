@@ -66,6 +66,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   const { diasParaVencer } = useCertificadoStatus()
   const automatizacionActivos = Math.floor(Math.random() * 2);
 
+  const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SHOW_WIP_TABS !== 'true'
+  const wipRoutes = [
+    '/cotizaciones',
+    '/compras',
+    '/reportes',
+    '/empresa',
+    '/usuarios-y-roles',
+    '/certificado-digital',
+    '/cumplimiento',
+  ]
+  const isWipRoute = wipRoutes.includes(pathname)
+
+  useEffect(() => {
+    if (isProd && isWipRoute) {
+      router.replace('/dashboard')
+    }
+  }, [isProd, isWipRoute, pathname, router])
+
   useEffect(() => {
     if (isReady && !token) {
       router.replace('/')
@@ -75,6 +93,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   useEffect(() => {
     setSidebarOpen(false)
   }, [pathname, setSidebarOpen])
+
+  if (isProd && isWipRoute) {
+    return <></>
+  }
 
   if (!isReady) {
     return (
