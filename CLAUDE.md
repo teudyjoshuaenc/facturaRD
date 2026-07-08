@@ -147,6 +147,21 @@ van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos po
 - ✅ **FIX 4 — E32 ≥ RD$250,000 exige identificación del comprador.** `crear()` (emisión) y `emitir()`
   rechazan con 400 un E32 sobre el umbral sin RNC/Cédula ni identificador extranjero. Umbral en la
   constante `UMBRAL_IDENTIFICACION_E32` (comprobantes.service.ts). Por debajo del umbral, permitido.
+- ✅ **FIX 6 — Error DGII [145] "Fecha de vencimiento de secuencia inválida".** La
+  `<FechaVencimientoSecuencia>` YA NO usa un default hardcodeado (`31-12-2028`). Ahora se resuelve por
+  prioridad: (a) `payload.fechaVencimiento` (override manual DD-MM-YYYY), (b) `secuencias.fechaVencimiento`
+  del tipo (formateada con getUTC*, sin corrimiento de día), (c) si el tipo la EXIGE y no hay ninguna →
+  **400 claro** ("Falta la fecha de vencimiento de la secuencia para el tipo X; configúrala en
+  Empresa/Secuencias"), NUNCA un default silencioso. Se resuelve ANTES de consumir la secuencia (no se
+  quema un e-NCF si falta). `TIPOS_REQUIEREN_FECHAVENC` = E31,E33,E41,E43,E44,E45,E46,E47 (E32/E34 no la
+  llevan → emiten sin exigirla). `siguienteENCF` ahora devuelve `{ eNCF, fechaVencimiento }` y existe
+  `getFechaVencimiento(tenantId, tipoECF)`. El processor conserva `requireFechaVenc()` como última barrera
+  (falla claro si faltara). `POST /secuencias/sincronizar` acepta `fechaVencimiento` (ISO) por tipo
+  (guardado a mediodía UTC; actualizar solo el número NO borra la fecha). Onboarding paso 4: input de
+  fecha por tipo (obligatorio para los que la exigen). **La nota E33 NO hereda la fecha del fuente**: usa
+  su propia secuencia. DMAIA (dc591cb7): E31 seteada a `2026-12-31` en prod (verificada en PDF de
+  E310000000008). Tests: `fecha-vencimiento.e2e-spec.ts` (origen secuencia / override / error sin gastar
+  e-NCF / E32 sin fecha) + sync guarda fecha por tipo. 84 e2e + 114 ecf-engine, build 0.
 - ✅ **FIX 1 — IndicadorNotaCredito (regla de 30 días) — APLICADO con el XSD oficial vigente.**
   - Se **reemplazaron por completo** los XSD del repo de **e-CF 33 y e-CF 34 v.1.0** por los oficiales
     vigentes de la DGII (fecha oficial 01/04/2026). No fue solo el campo: se adoptó el esquema entero.

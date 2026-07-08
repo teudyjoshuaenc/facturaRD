@@ -65,6 +65,12 @@ export class SecuenciasController {
     @CurrentUser() user: JwtPayload,
     @Body(new ParseArrayPipe({ items: SincronizarSecuenciaItemDto })) body: SincronizarSecuenciaItemDto[],
   ) {
-    return this.service.sincronizar(user.tenantId, body)
+    const entries = body.map((e) => ({
+      tipoECF: e.tipoECF,
+      ultimaSecuencia: e.ultimaSecuencia,
+      // Mediodía UTC para que el día no se corra por zona horaria al formatear.
+      ...(e.fechaVencimiento !== undefined && { fechaVencimiento: new Date(`${e.fechaVencimiento}T12:00:00.000Z`) }),
+    }))
+    return this.service.sincronizar(user.tenantId, entries)
   }
 }
