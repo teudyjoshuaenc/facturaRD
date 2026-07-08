@@ -6,6 +6,19 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/comprobantes'
 import type { ItemRow } from '@/hooks/useNuevaFactura'
+import { Select } from '@/components/ui/select'
+
+const taxOptions = [
+  { value: 'I1', label: '18%' },
+  { value: 'I2', label: '16%' },
+  { value: 'I3', label: '0%' },
+  { value: 'I4', label: 'Exento' },
+]
+
+const typeOptions = [
+  { value: '1', label: 'Bien' },
+  { value: '2', label: 'Servicio' },
+]
 
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
 
@@ -71,27 +84,23 @@ export function ItemsTable({ items, onChange }: Props): JSX.Element {
                       onChange={(e) => updateItem(item.key, { nombreItem: e.target.value })}
                     />
                   </td>
-                  <td className="py-2 pr-2">
-                    <select
-                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  <td className="py-2 pr-2 min-w-[100px]">
+                    <Select
                       value={item.indicadorFacturacion}
-                      onChange={(e) => updateItem(item.key, { indicadorFacturacion: e.target.value as ItemRow['indicadorFacturacion'] })}
-                    >
-                      <option value="I1">18%</option>
-                      <option value="I2">16%</option>
-                      <option value="I3">0%</option>
-                      <option value="I4">Exento</option>
-                    </select>
+                      onChange={(val) => updateItem(item.key, { indicadorFacturacion: val as ItemRow['indicadorFacturacion'] })}
+                      options={taxOptions}
+                      triggerClassName="h-9 px-2.5 text-body-sm border-neutral-300 bg-white"
+                      dropdownClassName="w-[100px]"
+                    />
                   </td>
-                  <td className="py-2 pr-2">
-                    <select
-                      className="rounded-lg border border-neutral-300 px-2 py-1.5 text-body-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                      value={item.indicadorBienoServicio}
-                      onChange={(e) => updateItem(item.key, { indicadorBienoServicio: Number(e.target.value) as 1 | 2 })}
-                    >
-                      <option value={1}>Bien</option>
-                      <option value={2}>Servicio</option>
-                    </select>
+                  <td className="py-2 pr-2 min-w-[110px]">
+                    <Select
+                      value={String(item.indicadorBienoServicio)}
+                      onChange={(val) => updateItem(item.key, { indicadorBienoServicio: Number(val) as 1 | 2 })}
+                      options={typeOptions}
+                      triggerClassName="h-9 px-2.5 text-body-sm border-neutral-300 bg-white"
+                      dropdownClassName="w-[110px]"
+                    />
                   </td>
                   <td className="py-2 pr-2">
                     <input

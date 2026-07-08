@@ -23,6 +23,27 @@ import { Button } from '@/components/ui/button'
 import { useProductos } from '@/hooks/useProductos'
 import { NuevoProductoModal } from '@/components/nueva-factura/NuevoProductoModal'
 import { formatCurrency } from '@/lib/comprobantes'
+import { Select } from '@/components/ui/select'
+
+const tipoOptions = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'BIEN', label: 'Bien' },
+  { value: 'SERVICIO', label: 'Servicio' },
+]
+
+const itbisOptions = [
+  { value: 'todos', label: 'ITBIS' },
+  { value: 'I1', label: '18% incl.' },
+  { value: 'I2', label: '16% incl.' },
+  { value: 'I3', label: '0%' },
+  { value: 'E', label: 'Exento' },
+]
+
+const estadoOptions = [
+  { value: 'todos', label: 'Estado' },
+  { value: 'ACTIVO', label: 'Activo' },
+  { value: 'INACTIVO', label: 'Inactivo' },
+]
 
 import { useUI } from '@/lib/context/UIContext'
 
@@ -136,10 +157,10 @@ export default function ProductosPage(): JSX.Element {
       </div>
 
       {/* Filter Row */}
-      <div className="flex flex-wrap items-center gap-3.5 bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm w-full">
+      <div className="flex flex-wrap gap-[12px] items-center bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" size={16} />
+        <div className="relative border border-[#e2e8f0] bg-white rounded-[10px] h-[44px] flex items-center px-[12px] gap-[10px] flex-1 min-w-[280px]">
+          <Search size={16} className="text-[#99a1af]" />
           <input
             type="text"
             placeholder="Buscar por producto, SKU..."
@@ -148,62 +169,45 @@ export default function ProductosPage(): JSX.Element {
               setSearch(e.target.value)
               setPage(1)
             }}
-            className="h-10 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 transition-colors"
+            className="flex-1 font-['Open_Sans'] font-normal leading-[normal] text-text-primary text-[14px] placeholder-[#99a1af] bg-transparent focus:outline-none"
           />
         </div>
 
         {/* Tipo Selector */}
-        <div className="relative">
-          <select
-            value={tipoFilter}
-            onChange={(e) => {
-              setTipoFilter(e.target.value as TipoFilter)
-              setPage(1)
-            }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
-          >
-            <option value="todos">Todas</option>
-            <option value="BIEN">Bien</option>
-            <option value="SERVICIO">Servicio</option>
-          </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        </div>
+        <Select
+          value={tipoFilter}
+          onChange={(val) => {
+            setTipoFilter(val as TipoFilter)
+            setPage(1)
+          }}
+          options={tipoOptions}
+          className="w-[126px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
 
         {/* ITBIS Selector */}
-        <div className="relative">
-          <select
-            value={itbisFilter}
-            onChange={(e) => {
-              setItbisFilter(e.target.value as ItbisFilter)
-              setPage(1)
-            }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
-          >
-            <option value="todos">ITBIS</option>
-            <option value="I1">18% incl.</option>
-            <option value="I2">16% incl.</option>
-            <option value="I3">0%</option>
-            <option value="E">Exento</option>
-          </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        </div>
+        <Select
+          value={itbisFilter}
+          onChange={(val) => {
+            setItbisFilter(val as ItbisFilter)
+            setPage(1)
+          }}
+          options={itbisOptions}
+          className="w-[126px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
 
         {/* Estado Selector */}
-        <div className="relative">
-          <select
-            value={estadoFilter}
-            onChange={(e) => {
-              setEstadoFilter(e.target.value as EstadoFilter)
-              setPage(1)
-            }}
-            className="h-10 rounded-lg border border-neutral-200 bg-white pl-3.5 pr-9 text-body-sm font-medium text-text-primary focus:outline-none focus:border-brand-500 appearance-none cursor-pointer hover:bg-neutral-50 transition-colors"
-          >
-            <option value="todos">Estado</option>
-            <option value="ACTIVO">Activo</option>
-            <option value="INACTIVO">Inactivo</option>
-          </select>
-          <ChevronRight size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        </div>
+        <Select
+          value={estadoFilter}
+          onChange={(val) => {
+            setEstadoFilter(val as EstadoFilter)
+            setPage(1)
+          }}
+          options={estadoOptions}
+          className="w-[126px] shrink-0"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+        />
       </div>
 
       {/* Product List Table */}

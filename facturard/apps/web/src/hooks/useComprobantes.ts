@@ -10,7 +10,7 @@ import {
 } from '@/lib/comprobantes'
 import { useUI } from '@/lib/context/UIContext'
 
-export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO'
+export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT'
 
 const PAGE_SIZE = 10
 
@@ -97,25 +97,40 @@ export function useComprobantes() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
-  // If any advanced filter is active, fetch more records so they filter correctly on client-side
-  const filterActive =
-    search.trim().length > 0 ||
-    globalSearch.trim().length > 0 ||
-    estadoFilter !== 'todos' ||
-    tipoFilter !== 'todos' ||
-    startDate ||
-    endDate ||
-    minAmount ||
-    maxAmount
+  // Combine local search with global search
+  const activeSearch = search.trim() || globalSearch.trim()
+
+  // Build server-side query params
+  const serverTipo = tipoFilter !== 'todos' ? tipoFilter : undefined
+  const serverSearch = activeSearch || undefined
+  const serverFechaDesde = startDate || undefined
+  const serverFechaHasta = endDate || undefined
+
+  // Determine if any client-side-only filter is active (amount range, estado grouping)
+  const hasClientFilter = minAmount !== '' || maxAmount !== '' || estadoFilter !== 'todos'
 
   const { data, isLoading } = useQuery({
-    queryKey: ['comprobantes-lista', filterActive ? 'filtered' : page],
+    queryKey: [
+      'comprobantes-lista',
+      page,
+      estadoFilter,
+      serverSearch,
+      serverTipo,
+      serverFechaDesde,
+      serverFechaHasta,
+      minAmount,
+      maxAmount,
+    ],
     queryFn: () =>
       api
         .get<PaginatedResponse<Comprobante>>('/comprobantes', {
           params: {
-            page: filterActive ? 1 : page,
-            limit: filterActive ? 300 : PAGE_SIZE,
+            page: hasClientFilter ? 1 : page,
+            limit: hasClientFilter ? 100 : PAGE_SIZE,
+            ...(serverSearch && { search: serverSearch }),
+            ...(serverTipo && { tipoECF: serverTipo }),
+            ...(serverFechaDesde && { fechaDesde: serverFechaDesde }),
+            ...(serverFechaHasta && { fechaHasta: serverFechaHasta }),
           },
         })
         .then((res) => res.data),
@@ -131,7 +146,7 @@ export function useComprobantes() {
   const filtered = useMemo(() => {
     let all = data?.data ?? []
 
-    // 1. Estado Filter (En proceso = PENDIENTE, EN_COLA, ENVIANDO)
+    // 1. Estado Filter (En proceso = PENDIENTE, EN_COLA, ENVIANDO) — client-side grouping
     if (estadoFilter !== 'todos') {
       if (estadoFilter === 'PENDIENTE') {
         all = all.filter(
@@ -145,41 +160,7 @@ export function useComprobantes() {
       }
     }
 
-    // 2. Text Search
-    const activeSearch = (search.trim() ? search : globalSearch).toLowerCase()
-    if (activeSearch) {
-      all = all.filter(
-        (c) =>
-          c.eNCF.toLowerCase().includes(activeSearch) ||
-          c.razonSocial.toLowerCase().includes(activeSearch) ||
-          (c.rnc && c.rnc.toLowerCase().includes(activeSearch)),
-      )
-    }
-
-    // 3. Tipo ECF
-    if (tipoFilter !== 'todos') {
-      all = all.filter((c) => c.tipoECF === tipoFilter)
-    }
-
-    // 4. Date Range (Parsing safely in local timezone)
-    if (startDate) {
-      const parts = startDate.split('-').map(Number)
-      const yr = parts[0] ?? 0
-      const mo = parts[1] ?? 1
-      const dy = parts[2] ?? 1
-      const start = new Date(yr, mo - 1, dy, 0, 0, 0, 0)
-      all = all.filter((c) => new Date(c.createdAt) >= start)
-    }
-    if (endDate) {
-      const parts = endDate.split('-').map(Number)
-      const yr = parts[0] ?? 0
-      const mo = parts[1] ?? 1
-      const dy = parts[2] ?? 1
-      const end = new Date(yr, mo - 1, dy, 23, 59, 59, 999)
-      all = all.filter((c) => new Date(c.createdAt) <= end)
-    }
-
-    // 5. Amount Range
+    // 2. Amount Range — client-side only
     if (minAmount) {
       const min = Number(minAmount)
       all = all.filter((c) => Number(c.montoTotal) >= min)
@@ -190,18 +171,18 @@ export function useComprobantes() {
     }
 
     return all
-  }, [data, estadoFilter, search, globalSearch, tipoFilter, startDate, endDate, minAmount, maxAmount])
+  }, [data, estadoFilter, minAmount, maxAmount])
 
   const paginatedComprobantes = useMemo(() => {
-    if (filterActive) {
+    if (hasClientFilter) {
       const offset = (page - 1) * PAGE_SIZE
       return filtered.slice(offset, offset + PAGE_SIZE)
     }
     return filtered
-  }, [filtered, filterActive, page])
+  }, [filtered, hasClientFilter, page])
 
   const customPaginationData = useMemo(() => {
-    if (filterActive) {
+    if (hasClientFilter) {
       return {
         total: filtered.length,
         totalPages: Math.ceil(filtered.length / PAGE_SIZE) || 1,
@@ -215,7 +196,7 @@ export function useComprobantes() {
       page: data.page,
       limit: data.limit,
     } : null
-  }, [data, filtered, filterActive, page])
+  }, [data, filtered, hasClientFilter, page])
 
   const handleDownload = useCallback(async (comprobante: Comprobante): Promise<void> => {
     setDownloadingId(comprobante.id)

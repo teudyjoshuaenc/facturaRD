@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 
 import { useUI } from '@/lib/context/UIContext'
 
@@ -204,16 +205,19 @@ export default function UsuariosRolesPage(): JSX.Element {
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <select
+                      <Select
                         value={u.role}
                         onChange={() => alert('Modificando rol del usuario...')}
-                        className={`h-7 rounded-lg text-ui-xs font-semibold px-2 py-0.5 focus:outline-none appearance-none cursor-pointer hover:opacity-90 ${roleColors[u.role] || 'bg-neutral-50 text-neutral-600'}`}
-                      >
-                        <option value="Administrador">Administrador</option>
-                        <option value="Facturador">Facturador</option>
-                        <option value="Contador">Contador</option>
-                        <option value="Solo lectura">Solo lectura</option>
-                      </select>
+                        options={[
+                          { value: 'Administrador', label: 'Administrador' },
+                          { value: 'Facturador', label: 'Facturador' },
+                          { value: 'Contador', label: 'Contador' },
+                          { value: 'Solo lectura', label: 'Solo lectura' },
+                        ]}
+                        className="w-32"
+                        triggerClassName={`h-7 px-2 py-0.5 text-ui-xs font-semibold ${roleColors[u.role] || 'bg-neutral-50 text-neutral-600 border border-neutral-200/50'}`}
+                        dropdownClassName="w-32"
+                      />
                     </td>
                     <td className="px-4 py-3.5">
                       {isActivo ? (

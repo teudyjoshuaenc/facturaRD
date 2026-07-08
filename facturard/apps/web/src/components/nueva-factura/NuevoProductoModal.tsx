@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { NuevoProductoData } from '@/hooks/useProductos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
+import { Select } from '@/components/ui/select'
 
 interface NuevoProductoModalProps {
   open: boolean
@@ -204,23 +205,12 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
         {/* Unidad de Medida */}
         <div className="flex flex-col gap-[6px] text-left">
           <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">Unidad de Medida</label>
-          <div className="relative w-full">
-            <select
-              value={unidadMedida}
-              onChange={(e) => setUnidadMedida(e.target.value)}
-              className="h-11 w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#333333] px-3.5 appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none transition-colors"
-            >
-              <option value="">Seleccionar</option>
-              {UNIDADES_MEDIDA.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#0379D5] pointer-events-none">
-              <ChevronDown size={18} />
-            </div>
-          </div>
+          <Select
+            value={unidadMedida}
+            onChange={setUnidadMedida}
+            options={UNIDADES_MEDIDA}
+            placeholder="Seleccionar"
+          />
         </div>
 
         {/* Precio (RD$) + Itbis row */}

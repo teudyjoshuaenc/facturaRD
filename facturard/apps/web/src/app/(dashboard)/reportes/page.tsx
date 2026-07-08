@@ -18,6 +18,22 @@ import {
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
+
+const monthOptions = [
+  { value: '01', label: 'Enero' },
+  { value: '02', label: 'Febrero' },
+  { value: '03', label: 'Marzo' },
+  { value: '04', label: 'Abril' },
+  { value: '05', label: 'Mayo' },
+  { value: '06', label: 'Junio' },
+]
+
+const yearOptions = [
+  { value: '2025', label: '2025' },
+  { value: '2026', label: '2026' },
+  { value: '2027', label: '2027' },
+]
 import { useUI } from '@/lib/context/UIContext'
 
 export default function ReportesPage(): JSX.Element {
@@ -57,28 +73,21 @@ export default function ReportesPage(): JSX.Element {
         </div>
         <div className="flex items-center gap-2">
           {/* Month selector */}
-          <select
+          <Select
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="h-10 rounded-lg border border-neutral-200 bg-white px-3 text-body-sm font-semibold text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer"
-          >
-            <option value="01">Enero</option>
-            <option value="02">Febrero</option>
-            <option value="03">Marzo</option>
-            <option value="04">Abril</option>
-            <option value="05">Mayo</option>
-            <option value="06">Junio</option>
-          </select>
+            onChange={setSelectedMonth}
+            options={monthOptions}
+            className="w-32"
+            triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+          />
           {/* Year selector */}
-          <select
+          <Select
             value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="h-10 rounded-lg border border-neutral-200 bg-white px-3 text-body-sm font-semibold text-text-primary focus:outline-none focus:border-brand-500 cursor-pointer"
-          >
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-            <option value="2027">2027</option>
-          </select>
+            onChange={setSelectedYear}
+            options={yearOptions}
+            className="w-24"
+            triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+          />
         </div>
       </div>
 

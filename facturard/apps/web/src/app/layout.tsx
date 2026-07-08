@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 import type { JSX } from 'react'
-import { Inter } from 'next/font/google'
+import { Open_Sans } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const openSans = Open_Sans({ subsets: ['latin'], variable: '--font-open-sans' })
 
 export const metadata: Metadata = {
   title: 'FacturaRD',
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
-    <html lang="es" className={inter.variable}>
+    <html lang="es" className={openSans.variable}>
       <body>
         <Providers>{children}</Providers>
       </body>

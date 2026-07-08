@@ -12,18 +12,18 @@ const OPERACION_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', iconPath: '/assets/56c6688862abd07d5527b09c3f035232f217f5f6.svg' },
   { href: '/nueva-factura', label: 'Emitir', iconPath: '/assets/5d63790c3ee381522361e95f58f5a882667714b0.svg' },
   { href: '/facturas', label: 'Facturas', iconPath: '/assets/61733f93d0c8001a74ba5b649600aae8be315442.svg' },
-  { href: '/cotizaciones', label: 'Cotizaciones', iconPath: '/assets/7f182d3f3a402971ce7e1081a600cec0405d8cd5.svg' },
-  { href: '/compras', label: 'Recepción y Compras', iconPath: '/assets/f6b535ce78a3cdad16b049e4047ce1d92cd8b6d1.svg' },
+  { href: '/cotizaciones', label: 'Cotizaciones', iconPath: '/assets/7f182d3f3a402971ce7e1081a600cec0405d8cd5.svg', wip: true },
+  { href: '/compras', label: 'Recepción y Compras', iconPath: '/assets/f6b535ce78a3cdad16b049e4047ce1d92cd8b6d1.svg', wip: true },
   { href: '/contacto', label: 'Contacto', iconPath: '/assets/0e61680031b0c0958286e2e9ae9f0bc98aed933d.svg' },
   { href: '/producto', label: 'Producto', iconPath: '/assets/0b59873e2e7ffc5e3ea365aa91ffdcad2beda49d.svg' },
 ] as const
 
 const SISTEMA_ITEMS = [
-  { href: '/reportes', label: 'Reportes', iconPath: '/assets/6f267c4ae6c73dc4966f99316120ffac8a1a08f4.svg' },
-  { href: '/empresa', label: 'Empresa', iconPath: '/assets/aea6417e5c12c502b8498862cacbc1c5f8370dc0.svg' },
-  { href: '/usuarios-y-roles', label: 'Usuarios y roles', iconPath: '/assets/2d9e550eb3a7ec6201239db740788d0b9c47c15c.svg' },
-  { href: '/certificado-digital', label: 'Certificado Digital', iconPath: '/assets/13241a49cce1e26dd59c84c1a822c865bb4b5d48.svg' },
-  { href: '/cumplimiento', label: 'Cumplimiento', iconPath: '/assets/b5e2b788c5b6fba6b49f4fe30c0ba26277cad92e.svg' },
+  { href: '/reportes', label: 'Reportes', iconPath: '/assets/6f267c4ae6c73dc4966f99316120ffac8a1a08f4.svg', wip: true },
+  { href: '/empresa', label: 'Empresa', iconPath: '/assets/aea6417e5c12c502b8498862cacbc1c5f8370dc0.svg', wip: true },
+  { href: '/usuarios-y-roles', label: 'Usuarios y roles', iconPath: '/assets/2d9e550eb3a7ec6201239db740788d0b9c47c15c.svg', wip: true },
+  { href: '/certificado-digital', label: 'Certificado Digital', iconPath: '/assets/13241a49cce1e26dd59c84c1a822c865bb4b5d48.svg', wip: true },
+  { href: '/cumplimiento', label: 'Cumplimiento', iconPath: '/assets/b5e2b788c5b6fba6b49f4fe30c0ba26277cad92e.svg', wip: true },
   { href: '/configuracion', label: 'Configuración', iconPath: '/assets/8e23a0d26d3f1ac328a53f7e8d576582527ebaae.svg' },
 ] as const
 
@@ -55,6 +55,10 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
       return next
     })
   }
+
+  const showWip = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_SHOW_WIP_TABS === 'true'
+  const visibleOperacionItems = OPERACION_ITEMS.filter((item) => !('wip' in item && item.wip) || showWip)
+  const visibleSistemaItems = SISTEMA_ITEMS.filter((item) => !('wip' in item && item.wip) || showWip)
 
   return (
     <>
@@ -138,7 +142,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
               </span>
             )}
             <nav className="flex flex-col gap-1 w-full">
-              {OPERACION_ITEMS.map((item) => (
+              {visibleOperacionItems.map((item) => (
                 <SidebarLink
                   key={item.href}
                   href={item.href}
@@ -171,7 +175,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
               </span>
             )}
             <nav className="flex flex-col gap-1 w-full">
-              {SISTEMA_ITEMS.map((item) => (
+              {visibleSistemaItems.map((item) => (
                 <SidebarLink
                   key={item.href}
                   href={item.href}

@@ -1,15 +1,53 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import type { JSX } from 'react'
 import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ClienteCard } from './ClienteCard'
 import { NuevoClienteModal } from './NuevoClienteModal'
 import { useContactos } from '@/hooks/useContactos'
 import type { Contacto, NuevoContactoData } from '@/hooks/useContactos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
+import { Select } from '@/components/ui/select'
+
+function formatDateSpanish(isoDate: string): string {
+  if (!isoDate) return ''
+  const parts = isoDate.split('-')
+  if (parts.length !== 3) return isoDate
+  const [year, month, day] = parts
+  return `${day}-${month}-${year}`
+}
+
+const tipoIngresoOptions = [
+  { value: '01', label: 'Ingresos por Operaciones (No financieros)' },
+  { value: '02', label: 'Ingresos Financieros' },
+  { value: '03', label: 'Ingresos Extraordinarios' },
+  { value: '04', label: 'Ingresos por Arrendamientos' },
+  { value: '05', label: 'Ingresos por Venta de Activo Depreciable' },
+  { value: '06', label: 'Otros Ingresos' },
+]
+
+const tipoPagoOptions = [
+  { value: 'CONTADO', label: 'Contado' },
+  { value: 'CREDITO', label: 'Crédito' },
+  { value: 'GRATUITO', label: 'Gratuito' },
+]
+
+const codigoModificacionOptions = [
+  { value: '1', label: '1 - Anulación total' },
+  { value: '2', label: '2 - Corrección de montos' },
+  { value: '3', label: '3 - Corrección de texto' },
+  { value: '4', label: '4 - Reemplazo de NCF' },
+  { value: '5', label: '5 - Ref. factura consumo' },
+]
+
+const indicadorNotaOptions = [
+  { value: '1', label: '1 - Anulación total' },
+  { value: '2', label: '2 - Corrección' },
+]
+
+
 
 const TIPOS_ECF: { value: TipoECF; label: string }[] = [
   { value: 'E31', label: 'Factura de Crédito Fiscal Electrónica (E31)' },
@@ -47,6 +85,11 @@ interface StepClienteProps {
   onCodigoModificacionChange: (val: string) => void
   indicadorNotaCredito: string
   onIndicadorNotaCreditoChange: (val: string) => void
+  identificadorExtranjero: string
+  onIdentificadorExtranjeroChange: (val: string) => void
+  paisComprador: string
+  onPaisCompradorChange: (val: string) => void
+  total: number
   onNext: () => void
   isQuickMode?: boolean
 }
@@ -74,12 +117,20 @@ export function StepCliente({
   onCodigoModificacionChange,
   indicadorNotaCredito,
   onIndicadorNotaCreditoChange,
+  identificadorExtranjero,
+  onIdentificadorExtranjeroChange,
+  paisComprador,
+  onPaisCompradorChange,
+  total,
   onNext,
   isQuickMode,
 }: StepClienteProps): JSX.Element {
-  const { contactos, frecuentes, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const contactos: Contacto[] = rawContactos as any
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
-  const [showNcfDropdown, setShowNcfDropdown] = useState(false)
+
+  const limiteRef = useRef<HTMLInputElement>(null)
+  const ncfModRef = useRef<HTMLInputElement>(null)
 
   // E43 (Gastos Menores) doesn't require a client
   const skipCliente = tipoECF === 'E43'
@@ -99,8 +150,20 @@ export function StepCliente({
       codigoModificacion !== '' &&
       (tipoECF !== 'E34' || indicadorNotaCredito !== ''))
 
+  const isE32UnderLimit = tipoECF === 'E32' && total < 250000
+  const isE32OverLimit = tipoECF === 'E32' && total >= 250000
+
+  const isRncRequired = tipoECF === 'E31' || tipoECF === 'E41' || tipoECF === 'E45' || isE32OverLimit
+  const isRncValid = !isRncRequired || (selectedCliente !== null && selectedCliente.rnc.trim() !== '')
+
+  const isForeignerType = tipoECF === 'E46' || tipoECF === 'E47'
+  const isIdentificadorExtranjeroValid = !isForeignerType || identificadorExtranjero.trim() !== ''
+
+  const isPaisCompradorRequired = tipoECF === 'E47'
+  const isPaisCompradorValid = !isPaisCompradorRequired || paisComprador.trim() !== ''
+
   const canProceed =
-    (skipCliente || selectedCliente !== null) &&
+    (skipCliente || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
     tipoPago &&
     isTipoIngresoValid &&
     isFechaLimiteValid &&
@@ -125,6 +188,20 @@ export function StepCliente({
           <div className="flex flex-col gap-4 w-[904px]">
             <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Seleccionar Cliente</h3>
 
+            {isE32OverLimit && !selectedCliente && (
+              <p className="text-[12px] font-semibold text-danger-600 text-left animate-in fade-in-50 mb-2">
+                La factura de consumo (E32) supera el límite de RD$250,000. Debe seleccionar un cliente con RNC o cédula.
+              </p>
+            )}
+
+            {isRncRequired && selectedCliente && selectedCliente.rnc.trim() === '' && (
+              <p className="text-[12px] font-semibold text-danger-600 animate-in fade-in-50 text-left mt-1 mb-2">
+                {tipoECF === 'E32'
+                  ? 'El RNC o cédula es obligatorio para comprobantes de consumo (E32) de RD$250,000 o más.'
+                  : 'El RNC es obligatorio para comprobantes E31, E41 y E45.'} Por favor, edite o seleccione otro cliente.
+              </p>
+            )}
+
             {/* Search and Button horizontally */}
             <div className="flex gap-[12px] h-[44px] items-center">
               <div className="relative flex-1">
@@ -140,7 +217,7 @@ export function StepCliente({
                 {/* Search dropdown (Limit to 5) */}
                 {showSearch && (
                   <div className="absolute z-50 mt-1.5 max-h-[337px] w-full md:w-[742px] overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
-                    {contactos.slice(0, 5).map((c) => {
+                    {contactos.slice(0, 5).map((c: Contacto) => {
                       const isSelected = selectedCliente?.id === c.id
                       return (
                         <button
@@ -198,6 +275,56 @@ export function StepCliente({
                 <span>Nuevo Cliente</span>
               </Button>
             </div>
+
+            {selectedCliente && isForeignerType && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full text-left mt-2 animate-in fade-in-50">
+                <div className="flex flex-col gap-[8px] items-start w-full">
+                  <div className="flex justify-between items-center w-full">
+                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                      Identificador Extranjero *
+                    </label>
+                    {!identificadorExtranjero && (
+                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                        Requerido
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ej: ID-987654"
+                    value={identificadorExtranjero}
+                    onChange={(e) => onIdentificadorExtranjeroChange(e.target.value)}
+                    className={cn(
+                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                      !identificadorExtranjero ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-[8px] items-start w-full">
+                  <div className="flex justify-between items-center w-full">
+                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                      País del Comprador {isPaisCompradorRequired ? '*' : '(Opcional)'}
+                    </label>
+                    {isPaisCompradorRequired && !paisComprador && (
+                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                        Requerido
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ej: US, ES, FR"
+                    value={paisComprador}
+                    onChange={(e) => onPaisCompradorChange(e.target.value)}
+                    className={cn(
+                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                      isPaisCompradorRequired && !paisComprador ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -212,45 +339,13 @@ export function StepCliente({
             {/* Tipo e-CF */}
             <div className="flex flex-col gap-[8px] items-start w-full">
               <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo e-CF</label>
-              <div className="relative w-full">
-                <button
-                  type="button"
-                  onClick={() => setShowNcfDropdown(!showNcfDropdown)}
-                  className="flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] border-[#F5F5F5] bg-white px-[16px] text-[13px] font-normal text-[#64748B] cursor-pointer hover:border-brand-500 transition-colors select-none"
-                >
-                  <span className="truncate">{TIPOS_ECF.find((t) => t.value === tipoECF)?.label}</span>
-                  <ChevronDown size={24} className="text-[#0379D5] flex-shrink-0" />
-                </button>
-                {showNcfDropdown && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowNcfDropdown(false)} />
-                    <div className="absolute right-0 mt-1.5 max-h-[220px] w-full overflow-y-auto rounded-[14px] border border-[#F3F4F6] bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] z-40 py-0 animate-in fade-in-50 duration-150">
-                      {TIPOS_ECF.map((t) => {
-                        const isSelected = tipoECF === t.value
-                        return (
-                          <button
-                            key={t.value}
-                            type="button"
-                            onClick={() => {
-                              onTipoECFChange(t.value)
-                              setShowNcfDropdown(false)
-                            }}
-                            className={cn(
-                              "flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[44px] border-b border-neutral-50 last:border-none",
-                              isSelected ? "bg-[#F0F5FF] text-brand-600 font-semibold" : "text-[#333333] hover:bg-[#F0F5FF]/50"
-                            )}
-                          >
-                            <span className="text-[12px] font-semibold text-[#333333] truncate leading-6">{t.label}</span>
-                            {isSelected && (
-                              <Check size={16} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
+              <Select
+                value={tipoECF}
+                onChange={(val) => onTipoECFChange(val as TipoECF)}
+                options={TIPOS_ECF}
+                placeholder="Seleccionar"
+                triggerClassName="h-[54.5px] border-[1.25px] border-[#F5F5F5] bg-white text-[13px] text-[#64748B]"
+              />
             </div>
 
             {/* Tipo de Ingreso */}
@@ -262,33 +357,24 @@ export function StepCliente({
                 )}
               </div>
               {isTipoIngresoRequired ? (
-                <div className="relative w-full">
-                  <select
-                    value={tipoIngreso}
-                    onChange={(e) => onTipoIngresoChange(e.target.value)}
-                    className={cn(
-                      "h-[54.5px] w-full rounded-[10px] border-[1.25px] bg-white text-[13px] text-[#64748B] px-[16px] appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none transition-colors",
-                      !tipoIngreso ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
-                  >
-                    <option value="">Seleccionar</option>
-                    <option value="01">Ingresos por Operaciones (No financieros)</option>
-                    <option value="02">Ingresos Financieros</option>
-                    <option value="03">Ingresos Extraordinarios</option>
-                    <option value="04">Ingresos por Arrendamientos</option>
-                    <option value="05">Ingresos por Venta de Activo Depreciable</option>
-                    <option value="06">Otros Ingresos</option>
-                  </select>
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#0379D5] pointer-events-none">
-                    <ChevronDown size={20} />
-                  </div>
-                </div>
+                <Select
+                  value={tipoIngreso}
+                  onChange={onTipoIngresoChange}
+                  options={tipoIngresoOptions}
+                  placeholder="Seleccionar"
+                  triggerClassName={cn(
+                    "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                    !tipoIngreso ? "border-danger-500" : "border-[#F5F5F5]"
+                  )}
+                />
               ) : (
                 <div className="w-full h-[54.5px] bg-[#F8FAFC] border-[1.25px] border-[#F5F5F5] rounded-[10px] flex items-center px-[16px]">
                   <span className="text-[13px] text-[#64748B]/60 italic">No aplica para este tipo e-CF</span>
                 </div>
               )}
             </div>
+
+
 
             {/* Tipo de Pago */}
             <div className="flex flex-col gap-[8px] items-start w-full">
@@ -298,24 +384,16 @@ export function StepCliente({
                   <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                 )}
               </div>
-              <div className="relative w-full">
-                <select
-                  value={tipoPago}
-                  onChange={(e) => onTipoPagoChange(e.target.value as 'CONTADO' | 'CREDITO' | 'GRATUITO')}
-                  className={cn(
-                    "h-[54.5px] w-full rounded-[10px] border-[1.25px] bg-white text-[13px] text-[#64748B] px-[16px] appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none transition-colors",
-                    !tipoPago ? "border-danger-500" : "border-[#F5F5F5]"
-                  )}
-                >
-                  <option value="">Seleccionar</option>
-                  <option value="CONTADO">Contado</option>
-                  <option value="CREDITO">Crédito</option>
-                  <option value="GRATUITO">Gratuito</option>
-                </select>
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#0379D5] pointer-events-none">
-                  <ChevronDown size={20} />
-                </div>
-              </div>
+              <Select
+                value={tipoPago}
+                onChange={(val) => onTipoPagoChange(val as any)}
+                options={tipoPagoOptions}
+                placeholder="Seleccionar"
+                triggerClassName={cn(
+                  "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                  !tipoPago ? "border-danger-500" : "border-[#F5F5F5]"
+                )}
+              />
             </div>
 
             {/* Fecha Límite */}
@@ -331,18 +409,36 @@ export function StepCliente({
                   <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                 )}
               </div>
-              <div className="relative w-full">
+              <div
+                onClick={() => {
+                  if (tipoPago === 'CREDITO') {
+                    try {
+                      limiteRef.current?.showPicker()
+                    } catch (e) {
+                      limiteRef.current?.focus()
+                    }
+                  }
+                }}
+                className="relative w-full cursor-pointer"
+              >
+                <div
+                  className={cn(
+                    "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors select-none",
+                    tipoPago === 'CREDITO'
+                      ? cn("bg-white text-[#333333]", !fechaLimite ? "border-danger-500" : "border-[#F5F5F5]")
+                      : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed"
+                  )}
+                >
+                  <span className={fechaLimite ? "truncate text-[#333333]" : "truncate text-[#64748B]/70"}>
+                    {fechaLimite ? formatDateSpanish(fechaLimite) : 'DD/MM/AAAA'}
+                  </span>
+                </div>
                 <input
+                  ref={limiteRef}
                   type="date"
                   value={fechaLimite}
-                  disabled={tipoPago !== 'CREDITO'}
                   onChange={(e) => onFechaLimiteChange(e.target.value)}
-                  className={cn(
-                    "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none",
-                    tipoPago === 'CREDITO'
-                      ? cn("bg-white text-[#333333] focus:bg-white", !fechaLimite ? "border-danger-500" : "border-[#F5F5F5]")
-                      : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed select-none"
-                  )}
+                  className="absolute -z-10 opacity-0 invisible w-0 h-0"
                 />
               </div>
             </div>
@@ -395,26 +491,16 @@ export function StepCliente({
                     <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                   )}
                 </div>
-                <div className="relative w-full">
-                  <select
-                    value={codigoModificacion}
-                    onChange={(e) => onCodigoModificacionChange(e.target.value)}
-                    className={cn(
-                      "h-[54.5px] w-full rounded-[10px] border-[1.25px] bg-white text-[13px] text-[#64748B] px-[16px] appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none transition-colors",
-                      !codigoModificacion ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
-                  >
-                    <option value="">Seleccionar</option>
-                    <option value="1">1 - Anulación total</option>
-                    <option value="2">2 - Corrección de montos</option>
-                    <option value="3">3 - Corrección de texto</option>
-                    <option value="4">4 - Reemplazo de NCF</option>
-                    <option value="5">5 - Ref. factura consumo</option>
-                  </select>
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#0379D5] pointer-events-none">
-                    <ChevronDown size={20} />
-                  </div>
-                </div>
+                <Select
+                  value={codigoModificacion}
+                  onChange={onCodigoModificacionChange}
+                  options={codigoModificacionOptions}
+                  placeholder="Seleccionar"
+                  triggerClassName={cn(
+                    "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                    !codigoModificacion ? "border-danger-500" : "border-[#F5F5F5]"
+                  )}
+                />
               </div>
 
               {/* Fecha NCF Modificado */}
@@ -425,15 +511,32 @@ export function StepCliente({
                     <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                   )}
                 </div>
-                <div className="relative w-full">
+                <div
+                  onClick={() => {
+                    try {
+                      ncfModRef.current?.showPicker()
+                    } catch (e) {
+                      ncfModRef.current?.focus()
+                    }
+                  }}
+                  className="relative w-full cursor-pointer"
+                >
+                  <div
+                    className={cn(
+                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors bg-white text-[#333333] select-none",
+                      !fechaNCFModificado ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  >
+                    <span className={fechaNCFModificado ? "truncate text-[#333333]" : "truncate text-[#64748B]/70"}>
+                      {fechaNCFModificado ? formatDateSpanish(fechaNCFModificado) : 'DD/MM/AAAA'}
+                    </span>
+                  </div>
                   <input
+                    ref={ncfModRef}
                     type="date"
                     value={fechaNCFModificado}
                     onChange={(e) => onFechaNCFModificadoChange(e.target.value)}
-                    className={cn(
-                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333] focus:bg-white",
-                      !fechaNCFModificado ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
+                    className="absolute -z-10 opacity-0 invisible w-0 h-0"
                   />
                 </div>
               </div>
@@ -451,26 +554,19 @@ export function StepCliente({
                     <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                   )}
                 </div>
-                <div className="relative w-full">
-                  <select
-                    value={indicadorNotaCredito}
-                    disabled={tipoECF !== 'E34'}
-                    onChange={(e) => onIndicadorNotaCreditoChange(e.target.value)}
-                    className={cn(
-                      "h-[54.5px] w-full rounded-[10px] border-[1.25px] text-[13px] px-[16px] appearance-none pr-10 transition-colors focus:outline-none",
-                      tipoECF === 'E34'
-                        ? cn("bg-white text-[#64748B] cursor-pointer focus:border-brand-500", !indicadorNotaCredito ? "border-danger-500" : "border-[#F5F5F5]")
-                        : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed select-none"
-                    )}
-                  >
-                    <option value="">Seleccionar</option>
-                    <option value="1">1 - Anulación total</option>
-                    <option value="2">2 - Corrección</option>
-                  </select>
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#0379D5] pointer-events-none">
-                    <ChevronDown size={20} />
-                  </div>
-                </div>
+                <Select
+                  value={indicadorNotaCredito}
+                  disabled={tipoECF !== 'E34'}
+                  onChange={onIndicadorNotaCreditoChange}
+                  options={indicadorNotaOptions}
+                  placeholder="Seleccionar"
+                  triggerClassName={cn(
+                    "h-[54.5px] border-[1.25px] text-[13px]",
+                    tipoECF === 'E34'
+                      ? cn("bg-white text-[#64748B] focus:border-brand-500", !indicadorNotaCredito ? "border-danger-500" : "border-[#F5F5F5]")
+                      : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed select-none"
+                  )}
+                />
               </div>
             </div>
           </div>

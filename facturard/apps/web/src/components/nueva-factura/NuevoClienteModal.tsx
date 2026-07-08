@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { NuevoContactoData } from '@/hooks/useContactos'
+import { Select } from '@/components/ui/select'
 
 interface NuevoClienteModalProps {
   open: boolean
@@ -244,42 +245,24 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
             {/* Provincia */}
             <div className="flex flex-col gap-1.5">
               <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Provincia</label>
-              <div className="relative w-full">
-                <select
-                  value={provincia}
-                  onChange={(e) => setProvincia(e.target.value)}
-                  className="h-11 w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#333333] px-4 appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-sans"
-                >
-                  <option value="">Seleccionar</option>
-                  {Object.keys(PROVINCIAS_MUNICIPIOS).map((prov) => (
-                    <option key={prov} value={prov}>{prov}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none">
-                  <ChevronDown size={16} />
-                </div>
-              </div>
+              <Select
+                value={provincia}
+                onChange={setProvincia}
+                options={Object.keys(PROVINCIAS_MUNICIPIOS).map((prov) => ({ value: prov, label: prov }))}
+                placeholder="Seleccionar"
+              />
             </div>
 
             {/* Municipio */}
             <div className="flex flex-col gap-1.5">
               <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Municipio</label>
-              <div className="relative w-full">
-                <select
-                  value={municipio}
-                  disabled={!provincia}
-                  onChange={(e) => setMunicipio(e.target.value)}
-                  className="h-11 w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#333333] px-4 appearance-none pr-10 cursor-pointer focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">Seleccionar</option>
-                  {municipiosDisponibles.map((muni) => (
-                    <option key={muni} value={muni}>{muni}</option>
-                  ))}
-                </select>
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none">
-                  <ChevronDown size={16} />
-                </div>
-              </div>
+              <Select
+                value={municipio}
+                disabled={!provincia}
+                onChange={setMunicipio}
+                options={municipiosDisponibles.map((muni) => ({ value: muni, label: muni }))}
+                placeholder="Seleccionar"
+              />
             </div>
           </div>
 
