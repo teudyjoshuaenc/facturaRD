@@ -49,7 +49,8 @@ import type {
 } from '@facturard/ecf-engine'
 import { CertificadosService } from '../certificados/certificados.service'
 import { WebhookSenderService } from '../webhooks/webhook-sender.service'
-import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
+import type { CreateComprobanteDto } from './dto/create-comprobante.dto'
+import { buildEcfPdfInput } from './pdf-input.builder'
 import type { EcfJobData } from './comprobantes.service'
 
 function mapIndicador(ind: string): IndicadorFacturacion {
@@ -76,15 +77,6 @@ function formatMensajesDGII(mensajes: { valor: string | null; codigo: number | n
       .join(' | ')
       .substring(0, 1000) ?? null
   )
-}
-
-function r2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-function calcularMontoItem(item: CreateItemDto): number {
-  const bruto = r2(item.cantidad * (item.precioUnitarioItem ?? 0))
-  return r2(bruto - r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100)))
 }
 
 // FechaVencimientoSecuencia: el servicio ya la resuelve (payload → secuencia →
@@ -262,7 +254,7 @@ export class EcfEmissionProcessor extends WorkerHost {
 
     let pdfPath: string | undefined
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
-      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, eNCF, env).catch(
+      pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, eNCF, env, xmlFirmado).catch(
         (err) => {
           this.logger.warn(`[${comprobanteId}] PDF no generado: ${(err as Error).message}`)
           return undefined
@@ -555,47 +547,14 @@ export class EcfEmissionProcessor extends WorkerHost {
     tenant: Tenant,
     eNCF: string,
     env: DgiiEnv,
+    xmlFirmado: string,
   ): Promise<string> {
     const outDir = join('/tmp', 'pdfs', tenantId)
     mkdirSync(outDir, { recursive: true })
     const pdfPath = join(outDir, `${eNCF}.pdf`)
 
-    const items = datos.items.map((item) => ({
-      descripcion: item.nombreItem ?? '',
-      cantidad: item.cantidad,
-      precioUnitario: item.precioUnitarioItem ?? 0,
-      valor: calcularMontoItem(item),
-    }))
-
-    const montoTotal = items.reduce((s, i) => s + i.valor, 0)
-    const itbisTotal = datos.items.reduce((s, item) => {
-      const monto = calcularMontoItem(item)
-      if (item.indicadorFacturacion === 'I1') return s + r2(monto * 0.18)
-      if (item.indicadorFacturacion === 'I2') return s + r2(monto * 0.16)
-      return s
-    }, 0)
-
-    const pdfInput = {
-      rncEmisor: tenant.rnc,
-      nombreEmisor: tenant.razonSocial,
-      eNCF,
-      ambiente: env,
-      tipoECF: datos.tipoECF,
-      fechaEmision: datos.fechaEmision,
-      nombreComprador: datos.razonSocialComprador ?? '',
-      items,
-      montoTotal: r2(montoTotal + itbisTotal),
-      itbisTotal,
-      montoGravadoTotal: montoTotal,
-      ...(tenant.nombreComercial !== null ? { nombreComercial: tenant.nombreComercial } : {}),
-      ...(datos.fechaVencimiento !== undefined ? { fechaVencimiento: datos.fechaVencimiento } : {}),
-      ...(datos.rncComprador !== undefined ? { rncComprador: datos.rncComprador } : {}),
-      ...(datos.ncfModificado !== undefined ? { eNCFReferencia: datos.ncfModificado } : {}),
-      // Branding del tenant (Sprint 6). Si son null, el PDF usa los defaults.
-      ...(tenant.logoUrl !== null ? { logoUrl: tenant.logoUrl } : {}),
-      ...(tenant.colorPrimario !== null ? { colorPrimario: tenant.colorPrimario } : {}),
-      ...(tenant.colorSecundario !== null ? { colorSecundario: tenant.colorSecundario } : {}),
-    }
+    // codigoSeguridad + fechaHoraFirma se extraen del XML firmado (van en el QR).
+    const pdfInput = buildEcfPdfInput(datos, tenant, eNCF, env, xmlFirmado)
     await generarRepresentacionImpresa(pdfInput, pdfPath)
 
     await prisma.comprobante.update({ where: { id: comprobanteId }, data: { pdfUrl: pdfPath } })

@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import type { Response } from 'express'
-import { createReadStream, existsSync } from 'fs'
 import { ComprobantesService } from './comprobantes.service'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
@@ -11,7 +10,6 @@ import { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { PlanActivoGuard } from '../../common/guards/plan-activo.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
-import { NotFoundException } from '@nestjs/common'
 import { ComprobanteEstado, TipoECF } from '@facturard/database'
 
 @ApiTags('Comprobantes')
@@ -87,11 +85,11 @@ export class ComprobantesController {
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ): Promise<void> {
-    const comprobante = await this.service.findOne(tenantId, id)
-    if (!comprobante.pdfUrl) throw new NotFoundException('PDF no disponible para este comprobante')
-    if (!existsSync(comprobante.pdfUrl)) throw new NotFoundException('Archivo PDF no encontrado en disco')
-
-    res.setHeader('Content-Disposition', `attachment; filename="${comprobante.eNCF}.pdf"`)
-    createReadStream(comprobante.pdfUrl).pipe(res)
+    // Se regenera al vuelo desde los datos persistidos (no se sirve un PDF viejo
+    // de disco): así el QR lleva siempre el consultatimbre correcto y no depende
+    // del /tmp efímero de Railway. Ver ComprobantesService.regenerarPdfBuffer.
+    const { buffer, filename } = await this.service.regenerarPdfBuffer(tenantId, id)
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(buffer)
   }
 }

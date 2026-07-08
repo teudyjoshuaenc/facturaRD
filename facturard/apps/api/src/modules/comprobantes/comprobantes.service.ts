@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import type { Queue } from 'bullmq'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { readFile, unlink } from 'node:fs/promises'
 import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
+import { generarRepresentacionImpresa, resolveDgiiEnv } from '@facturard/ecf-engine'
+import { buildEcfPdfInput } from './pdf-input.builder'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import type { CrearNotaDto } from './dto/crear-nota.dto'
@@ -468,6 +473,43 @@ export class ComprobantesService {
     const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId } })
     if (!comprobante) throw new NotFoundException(`Comprobante ${id} no encontrado`)
     return comprobante
+  }
+
+  /**
+   * Regenera el PDF del comprobante AL VUELO desde los datos persistidos
+   * (`datos` + `xmlFirmado`), en vez de servir el archivo guardado en disco.
+   * Motivos: (a) el /tmp de Railway es efímero (se borra en cada redeploy), y
+   * (b) así el QR/consultatimbre lleva siempre el set correcto (e-NCF en MAYÚS,
+   * fechafirma y codigoseguridad), sin depender de PDFs viejos ya horneados ni
+   * reemitir el e-CF. No consume secuencia ni contacta a la DGII.
+   */
+  async regenerarPdfBuffer(tenantId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const comprobante = await this.findOne(tenantId, id)
+    if (comprobante.estado !== 'ACEPTADO' && comprobante.estado !== 'ACEPTADO_CONDICIONAL') {
+      throw new NotFoundException('El PDF sólo está disponible para comprobantes aceptados')
+    }
+    if (!comprobante.eNCF || !comprobante.xmlFirmado) {
+      throw new NotFoundException('El comprobante no tiene datos suficientes para regenerar el PDF')
+    }
+
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
+    const datos = comprobante.datos as unknown as CreateComprobanteDto
+    const pdfInput = buildEcfPdfInput(
+      datos,
+      tenant,
+      comprobante.eNCF,
+      resolveDgiiEnv(),
+      comprobante.xmlFirmado,
+    )
+
+    const tmpPath = join(tmpdir(), `ecf-${id}-${Date.now()}.pdf`)
+    try {
+      await generarRepresentacionImpresa(pdfInput, tmpPath)
+      const buffer = await readFile(tmpPath)
+      return { buffer, filename: `${comprobante.eNCF}.pdf` }
+    } finally {
+      await unlink(tmpPath).catch(() => undefined)
+    }
   }
 
   async resumen(tenantId: string, query: ResumenComprobantesDto): Promise<ResumenComprobantes> {
