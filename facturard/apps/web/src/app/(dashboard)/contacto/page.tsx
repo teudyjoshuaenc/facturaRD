@@ -98,9 +98,13 @@ export default function ContactosPage(): JSX.Element {
 
   const activeSearch = (search.trim() ? search : globalSearch).trim()
 
+  // estadoFilter es el control de 3 estados de la gestión → se resuelve server-side.
+  const activoParam = estadoFilter === 'todos' ? undefined : estadoFilter === 'ACTIVO'
+
   const { contactos, total, totalPages, isLoading, isError, refetch } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
+    activo: activoParam,
     page,
     limit: 10,
   })
@@ -131,12 +135,7 @@ export default function ContactosPage(): JSX.Element {
       })
     }
 
-    if (estadoFilter !== 'todos') {
-      list = list.filter((c) => {
-        const isActivo = !!c.activo
-        return estadoFilter === 'ACTIVO' ? isActivo : !isActivo
-      })
-    }
+    // estadoFilter se aplica server-side (ver activoParam en useContactosDirectorio).
 
     if (startDate) {
       list = list.filter((c) => {
@@ -152,7 +151,7 @@ export default function ContactosPage(): JSX.Element {
     }
 
     return list
-  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, estadoFilter, startDate, endDate])
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, startDate, endDate])
 
   async function handleSincronizarGhl(): Promise<void> {
     if (!conectado) {
@@ -411,6 +410,7 @@ export default function ContactosPage(): JSX.Element {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Teléfono</th>
                   <th className="px-4 py-3">Validación</th>
+                  <th className="px-4 py-3">Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -445,6 +445,13 @@ export default function ContactosPage(): JSX.Element {
                         <Badge variant="success"><CheckCircle2 size={12} /> Válido</Badge>
                       ) : (
                         <Badge variant="warning"><AlertTriangle size={12} /> Sin validar</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {c.activo ? (
+                        <Badge variant="success"><CheckCircle2 size={12} /> Activo</Badge>
+                      ) : (
+                        <Badge variant="neutral"><XCircle size={12} /> Inactivo</Badge>
                       )}
                     </td>
                   </tr>

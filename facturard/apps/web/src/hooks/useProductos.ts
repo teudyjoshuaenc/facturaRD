@@ -18,6 +18,7 @@ export interface Producto {
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
+  activo: boolean
 }
 
 export interface NuevoProductoData {
@@ -34,16 +35,21 @@ export interface NuevoProductoData {
   aplicarPropinaLegal?: boolean
 }
 
-export function useProductos() {
+// options.activo controla el filtro de 3 estados del backend:
+//   undefined → todos (activos e inactivos) — usado por la GESTIÓN del catálogo.
+//   true → sólo activos — usado por el SELECTOR de emisión (no se factura con bajas).
+//   false → sólo inactivos.
+export function useProductos(options?: { activo?: boolean }) {
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data: productos = [], isLoading } = useQuery({
-    queryKey: ['productos', searchQuery],
+    queryKey: ['productos', searchQuery, options?.activo],
     queryFn: async () => {
       const res = await api.get('/productos', {
         params: {
           search: searchQuery.trim() || undefined,
+          activo: options?.activo,
           limit: 100,
         },
       })
@@ -57,6 +63,7 @@ export function useProductos() {
           precio: Number(p.precioUnitario),
           indicadorFacturacion: p.tratamientoITBIS === 'EXENTO' ? 'E' : (p.tratamientoITBIS || 'I1'),
           precioIncluyeItbis: false,
+          activo: p.activo !== false,
         }
         if (p.unidadMedida) {
           item.unidadMedida = Number(p.unidadMedida)
@@ -100,6 +107,7 @@ export function useProductos() {
         precio: Number(result.precioUnitario),
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
         precioIncluyeItbis: false,
+        activo: result.activo !== false,
       }
       if (result.unidadMedida) {
         p.unidadMedida = Number(result.unidadMedida)

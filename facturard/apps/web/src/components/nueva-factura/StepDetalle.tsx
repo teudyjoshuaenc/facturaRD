@@ -50,7 +50,8 @@ export function StepDetalle({
   tipoECF,
 }: StepDetalleProps): JSX.Element {
   const baseId = useId()
-  const { allProductos, crearProducto } = useProductos()
+  // Selector de emisión: sólo productos activos (no se factura con productos dados de baja).
+  const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
   const [productSearch, setProductSearch] = useState('')
 
