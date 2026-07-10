@@ -107,4 +107,69 @@ describe('GHL sync de contactos (e2e)', () => {
     const total = await prisma.contacto.count({ where: { tenantId: tenant.tenant.id, origen: 'GHL' } })
     expect(total).toBe(3)
   })
+
+  // La re-sync puede AGREGAR/MEJORAR datos, pero nunca degradar/revertir lo que el
+  // usuario editó a mano en FacturaRD.
+  describe('re-sync no degrada datos editados en FacturaRD', () => {
+    const setGhlContacts = (contacts: unknown[]) => {
+      fetchSpy.mockImplementation((input: string | URL | Request) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/customFields')) return Promise.resolve(jsonRes(customFieldsDef))
+        return Promise.resolve(jsonRes({ contacts, meta: { nextPageUrl: null } }))
+      })
+    }
+
+    it('RNC manual + rncValidado=true → re-sync con GHL sin RNC conserva ambos (no resetea)', async () => {
+      await prisma.contacto.create({
+        data: { tenantId: tenant.tenant.id, ghlContactId: 'g-pres', origen: 'GHL', tipo: 'CLIENTE', razonSocial: 'Cliente Pres', rnc: '40200000001', rncValidado: true },
+      })
+      setGhlContacts([{ id: 'g-pres', companyName: 'Cliente Pres', customFields: [] }]) // GHL sin RNC
+
+      await request(app.getHttpServer()).post('/api/v1/contactos/sincronizar-ghl').set(auth()).expect(201)
+
+      const c = await prisma.contacto.findFirstOrThrow({ where: { tenantId: tenant.tenant.id, ghlContactId: 'g-pres' } })
+      expect(c.rnc).toBe('40200000001')
+      expect(c.rncValidado).toBe(true)
+      expect(buscarPorRNC).not.toHaveBeenCalled() // no revalida con RNC vacío
+    })
+
+    it('renombrado en FacturaRD → re-sync con GHL sin nombre útil conserva el nombre manual', async () => {
+      await prisma.contacto.create({
+        data: { tenantId: tenant.tenant.id, ghlContactId: 'g-name', origen: 'GHL', tipo: 'CLIENTE', razonSocial: 'Nombre Editado A Mano' },
+      })
+      setGhlContacts([{ id: 'g-name', customFields: [] }]) // GHL sin nombre ni empresa
+
+      await request(app.getHttpServer()).post('/api/v1/contactos/sincronizar-ghl').set(auth()).expect(201)
+
+      const c = await prisma.contacto.findFirstOrThrow({ where: { tenantId: tenant.tenant.id, ghlContactId: 'g-name' } })
+      expect(c.razonSocial).toBe('Nombre Editado A Mano')
+    })
+
+    it('marcado PROVEEDOR → re-sync lo mantiene como PROVEEDOR (no lo revierte a CLIENTE)', async () => {
+      await prisma.contacto.create({
+        data: { tenantId: tenant.tenant.id, ghlContactId: 'g-prov', origen: 'GHL', tipo: 'PROVEEDOR', razonSocial: 'Proveedor X' },
+      })
+      setGhlContacts([{ id: 'g-prov', companyName: 'Proveedor X', customFields: [] }])
+
+      await request(app.getHttpServer()).post('/api/v1/contactos/sincronizar-ghl').set(auth()).expect(201)
+
+      const c = await prisma.contacto.findFirstOrThrow({ where: { tenantId: tenant.tenant.id, ghlContactId: 'g-prov' } })
+      expect(c.tipo).toBe('PROVEEDOR')
+    })
+
+    it('RNC nuevo que SÍ viene de GHL → se actualiza y revalida (el caso bueno sigue funcionando)', async () => {
+      await prisma.contacto.create({
+        data: { tenantId: tenant.tenant.id, ghlContactId: 'g-newrnc', origen: 'GHL', tipo: 'CLIENTE', razonSocial: 'Cliente Sin RNC', rncValidado: false },
+      })
+      buscarPorRNC.mockResolvedValue({ rnc: '40299988877', razonSocial: 'X', nombreComercial: undefined, estado: 'ACTIVO', categoria: undefined })
+      setGhlContacts([{ id: 'g-newrnc', companyName: 'Cliente Sin RNC', customFields: [{ id: RNC_FIELD_ID, value: '40299988877' }] }])
+
+      await request(app.getHttpServer()).post('/api/v1/contactos/sincronizar-ghl').set(auth()).expect(201)
+
+      const c = await prisma.contacto.findFirstOrThrow({ where: { tenantId: tenant.tenant.id, ghlContactId: 'g-newrnc' } })
+      expect(c.rnc).toBe('40299988877')
+      expect(c.rncValidado).toBe(true)
+      expect(buscarPorRNC).toHaveBeenCalledWith('40299988877')
+    })
+  })
 })
