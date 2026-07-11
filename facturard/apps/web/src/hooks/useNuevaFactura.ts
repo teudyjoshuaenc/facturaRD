@@ -47,10 +47,10 @@ export function useNuevaFactura() {
     try {
       const referencia = data.ncfModificado && data.fechaNCFModificado && data.codigoModificacion
         ? {
-            ncfModificado: data.ncfModificado,
-            fechaNCFModificado: toDDMMYYYY(data.fechaNCFModificado),
-            codigoModificacion: Number(data.codigoModificacion),
-          }
+          ncfModificado: data.ncfModificado,
+          fechaNCFModificado: toDDMMYYYY(data.fechaNCFModificado),
+          codigoModificacion: Number(data.codigoModificacion),
+        }
         : {}
 
       const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
@@ -64,7 +64,8 @@ export function useNuevaFactura() {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
         emitir: data.emitirConComprobante,
-        ...(data.emitirConComprobante !== false && tiposConTipoIngresos.includes(data.tipoECF) && { tipoIngresos: data.tipoIngresos }),
+        ...(tiposConTipoIngresos.includes(data.tipoECF) && data.tipoIngresos && { tipoIngresos: data.tipoIngresos }),
+        ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
         ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
         ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),
@@ -92,5 +93,55 @@ export function useNuevaFactura() {
     }
   }
 
-  return { createComprobante }
+  async function updateComprobante(id: string, data: ComprobanteFormData): Promise<{ id: string; eNCF: string; montoTotal: number }> {
+    try {
+      const referencia = data.ncfModificado && data.fechaNCFModificado && data.codigoModificacion
+        ? {
+          ncfModificado: data.ncfModificado,
+          fechaNCFModificado: toDDMMYYYY(data.fechaNCFModificado),
+          codigoModificacion: Number(data.codigoModificacion),
+        }
+        : {}
+
+      const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
+      const tiposSinComprador: TipoECF[] = ['E43']
+
+      let backendTipoPago = 1
+      if (data.condicionPago === 'CREDITO') backendTipoPago = 2
+      else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
+
+      const res = await api.patch<{ id: string; eNCF: string; montoTotal: number }>(`/comprobantes/${id}`, {
+        tipoECF: data.tipoECF,
+        tipoPago: backendTipoPago,
+        emitir: data.emitirConComprobante,
+        ...(tiposConTipoIngresos.includes(data.tipoECF) && data.tipoIngresos && { tipoIngresos: data.tipoIngresos }),
+        ...(data.terminoPago && { terminoPago: data.terminoPago }),
+        fechaEmision: toDDMMYYYY(data.fechaEmision),
+        ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
+        ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),
+        ...(!tiposSinComprador.includes(data.tipoECF) && { razonSocialComprador: data.razonSocialComprador }),
+        ...(data.identificadorExtranjero && { identificadorExtranjero: data.identificadorExtranjero }),
+        ...(data.paisComprador && { paisComprador: data.paisComprador }),
+        ...(data.indicadorNotaCredito && { indicadorNotaCredito: Number(data.indicadorNotaCredito) }),
+        ...referencia,
+        items: data.items.map((item, i) => ({
+          numeroLinea: i + 1,
+          indicadorFacturacion: item.indicadorFacturacion,
+          nombreItem: item.nombreItem,
+          indicadorBienoServicio: item.indicadorBienoServicio,
+          cantidad: item.cantidad,
+          precioUnitarioItem: item.precioUnitarioItem,
+          ...(item.unidadMedida && { unidadMedida: item.unidadMedida }),
+          ...(item.descuento && { descuento: item.descuento }),
+          ...(item.itbisRetenido && { itbisRetenido: item.itbisRetenido }),
+          ...(item.isrRetenido && { isrRetenido: item.isrRetenido }),
+        })),
+      })
+      return res.data
+    } catch (err) {
+      throw new Error(getErrorMessage(err))
+    }
+  }
+
+  return { createComprobante, updateComprobante }
 }

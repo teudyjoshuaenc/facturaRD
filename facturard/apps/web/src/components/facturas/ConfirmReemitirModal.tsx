@@ -2,41 +2,28 @@
 
 import React from 'react'
 import type { JSX } from 'react'
-import { AlertTriangle, Trash2 } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 
-interface Producto {
-  id: string
-  nombre: string
-  tipo: 'BIEN' | 'SERVICIO'
-  codigo: string
-  precio: number
-  indicadorFacturacion: string
-  precioFinal: number
-  estado: string
-}
-
-interface ConfirmDeleteModalProps {
+interface ConfirmReemitirModalProps {
   open: boolean
-  producto: Producto | null
   onClose: () => void
   onConfirm: () => void
 }
 
-export function ConfirmDeleteModal({
+export function ConfirmReemitirModal({
   open,
-  producto,
   onClose,
   onConfirm,
-}: ConfirmDeleteModalProps): JSX.Element {
+}: ConfirmReemitirModalProps): JSX.Element {
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Eliminar producto"
+      title="¿Reemitir factura?"
       subtitle=""
-      icon={<Trash2 size={20} className="text-[#d92d20]" />}
+      icon={<AlertTriangle size={20} className="text-[#0379D5]" />}
       className="max-w-[448px]"
       footer={
         <div className="flex items-center justify-end gap-3 w-full">
@@ -52,18 +39,16 @@ export function ConfirmDeleteModal({
             variant="primary"
             size="md"
             onClick={onConfirm}
-            className="h-10 rounded-[10px] bg-[#d92d20] hover:bg-[#b42318] text-white border-0 text-[13px]"
+            className="h-10 rounded-[10px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-white border-0 text-[13px]"
           >
-            Eliminar
+            Enviar
           </Button>
         </div>
       }
     >
       <div className="py-2 text-left">
         <p className="text-[14px] text-[#64748b] leading-[22px] font-sans">
-          Vas a eliminar{' '}
-          <span className="font-bold text-[#333]">{producto?.nombre || 'este producto'}</span>
-          . Esta acción no se puede deshacer.
+          ¿Está seguro de que desea volver a emitir esta factura? Al reemitir un comprobante rechazado o con error, se consumirá una nueva secuencia e-NCF en la DGII.
         </p>
       </div>
     </Modal>

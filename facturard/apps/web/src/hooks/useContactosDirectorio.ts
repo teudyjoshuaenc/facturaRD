@@ -26,17 +26,18 @@ export interface ContactosDirParams {
   search?: string | undefined
   tipo?: string | undefined
   origen?: string | undefined
+  activo?: boolean | undefined
   page?: number | undefined
   limit?: number | undefined
 }
 
 export function useContactosDirectorio(params: ContactosDirParams) {
   const queryClient = useQueryClient()
-  const { search, tipo, origen, page = 1, limit = 10 } = params
+  const { search, tipo, origen, activo, page = 1, limit = 10 } = params
 
   const { data, isLoading, isError, isFetching } = useQuery({
     // La key empieza con 'contactos' → la invalida la sync GHL y crearContacto.
-    queryKey: ['contactos', 'directorio', { search, tipo, origen, page, limit }],
+    queryKey: ['contactos', 'directorio', { search, tipo, origen, activo, page, limit }],
     queryFn: () =>
       api
         .get<PaginatedResponse<ContactoDir>>('/contactos', {
@@ -44,6 +45,7 @@ export function useContactosDirectorio(params: ContactosDirParams) {
             search: search?.trim() || undefined,
             tipo: tipo || undefined,
             origen: origen || undefined,
+            activo,
             page,
             limit,
           },

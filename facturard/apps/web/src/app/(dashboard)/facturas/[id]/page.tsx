@@ -4,7 +4,7 @@ import React, { use, useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, getErrorMessage } from '@/lib/api'
 import {
   ChevronLeft,
   Download,
@@ -18,6 +18,7 @@ import {
   Mail,
   AlertTriangle,
   Shield,
+  Pencil,
 } from 'lucide-react'
 import {
   type Comprobante,
@@ -31,6 +32,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
+import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
+import { toast } from 'sonner'
+import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -43,9 +47,26 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
   const resolvedParams = use(params)
   const id = resolvedParams.id
 
+  const { blockingReason } = useEmissionStatus()
+
   const [activeTab, setActiveTab] = useState<TabType>('resumen')
   const [downloading, setDownloading] = useState(false)
   const [isReenviarOpen, setIsReenviarOpen] = useState(false)
+  const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
+  const [emitting, setEmitting] = useState(false)
+
+  const handleEmitir = async () => {
+    setEmitting(true)
+    try {
+      await api.post(`/comprobantes/${id}/emitir`)
+      toast.success('Comprobante emitido exitosamente')
+      router.push('/facturas')
+    } catch (err) {
+      toast.error('Error al emitir comprobante', { description: getErrorMessage(err) })
+    } finally {
+      setEmitting(false)
+    }
+  }
 
   // Fetch Comprobante details
   const { data: comprobante, isLoading, error } = useQuery<Comprobante>({
@@ -127,7 +148,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           title="Volver a facturas"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
-            <path d="M5.33333 3.33333H14M5.33333 8H14M5.33333 12.6667H14M2 3.33333H2.00667M2 8H2.00667M2 12.6667H2.00667" stroke="#64748B" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M5.33333 3.33333H14M5.33333 8H14M5.33333 12.6667H14M2 3.33333H2.00667M2 8H2.00667M2 12.6667H2.00667" stroke="#64748B" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
@@ -138,19 +159,18 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
               {comprobante.eNCF || 'Borrador'}
             </h1>
             <div
-              className={`inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[10px] text-[12px] font-normal leading-[18px] ${
-                comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
+              className={`inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[10px] text-[12px] font-normal leading-[18px] ${comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
                   ? 'bg-[rgba(6,118,71,0.1)] text-[#067647]'
                   : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR'
-                  ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
-                  : 'bg-neutral-100 text-[#64748b]'
-              }`}
+                    ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
+                    : 'bg-neutral-100 text-[#64748b]'
+                }`}
             >
               {comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL' ? (
                 <>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0">
-                    <path d="M10.5 4.08337L5.25 9.33337L3.5 7.58337" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12.8333 7.00004C12.8333 10.2217 10.2217 12.8334 7.00004 12.8334C3.77838 12.8334 1.16671 10.2217 1.16671 7.00004C1.16671 3.77838 3.77838 1.16671 7.00004 1.16671C10.2217 1.16671 12.8333 3.77838 12.8333 7.00004Z" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M10.5 4.08337L5.25 9.33337L3.5 7.58337" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12.8333 7.00004C12.8333 10.2217 10.2217 12.8334 7.00004 12.8334C3.77838 12.8334 1.16671 10.2217 1.16671 7.00004C1.16671 3.77838 3.77838 1.16671 7.00004 1.16671C10.2217 1.16671 12.8333 3.77838 12.8333 7.00004Z" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <span>Aceptado</span>
                 </>
@@ -184,38 +204,68 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           {downloading ? <Spinner size={14} /> : <Download size={14} className="shrink-0 text-[#64748b]" />}
           <span>Descargar PDF</span>
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() => setIsReenviarOpen(true)}
-          className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all"
-        >
-          <Send size={14} className="shrink-0 text-[#64748b]" />
-          <span>Reenviar al receptor</span>
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => alert('Clonando comprobante...')}
-          className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all"
-        >
-          <Copy size={14} className="shrink-0 text-[#64748b]" />
-          <span>Clonar</span>
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => alert('Generando nota de crédito E34...')}
-          className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all"
-        >
-          <FileText size={14} className="shrink-0 text-[#64748b]" />
-          <span>Crear nota de crédito E34</span>
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => alert('Generando nota de crédito E33...')}
-          className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all"
-        >
-          <FileText size={14} className="shrink-0 text-[#64748b]" />
-          <span>Crear nota de crédito E33</span>
-        </Button>
+        {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/nueva-factura?id=${id}`)}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all cursor-pointer"
+            >
+              <Pencil size={14} className="shrink-0 text-[#64748b]" />
+              <span>Editar factura</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (blockingReason) {
+                  toast.error('Emisión bloqueada', { description: blockingReason })
+                  return
+                }
+                setShowConfirmReemitir(true)
+              }}
+              disabled={emitting}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#0379d5]/30 bg-white text-[#0379d5] hover:bg-blue-50 text-[12px] font-semibold leading-[19.5px] gap-[7px] flex items-center transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {emitting ? <Spinner size={14} /> : <Send size={14} className="shrink-0 text-[#0379d5]" />}
+              <span>Emitir comprobante</span>
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setIsReenviarOpen(true)}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer"
+            >
+              <Mail size={14} className="shrink-0 text-[#64748b]" />
+              <span>Reenviar al receptor</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => alert('Clonando comprobante...')}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all cursor-pointer"
+            >
+              <Copy size={14} className="shrink-0 text-[#64748b]" />
+              <span>Clonar</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => alert('Generando nota de crédito E34...')}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer"
+            >
+              <FileText size={14} className="shrink-0 text-[#64748b]" />
+              <span>Crear nota de crédito E34</span>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => alert('Generando nota de crédito E33...')}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer"
+            >
+              <FileText size={14} className="shrink-0 text-[#64748b]" />
+              <span>Crear nota de crédito E33</span>
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Tabs list switcher */}
@@ -232,9 +282,8 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as TabType)}
-              className={`px-[24px] py-[14px] flex items-center justify-center text-[12px] text-center font-semibold relative transition-colors focus:outline-none cursor-pointer font-sans leading-[19.5px] ${
-                isActive ? 'text-[#0379d5]' : 'text-[#333] hover:text-[#0379d5]'
-              }`}
+              className={`px-[24px] py-[14px] flex items-center justify-center text-[12px] text-center font-semibold relative transition-colors focus:outline-none cursor-pointer font-sans leading-[19.5px] ${isActive ? 'text-[#0379d5]' : 'text-[#333] hover:text-[#0379d5]'
+                }`}
             >
               <span>{tab.label}</span>
               {isActive && (
@@ -570,6 +619,15 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
         onSend={async (data) => {
           await new Promise((r) => setTimeout(r, 1000))
           alert(`Comprobante reenviado exitosamente a: ${data.para}`)
+        }}
+      />
+
+      <ConfirmReemitirModal
+        open={showConfirmReemitir}
+        onClose={() => setShowConfirmReemitir(false)}
+        onConfirm={() => {
+          setShowConfirmReemitir(false)
+          handleEmitir()
         }}
       />
     </div>

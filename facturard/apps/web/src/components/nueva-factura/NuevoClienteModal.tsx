@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Building2, User, CreditCard, Mail, Phone, UserPlus, MapPin, AlignLeft, ChevronDown } from 'lucide-react'
+import { Building2, User, CreditCard, Mail, Phone, UserPlus, MapPin, AlignLeft, ChevronDown, Check } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { NuevoContactoData } from '@/hooks/useContactos'
 import { Select } from '@/components/ui/select'
+import { useRncValidation } from '@/hooks/useRncValidation'
+import { Spinner } from '@/components/ui/spinner'
 
 interface NuevoClienteModalProps {
   open: boolean
   onClose: () => void
   onSave: (data: NuevoContactoData) => void
+  defaultTipo?: 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
 }
 
 const PROVINCIAS_MUNICIPIOS: Record<string, string[]> = {
@@ -23,7 +26,7 @@ const PROVINCIAS_MUNICIPIOS: Record<string, string[]> = {
   'La Altagracia': ['Salvaleón de Higüey', 'San Rafael del Yuma'],
   'La Romana': ['La Romana', 'Guaymate', 'Villa Hermosa'],
   'San Pedro de Macorís': ['San Pedro de Macorís', 'Consuelo', 'El Valle', 'Quisqueya', 'Ramón Santana', 'San José de los Llanos'],
-  'San Cristóbal': ['San Cristóbal', 'Sabana Grande de Palenque', 'Bajos de Haina', 'Cambita Garabitos', 'Villa Altagracia', 'Yaguate', 'San Gregorio de Nigua', 'Los Cacaos'],
+  'San Cristóbal': ['San Cristóbal', 'Bajos de Haina', 'Cambita Garabitos', 'Villa Altagracia', 'Yaguate', 'San Gregorio de Nigua', 'Los Cacaos'],
   'Duarte': ['San Francisco de Macorís', 'Arenoso', 'Castillo', 'Las Guáranas', 'Pimentel', 'Villa Riva', 'Hostos']
 }
 
@@ -58,8 +61,9 @@ function formatPhoneInput(value: string): string {
   })
 }
 
-export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalProps): JSX.Element {
+export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENTE' }: NuevoClienteModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
+  const [tipo, setTipo] = useState<'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'>(defaultTipo)
   const [rnc, setRnc] = useState('')
   const [idExtranjero, setIdExtranjero] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -73,11 +77,18 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
   const [nombreTouched, setNombreTouched] = useState(false)
 
   useEffect(() => {
+    if (open) {
+      setTipo(defaultTipo)
+    }
+  }, [open, defaultTipo])
+
+  useEffect(() => {
     setMunicipio('')
   }, [provincia])
 
   function reset(): void {
     setNombre('')
+    setTipo(defaultTipo)
     setRnc('')
     setIdExtranjero('')
     setTelefono('')
@@ -90,16 +101,28 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
     setNombreTouched(false)
   }
 
+  const cleanRnc = rnc.replace(/\D/g, '')
+  const isEligibleForValidation = tipo !== 'CONSUMIDOR_FINAL' && (cleanRnc.length === 9 || cleanRnc.length === 11)
+  const { status: rncStatus, razonSocial: validatedRazonSocial, error: rncError } = useRncValidation(
+    isEligibleForValidation ? cleanRnc : ''
+  )
+
+  useEffect(() => {
+    if (isEligibleForValidation && rncStatus === 'valid' && validatedRazonSocial) {
+      setNombre(validatedRazonSocial)
+      setNombreTouched(true)
+    }
+  }, [rncStatus, validatedRazonSocial, isEligibleForValidation])
+
   function handleSave(): void {
     if (!nombre.trim()) return
     const cleanRnc = rnc.replace(/\D/g, '')
-    const resolvedTipo = cleanRnc.length === 9 ? 'EMPRESA' : 'PERSONA'
     onSave({
       nombre,
       rnc: cleanRnc,
       email,
       telefono: telefono.replace(/\D/g, ''),
-      tipo: resolvedTipo,
+      tipo,
       idExtranjero,
       direccion,
       provincia,
@@ -115,9 +138,12 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
     onClose()
   }
 
-  const isValid = nombre.trim().length > 0 && (rnc.replace(/\D/g, '').length >= 9 || idExtranjero.trim().length > 0)
+  const isRncOrIdExtranjeroValid = rnc.replace(/\D/g, '').length >= 9 || idExtranjero.trim().length > 0
+  const isValid = nombre.trim().length > 0 && (tipo === 'CONSUMIDOR_FINAL' || isRncOrIdExtranjeroValid)
   
-  const showRncError = rncTouched && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
+  const showRncError = rncTouched && tipo !== 'CONSUMIDOR_FINAL' && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
+  const validationError = tipo !== 'CONSUMIDOR_FINAL' && rncStatus === 'invalid' ? rncError : ''
+  const displayRncError = showRncError ? "Este campo es requerido" : validationError
   const showNombreError = nombreTouched && !nombre.trim()
 
   const municipiosDisponibles = provincia ? (PROVINCIAS_MUNICIPIOS[provincia] || []) : []
@@ -126,8 +152,8 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
     <Modal
       open={open}
       onClose={handleClose}
-      title="Nuevo Cliente"
-      subtitle="Registre un nuevo cliente para facturación"
+      title="Nuevo Contacto"
+      subtitle="Registre un nuevo contacto para facturación o compras"
       icon={<UserPlus size={20} />}
       className="max-w-[740px]"
       footer={
@@ -149,16 +175,38 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
               size="md"
               disabled={!isValid}
               onClick={handleSave}
-              className="flex items-center justify-center gap-1 h-[42px] w-[168px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
+              className="flex items-center justify-center gap-[4px] h-[42px] px-[20px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
             >
-              <UserPlus size={16} />
-              Guardar Cliente
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                <path d="M13.3333 17.5V15.8333C13.3333 14.9493 12.9821 14.1014 12.357 13.4763C11.7319 12.8512 10.8841 12.5 10 12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M7.5 9.16667C9.34095 9.16667 10.8333 7.67428 10.8333 5.83333C10.8333 3.99238 9.34095 2.5 7.5 2.5C5.65905 2.5 4.16667 3.99238 4.16667 5.83333C4.16667 7.67428 5.65905 9.16667 7.5 9.16667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M18.3333 17.5V15.8333C18.3328 15.0948 18.087 14.3773 17.6345 13.7936C17.182 13.2099 16.5484 12.793 15.8333 12.6083" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13 2.5C13.717 2.68358 14.3525 3.10058 14.8064 3.68526C15.2602 4.26993 15.5065 4.98902 15.5065 5.72917C15.5065 6.46931 15.2602 7.1884 14.8064 7.77307C14.3525 8.35775 13.717 8.77475 13 8.95833" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M2.25 14.75H7.25" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.75 12.25V17.25" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span>Guardar Contacto</span>
             </Button>
           </div>
         </>
       }
     >
       <div className="flex flex-col gap-[20px] select-none text-left pt-2">
+        {/* Tipo de Contacto Dropdown */}
+        <div className="flex flex-col gap-1.5 w-full">
+          <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Tipo de Contacto *</label>
+          <Select
+            value={tipo}
+            onChange={(val) => setTipo(val as any)}
+            options={[
+              { value: 'CLIENTE', label: 'Cliente' },
+              { value: 'PROVEEDOR', label: 'Proveedor' },
+              { value: 'CONSUMIDOR_FINAL', label: 'Consumidor Final' },
+            ]}
+            placeholder="Seleccionar tipo"
+          />
+        </div>
+
         {/* 2-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           
@@ -166,9 +214,16 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
           <div className="flex flex-col gap-4">
             {/* Rnc / Cédula */}
             <Input
-              label="Rnc / Cédula *"
+              label={tipo === 'CONSUMIDOR_FINAL' ? "Rnc / Cédula" : "Rnc / Cédula *"}
               placeholder="Ej: 130-56789-1"
               leftIcon={<CreditCard size={16} className="text-[#64748B]" />}
+              rightIcon={
+                rncStatus === 'loading' ? (
+                  <Spinner size={16} />
+                ) : rncStatus === 'valid' ? (
+                  <Check size={16} className="text-green-600" />
+                ) : null
+              }
               inputMode="numeric"
               maxLength={13}
               value={rnc}
@@ -177,7 +232,7 @@ export function NuevoClienteModal({ open, onClose, onSave }: NuevoClienteModalPr
                 setRncTouched(true)
               }}
               onBlur={() => setRncTouched(true)}
-              {...(showRncError ? { error: "Este campo es requerido" } : {})}
+              {...(displayRncError ? { error: displayRncError } : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
 

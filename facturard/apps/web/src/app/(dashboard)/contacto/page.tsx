@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   XCircle,
   Calendar,
-  MoreHorizontal,
   Send,
   Edit2,
 } from 'lucide-react'
@@ -35,6 +34,7 @@ import { EditarClienteModal } from '@/components/contacto/EditarClienteModal'
 import { formatDate } from '@/lib/comprobantes'
 import { cn } from '@/lib/utils'
 import { DetailPanel } from '@/components/contacto/DetailPanel'
+import { Modal } from '@/components/ui/modal'
 import { toast } from 'sonner'
 
 import {
@@ -46,9 +46,15 @@ import {
 
 const tipoOptions = [
   { value: 'todos', label: 'Tipo' },
-  { value: 'CLIENTE', label: 'Cliente' },
-  { value: 'PROVEEDOR', label: 'Proveedor' },
-  { value: 'CONSUMIDOR_FINAL', label: 'Consumidor final' },
+  { value: 'CLIENTE', label: 'CLIENTE' },
+  { value: 'PROVEEDOR', label: 'PROVEEDOR' },
+  { value: 'CONSUMIDOR_FINAL', label: 'CONSUMIDOR_FINAL' },
+]
+
+const origenOptions = [
+  { value: 'todos', label: 'Origen' },
+  { value: 'MANUAL', label: 'Manual' },
+  { value: 'GHL', label: 'GHL' },
 ]
 
 const tipoFiscalOptions = [
@@ -95,6 +101,7 @@ export default function ContactosPage(): JSX.Element {
   const [tipoFiscalFilter, setTipoFiscalFilter] = useState('todos')
   const [validacionFilter, setValidacionFilter] = useState('todos')
   const [estadoFilter, setEstadoFilter] = useState('todos')
+  const [origenFilter, setOrigenFilter] = useState('todos')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [soloSinRnc, setSoloSinRnc] = useState(false)
@@ -102,6 +109,7 @@ export default function ContactosPage(): JSX.Element {
   const [openModal, setOpenModal] = useState(false)
   const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
   const [editingContacto, setEditingContacto] = useState<any | null>(null)
+  const [togglingContacto, setTogglingContacto] = useState<any | null>(null)
 
   const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
   const [syncError, setSyncError] = useState('')
@@ -112,6 +120,8 @@ export default function ContactosPage(): JSX.Element {
   const { contactos, total, totalPages, isLoading, isError, refetch, isFetching } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
+    activo: estadoFilter === 'todos' ? undefined : (estadoFilter === 'ACTIVO'),
+    origen: origenFilter === 'todos' ? undefined : origenFilter,
     page,
     limit: 10,
   })
@@ -201,16 +211,27 @@ export default function ContactosPage(): JSX.Element {
 
   // Toggles contact status Active / Inactive
   async function handleToggleStatus(c: any): Promise<void> {
-    const nextStatus = !c.activo
+    const rawContact = visibles.find(item => item.id === c.id) || c
+    setTogglingContacto(rawContact)
+  }
+
+  async function confirmToggleStatus(): Promise<void> {
+    if (!togglingContacto) return
+    const c = togglingContacto
+    const isCurrentlyActive = c.activo !== undefined ? !!c.activo : c.estado === 'ACTIVO'
+    const nextStatus = !isCurrentlyActive
+    const contactName = c.razonSocial || c.nombre || 'Contacto'
+
     setLocalStatusOverrides(prev => ({ ...prev, [c.id]: nextStatus }))
     try {
       await actualizarContacto.mutateAsync({ id: c.id, data: { activo: nextStatus } })
-      toast.success(`Estado de ${c.razonSocial} actualizado`)
+      toast.success(`Estado de ${contactName} actualizado`)
     } catch (err) {
       // Revert in case of error
       setLocalStatusOverrides(prev => ({ ...prev, [c.id]: !nextStatus }))
       toast.error('Ocurrió un error al actualizar el estado')
     }
+    setTogglingContacto(null)
   }
 
   async function handleEditSave(id: string, data: any) {
@@ -218,16 +239,10 @@ export default function ContactosPage(): JSX.Element {
       const cleanPhone = data.telefono.replace(/\D/g, '')
       const cleanRnc = (data.rnc || '').replace(/\D/g, '')
 
-      const orig = contactos.find(c => c.id === id)
-      let resolvedTipo = orig?.tipo || 'CONSUMIDOR_FINAL'
-      if (resolvedTipo !== 'PROVEEDOR') {
-        resolvedTipo = (cleanRnc.length === 9 || cleanRnc.length === 11) ? 'CLIENTE' : 'CONSUMIDOR_FINAL'
-      }
-
       await actualizarContacto.mutateAsync({
         id,
         data: {
-          tipo: resolvedTipo,
+          tipo: data.tipo,
           rnc: cleanRnc || undefined,
           razonSocial: data.nombre,
           nombreComercial: data.nombreComercial || undefined,
@@ -241,7 +256,7 @@ export default function ContactosPage(): JSX.Element {
       if (selectedContacto && selectedContacto.id === id) {
         setSelectedContacto((prev: any) => ({
           ...prev,
-          tipo: resolvedTipo,
+          tipo: data.tipo,
           rnc: cleanRnc || null,
           razonSocial: data.nombre,
           email: data.email || null,
@@ -380,7 +395,7 @@ export default function ContactosPage(): JSX.Element {
               value={tipoFilter}
               onChange={(val) => resetPage(setTipoFilter)(val as any)}
               options={tipoOptions}
-              className="w-[84px] shrink-0"
+              className="w-[165px] shrink-0"
               triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
             />
 
@@ -389,7 +404,7 @@ export default function ContactosPage(): JSX.Element {
               value={tipoFiscalFilter}
               onChange={(val) => resetPage(setTipoFiscalFilter)(val)}
               options={tipoFiscalOptions}
-              className="w-[105px] shrink-0"
+              className="w-[140px] shrink-0"
               triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
             />
 
@@ -398,7 +413,7 @@ export default function ContactosPage(): JSX.Element {
               value={validacionFilter}
               onChange={(val) => resetPage(setValidacionFilter)(val)}
               options={validacionOptions}
-              className="w-[145px] shrink-0"
+              className="w-[160px] shrink-0"
               triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
             />
 
@@ -408,6 +423,15 @@ export default function ContactosPage(): JSX.Element {
               onChange={(val) => resetPage(setEstadoFilter)(val)}
               options={estadoOptions}
               className="w-[95px] shrink-0"
+              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
+            />
+
+            {/* Origen Selector */}
+            <Select
+              value={origenFilter}
+              onChange={(val) => resetPage(setOrigenFilter)(val)}
+              options={origenOptions}
+              className="w-[100px] shrink-0"
               triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
             />
 
@@ -512,6 +536,7 @@ export default function ContactosPage(): JSX.Element {
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Identificacion</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Validación</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">e-CF sugerido</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[85px]">Origen</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Ultima actividad</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-center w-[100px]">Estado</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-right pr-6 w-[110px]">Acciones</th>
@@ -614,6 +639,17 @@ export default function ContactosPage(): JSX.Element {
                               {suggestedEcf}
                             </span>
                           </td>
+                          <td className="px-4 py-3 w-[85px]">
+                            {c.origen === 'GHL' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]">
+                                GHL
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-neutral-50 text-neutral-800 border-neutral-200">
+                                Manual
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 w-[110px] text-text-secondary">
                             {formattedActivity}
                           </td>
@@ -667,17 +703,7 @@ export default function ContactosPage(): JSX.Element {
                               >
                                 <Edit2 size={15} />
                               </button>
-                              <button
-                                type="button"
-                                title="Acciones"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedContacto(c)
-                                }}
-                                className="p-1.5 hover:bg-neutral-100 rounded-lg text-[#64748b] transition-colors focus:outline-none"
-                              >
-                                <MoreHorizontal size={15} />
-                              </button>
+
                             </div>
                           </td>
                         </tr>
@@ -735,6 +761,7 @@ export default function ContactosPage(): JSX.Element {
                 const orig = visibles.find(v => v.id === c.id)
                 setEditingContacto(orig || selectedContacto)
               }}
+              onToggleStatus={handleToggleStatus}
             />
           )}
         </div>
@@ -747,6 +774,63 @@ export default function ContactosPage(): JSX.Element {
         onClose={() => setEditingContacto(null)}
         onSave={handleEditSave}
       />
+
+      <Modal
+        open={togglingContacto !== null}
+        onClose={() => setTogglingContacto(null)}
+        title={(togglingContacto?.activo !== undefined ? togglingContacto.activo : togglingContacto?.estado === 'ACTIVO') ? 'Desactivar contacto' : 'Activar contacto'}
+        subtitle=""
+        icon={<AlertTriangle size={20} className="text-[#f79009]" />}
+        className="max-w-[448px]"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setTogglingContacto(null)}
+              className="h-10 rounded-[10px] border-[#e2e8f0] text-[#64748b] text-[13px]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={confirmToggleStatus}
+              className="h-10 rounded-[10px] bg-[#0379D5] hover:bg-[#0262ad] text-white border-0 text-[13px]"
+            >
+              Confirmar
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2 text-left">
+          <p className="text-[14px] text-[#64748b] leading-[22px] font-sans">
+            ¿Estás seguro de que deseas{' '}
+            <span className="font-bold text-[#333]">
+              {(togglingContacto?.activo !== undefined ? togglingContacto.activo : togglingContacto?.estado === 'ACTIVO') ? 'desactivar' : 'activar'}
+            </span>{' '}
+            el contacto{' '}
+            <span className="font-bold text-[#333]">{togglingContacto?.razonSocial || togglingContacto?.nombre}</span>
+            {togglingContacto?.rnc ? (
+              <>
+                {' '}
+                (RNC/Cédula: <span className="font-bold text-[#333]">{formatRnc(togglingContacto.rnc)}</span>)
+              </>
+            ) : togglingContacto?.identificadorExtranjero ? (
+              <>
+                {' '}
+                (ID Extranjero: <span className="font-bold text-[#333]">{togglingContacto.identificadorExtranjero}</span>)
+              </>
+            ) : togglingContacto?.idExtranjero ? (
+              <>
+                {' '}
+                (ID Extranjero: <span className="font-bold text-[#333]">{togglingContacto.idExtranjero}</span>)
+              </>
+            ) : ''}
+            ?
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Building2, User, CreditCard, Mail, Phone, Edit, MapPin, AlignLeft, ChevronDown } from 'lucide-react'
+import { Building2, User, CreditCard, Mail, Phone, Edit, MapPin, AlignLeft, ChevronDown, Check } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { NuevoContactoData } from '@/hooks/useContactos'
 import { Select } from '@/components/ui/select'
+import { useRncValidation } from '@/hooks/useRncValidation'
+import { Spinner } from '@/components/ui/spinner'
 
 interface EditarClienteModalProps {
   open: boolean
@@ -59,6 +61,7 @@ function formatPhoneInput(value: string): string {
 
 export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarClienteModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
+  const [tipo, setTipo] = useState<'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'>('CLIENTE')
   const [rnc, setRnc] = useState('')
   const [idExtranjero, setIdExtranjero] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -74,6 +77,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
   useEffect(() => {
     if (contacto) {
       setNombre(contacto.razonSocial || contacto.nombre || '')
+      setTipo(contacto.tipo || 'CLIENTE')
       setRnc(contacto.rnc ? formatRncInput(contacto.rnc) : '')
       setIdExtranjero(contacto.identificadorExtranjero || contacto.idExtranjero || '')
       setTelefono(contacto.telefono ? formatPhoneInput(contacto.telefono) : '')
@@ -102,6 +106,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
 
   function reset(): void {
     setNombre('')
+    setTipo('CLIENTE')
     setRnc('')
     setIdExtranjero('')
     setTelefono('')
@@ -114,16 +119,28 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
     setNombreTouched(false)
   }
 
+  const cleanRnc = rnc.replace(/\D/g, '')
+  const isEligibleForValidation = tipo !== 'CONSUMIDOR_FINAL' && (cleanRnc.length === 9 || cleanRnc.length === 11)
+  const { status: rncStatus, razonSocial: validatedRazonSocial, error: rncError } = useRncValidation(
+    isEligibleForValidation ? cleanRnc : ''
+  )
+
+  useEffect(() => {
+    if (isEligibleForValidation && rncStatus === 'valid' && validatedRazonSocial) {
+      setNombre(validatedRazonSocial)
+      setNombreTouched(true)
+    }
+  }, [rncStatus, validatedRazonSocial, isEligibleForValidation])
+
   function handleSave(): void {
     if (!nombre.trim() || !contacto) return
     const cleanRnc = rnc.replace(/\D/g, '')
-    const resolvedTipo = cleanRnc.length === 9 ? 'EMPRESA' : 'PERSONA'
     onSave(contacto.id, {
       nombre,
       rnc: cleanRnc,
       email,
       telefono: telefono.replace(/\D/g, ''),
-      tipo: resolvedTipo,
+      tipo,
       idExtranjero,
       direccion,
       provincia,
@@ -138,9 +155,12 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
     onClose()
   }
 
-  const isValid = nombre.trim().length > 0 && (rnc.replace(/\D/g, '').length >= 9 || idExtranjero.trim().length > 0)
+  const isRncOrIdExtranjeroValid = rnc.replace(/\D/g, '').length >= 9 || idExtranjero.trim().length > 0
+  const isValid = nombre.trim().length > 0 && (tipo === 'CONSUMIDOR_FINAL' || isRncOrIdExtranjeroValid)
   
-  const showRncError = rncTouched && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
+  const showRncError = rncTouched && tipo !== 'CONSUMIDOR_FINAL' && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
+  const validationError = tipo !== 'CONSUMIDOR_FINAL' && rncStatus === 'invalid' ? rncError : ''
+  const displayRncError = showRncError ? "Este campo es requerido" : validationError
   const showNombreError = nombreTouched && !nombre.trim()
 
   const municipiosDisponibles = provincia ? (PROVINCIAS_MUNICIPIOS[provincia] || []) : []
@@ -149,8 +169,8 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
     <Modal
       open={open}
       onClose={handleClose}
-      title="Editar Cliente"
-      subtitle="Complete o actualice la información del cliente"
+      title="Editar Contacto"
+      subtitle="Complete o actualice la información del contacto"
       icon={<Edit size={20} />}
       className="max-w-[740px]"
       footer={
@@ -172,7 +192,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
               size="md"
               disabled={!isValid}
               onClick={handleSave}
-              className="flex items-center justify-center gap-1 h-[42px] w-[168px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
+              className="flex items-center justify-center gap-[4px] h-[42px] px-[20px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal whitespace-nowrap"
             >
               <Edit size={16} />
               Guardar Cambios
@@ -182,15 +202,37 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
       }
     >
       <div className="flex flex-col gap-[20px] select-none text-left pt-2">
+        {/* Tipo de Contacto Dropdown */}
+        <div className="flex flex-col gap-1.5 w-full">
+          <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Tipo de Contacto *</label>
+          <Select
+            value={tipo}
+            onChange={(val) => setTipo(val as any)}
+            options={[
+              { value: 'CLIENTE', label: 'Cliente' },
+              { value: 'PROVEEDOR', label: 'Proveedor' },
+              { value: 'CONSUMIDOR_FINAL', label: 'Consumidor Final' },
+            ]}
+            placeholder="Seleccionar tipo"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           
           {/* Left Column */}
           <div className="flex flex-col gap-4">
             {/* Rnc / Cédula */}
             <Input
-              label="Rnc / Cédula *"
+              label={tipo === 'CONSUMIDOR_FINAL' ? "Rnc / Cédula" : "Rnc / Cédula *"}
               placeholder="Ej: 130-56789-1"
               leftIcon={<CreditCard size={16} className="text-[#64748B]" />}
+              rightIcon={
+                rncStatus === 'loading' ? (
+                  <Spinner size={16} />
+                ) : rncStatus === 'valid' ? (
+                  <Check size={16} className="text-green-600" />
+                ) : null
+              }
               inputMode="numeric"
               maxLength={13}
               value={rnc}
@@ -199,7 +241,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
                 setRncTouched(true)
               }}
               onBlur={() => setRncTouched(true)}
-              {...(showRncError ? { error: "Este campo es requerido" } : {})}
+              {...(displayRncError ? { error: displayRncError } : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
 

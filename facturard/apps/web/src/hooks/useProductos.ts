@@ -19,6 +19,7 @@ export interface Producto {
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
+  descripcion?: string
 }
 
 export interface NuevoProductoData {
@@ -33,6 +34,7 @@ export interface NuevoProductoData {
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
+  descripcion?: string
 }
 
 export interface UseProductosParams {

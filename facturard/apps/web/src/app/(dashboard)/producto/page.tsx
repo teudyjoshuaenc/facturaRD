@@ -7,14 +7,14 @@ import {
   Plus,
   Wrench,
   Package,
-  TrendingUp,
   Copy,
   Edit2,
   Trash2,
   CheckCircle2,
   XCircle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProductos } from '@/hooks/useProductos'
@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils'
 import { ProductDetailPanel } from '@/components/producto/ProductDetailPanel'
 import { EditarProductoModal } from '@/components/producto/EditarProductoModal'
 import { ConfirmDeleteModal } from '@/components/producto/ConfirmDeleteModal'
+import { Modal } from '@/components/ui/modal'
 import { useUI } from '@/lib/context/UIContext'
 import { toast } from 'sonner'
 
@@ -54,18 +55,28 @@ type ItbisFilter = 'todos' | 'I1' | 'I2' | 'I3' | 'E'
 type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO'
 
 export default function ProductosPage(): JSX.Element {
-  const { allProductos, crearProducto, actualizarProducto, eliminarProducto, refetch, isFetching } = useProductos()
   const { globalSearch } = useUI()
   const [search, setSearch] = useState('')
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos')
   const [itbisFilter, setItbisFilter] = useState<ItbisFilter>('todos')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [page, setPage] = useState(1)
+
+  const useProductosParams = useMemo(() => {
+    const params: { activo?: boolean } = {}
+    if (estadoFilter !== 'todos') {
+      params.activo = estadoFilter === 'ACTIVO'
+    }
+    return params
+  }, [estadoFilter])
+
+  const { allProductos, crearProducto, actualizarProducto, eliminarProducto, refetch, isFetching } = useProductos(useProductosParams)
   const [openModal, setOpenModal] = useState(false)
 
   const [selectedProducto, setSelectedProducto] = useState<any | null>(null)
   const [editingProducto, setEditingProducto] = useState<any | null>(null)
   const [deletingProducto, setDeletingProducto] = useState<any | null>(null)
+  const [togglingProducto, setTogglingProducto] = useState<any | null>(null)
 
   const [localMockOverrides, setLocalMockOverrides] = useState<Record<string, any>>({})
   const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
@@ -73,9 +84,9 @@ export default function ProductosPage(): JSX.Element {
   // Mock initial dataset matching Foto 2 to make it high-fidelity
   const extendedProductos = useMemo(() => {
     const list = [
-      { id: 'mock-p1', nombre: 'Consultoría tecnológica', codigo: 'SRV-001 · Hora', tipo: 'SERVICIO' as const, precio: 84999.99, indicadorFacturacion: 'I1', precioFinal: 100299.99, uso: 42, estado: 'ACTIVO' },
-      { id: 'mock-p2', nombre: 'Licencia de software anual', codigo: 'SRV-002 · Hora', tipo: 'BIEN' as const, precio: 21271.19, indicadorFacturacion: 'I1', precioFinal: 25100.00, uso: 18, estado: 'ACTIVO' },
-      { id: 'mock-p3', nombre: 'Soporte técnico mensual', codigo: 'SRV-003 · Hora', tipo: 'SERVICIO' as const, precio: 15000.00, indicadorFacturacion: 'I1', precioFinal: 17700.00, uso: 21, estado: 'ACTIVO' },
+      { id: 'mock-p1', nombre: 'Consultoría tecnológica', codigo: 'SRV-001 · Hora', tipo: 'SERVICIO' as const, precio: 84999.99, indicadorFacturacion: 'I1', precioFinal: 100299.99, estado: 'ACTIVO' },
+      { id: 'mock-p2', nombre: 'Licencia de software anual', codigo: 'SRV-002 · Hora', tipo: 'BIEN' as const, precio: 21271.19, indicadorFacturacion: 'I1', precioFinal: 25100.00, estado: 'ACTIVO' },
+      { id: 'mock-p3', nombre: 'Soporte técnico mensual', codigo: 'SRV-003 · Hora', tipo: 'SERVICIO' as const, precio: 15000.00, indicadorFacturacion: 'I1', precioFinal: 17700.00, estado: 'ACTIVO' },
     ]
 
     // Apply mock deletions
@@ -111,7 +122,6 @@ export default function ProductosPage(): JSX.Element {
           precio: p.precio,
           indicadorFacturacion: p.indicadorFacturacion,
           precioFinal: p.precio * (1 + rate),
-          uso: 5,
           estado: p.activo !== false ? 'ACTIVO' : 'INACTIVO',
         })
       }
@@ -120,6 +130,12 @@ export default function ProductosPage(): JSX.Element {
   }, [allProductos, deletedMockIds, localMockOverrides])
 
   async function handleToggleEstado(p: any) {
+    setTogglingProducto(p)
+  }
+
+  async function confirmToggleEstado() {
+    if (!togglingProducto) return
+    const p = togglingProducto
     const nuevoEstado = p.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
     const nuevoActivo = nuevoEstado === 'ACTIVO'
 
@@ -145,6 +161,7 @@ export default function ProductosPage(): JSX.Element {
         // error toast handled by mutation
       }
     }
+    setTogglingProducto(null)
   }
 
   async function handleEditSave(id: string, data: any) {
@@ -261,7 +278,7 @@ export default function ProductosPage(): JSX.Element {
   const totalPages = Math.ceil(filtered.length / 10) || 1
 
   const ITBIS_LABELS: Record<string, string> = { I1: '18%', I2: '16%', I3: '0%', I4: 'Exento', E: 'Exento' }
-  const nameColClass = selectedProducto ? "min-w-[200px]" : "w-[350px] max-w-[350px]"
+  const nameColClass = selectedProducto ? "min-w-[200px]" : "w-[500px] max-w-[500px]"
   const priceColClass = selectedProducto ? "w-[155px] max-w-[155px] truncate" : ""
 
   return (
@@ -359,9 +376,8 @@ export default function ProductosPage(): JSX.Element {
                     <th className={cn("px-4 py-3 font-semibold", priceColClass)}>Precio</th>
                     <th className="px-4 py-3 font-semibold">ITBIS</th>
                     <th className={cn("px-4 py-3 font-semibold", priceColClass)}>Precio final</th>
-                    <th className="px-4 py-3 font-semibold">Uso</th>
                     <th className="px-4 py-3 font-semibold">Estado</th>
-                    <th className="px-4 py-3 font-semibold text-right pr-6">Acciones</th>
+                    <th className="px-4 py-3 font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -408,12 +424,7 @@ export default function ProductosPage(): JSX.Element {
                         >
                           {p.precioFinal === 0 ? '0.00' : formatCurrency(p.precioFinal)}
                         </td>
-                        <td className="px-4 py-3.5 text-text-secondary text-body-sm font-semibold">
-                          <div className="flex items-center gap-1.5">
-                            <TrendingUp size={14} className="text-green-500" />
-                            <span>{p.uso}</span>
-                          </div>
-                        </td>
+
                         <td className="px-4 py-3.5">
                           <button
                             type="button"
@@ -436,8 +447,8 @@ export default function ProductosPage(): JSX.Element {
                             )}
                           </button>
                         </td>
-                        <td className="px-4 py-3.5 text-right pr-6">
-                          <div className="flex items-center justify-end gap-3.5">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3.5">
                             <button
                               type="button"
                               title="Duplicar"
@@ -478,7 +489,7 @@ export default function ProductosPage(): JSX.Element {
                   })}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-body-sm text-text-secondary">
+                      <td colSpan={7} className="px-4 py-12 text-center text-body-sm text-text-secondary">
                         No se encontraron productos en el catálogo.
                       </td>
                     </tr>
@@ -553,6 +564,53 @@ export default function ProductosPage(): JSX.Element {
         onClose={() => setOpenModal(false)}
         onSave={crearProducto}
       />
+
+      <Modal
+        open={togglingProducto !== null}
+        onClose={() => setTogglingProducto(null)}
+        title={togglingProducto?.estado === 'ACTIVO' ? 'Desactivar producto' : 'Activar producto'}
+        subtitle=""
+        icon={<AlertTriangle size={20} className="text-[#f79009]" />}
+        className="max-w-[448px]"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setTogglingProducto(null)}
+              className="h-10 rounded-[10px] border-[#e2e8f0] text-[#64748b] text-[13px]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={confirmToggleEstado}
+              className="h-10 rounded-[10px] bg-[#0379D5] hover:bg-[#0262ad] text-white border-0 text-[13px]"
+            >
+              Confirmar
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2 text-left">
+          <p className="text-[14px] text-[#64748b] leading-[22px] font-sans">
+            ¿Estás seguro de que deseas{' '}
+            <span className="font-bold text-[#333]">
+              {togglingProducto?.estado === 'ACTIVO' ? 'desactivar' : 'activar'}
+            </span>{' '}
+            el producto{' '}
+            <span className="font-bold text-[#333]">{togglingProducto?.nombre}</span>
+            {togglingProducto?.codigo ? (
+              <>
+                {' '}
+                (Código/SKU: <span className="font-bold text-[#333]">{togglingProducto.codigo}</span>)
+              </>
+            ) : ''}
+            ?
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

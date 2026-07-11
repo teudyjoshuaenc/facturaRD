@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { JSX } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Download, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
 import { FacturaRow } from '@/components/facturas/FacturaRow'
@@ -10,9 +11,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
+import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
 import { Comprobante } from '@/lib/comprobantes'
 import { useComprobantes } from '@/hooks/useComprobantes'
+import { api, getErrorMessage } from '@/lib/api'
+import { toast } from 'sonner'
 import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
+import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 import {
   ESTADO_LABELS,
   ESTADO_BADGE_VARIANT,
@@ -22,6 +27,7 @@ import {
 } from '@/lib/comprobantes'
 
 export default function FacturasPage(): JSX.Element {
+  const router = useRouter()
   const {
     comprobantes,
     paginationData,
@@ -52,7 +58,35 @@ export default function FacturasPage(): JSX.Element {
     refetch,
   } = useComprobantes()
 
+  const { blockingReason } = useEmissionStatus()
+
   const [reenviarComprobante, setReenviarComprobante] = useState<Comprobante | null>(null)
+  const [comprobanteToEmit, setComprobanteToEmit] = useState<Comprobante | null>(null)
+  const [emittingId, setEmittingId] = useState<string | null>(null)
+
+  async function executeEmit(c: Comprobante) {
+    setEmittingId(c.id)
+    try {
+      await api.post(`/comprobantes/${c.id}/emitir`)
+      toast.success('Comprobante emitido exitosamente')
+      refetch()
+      setSelectedId(null)
+    } catch (err) {
+      toast.error('Error al emitir comprobante', { description: getErrorMessage(err) })
+    } finally {
+      setEmittingId(null)
+      setComprobanteToEmit(null)
+    }
+  }
+
+  async function handleEmitir(c: Comprobante) {
+    if (emittingId) return
+    if (blockingReason) {
+      toast.error('Emisión bloqueada', { description: blockingReason })
+      return
+    }
+    setComprobanteToEmit(c)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,14 +94,20 @@ export default function FacturasPage(): JSX.Element {
       <div className="flex items-center justify-between select-none">
         <div className="flex flex-col items-start font-sans">
           <h1 className="text-[24px] font-semibold leading-[36px] text-[#333333]">
-            Comprobantes
+            Facturas
           </h1>
           <p className="text-[14px] font-normal leading-[21px] text-[#64748b] mt-0.5">
-            {paginationData ? `${paginationData.total} comprobantes` : `${comprobantes.length} comprobantes`} · {comprobantes.length} visibles
+            {paginationData ? `${paginationData.total} facturas` : `${comprobantes.length} facturas`} · {comprobantes.length} visibles
           </p>
         </div>
         <div className="flex items-center gap-[8px]">
-          <EditActionButton onClick={() => alert('Editar comprobante')} />
+          <EditActionButton onClick={() => {
+            if (!selectedId) {
+              toast.error('Seleccione un comprobante para editar')
+              return
+            }
+            router.push(`/nueva-factura?id=${selectedId}`)
+          }} />
           <RefreshActionButton onClick={() => refetch()} isLoading={isFetching} />
           <ExportActionButton onClick={() => alert('Exportar comprobantes')} title="Exportar comprobantes" />
         </div>
@@ -128,6 +168,7 @@ export default function FacturasPage(): JSX.Element {
                         onViewDetail={setSelectedId}
                         selected={selectedId === c.id}
                         onReenviar={setReenviarComprobante}
+                        onEmitir={handleEmitir}
                       />
                     ))}
                   </tbody>
@@ -180,6 +221,7 @@ export default function FacturasPage(): JSX.Element {
             onDownload={handleDownload}
             downloading={!!downloadingId}
             onReenviar={setReenviarComprobante}
+            onEmitir={handleEmitir}
           />
         </div>
       </div>
@@ -195,6 +237,16 @@ export default function FacturasPage(): JSX.Element {
           }}
         />
       )}
+
+      <ConfirmReemitirModal
+        open={comprobanteToEmit !== null}
+        onClose={() => setComprobanteToEmit(null)}
+        onConfirm={() => {
+          if (comprobanteToEmit) {
+            executeEmit(comprobanteToEmit)
+          }
+        }}
+      />
     </div>
   )
 }

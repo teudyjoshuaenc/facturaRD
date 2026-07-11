@@ -14,7 +14,6 @@ interface Producto {
   precio: number
   indicadorFacturacion: string
   precioFinal: number
-  uso: number
   estado: string
 }
 
@@ -97,14 +96,32 @@ export function ProductDetailPanel({
               </div>
             </div>
 
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-neutral-100 rounded-lg transition-colors flex items-center justify-center w-7 h-7 text-[#64748b] hover:text-text-primary"
-              title="Cerrar panel"
-            >
-              <X size={18} />
-            </button>
+            {/* Action Buttons Row */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => onDuplicar(producto)}
+                className="p-1 hover:bg-neutral-100 rounded-lg transition-colors flex items-center justify-center w-7 h-7 text-[#64748b] hover:text-text-primary"
+                title="Duplicar"
+              >
+                <Copy size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onEditar(producto)}
+                className="p-1 hover:bg-neutral-100 rounded-lg transition-colors flex items-center justify-center w-7 h-7 text-[#64748b] hover:text-text-primary"
+                title="Editar"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button
+                onClick={onClose}
+                className="p-1 hover:bg-neutral-100 rounded-lg transition-colors flex items-center justify-center w-7 h-7 text-[#64748b] hover:text-text-primary"
+                title="Cerrar panel"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -145,9 +162,6 @@ export function ProductDetailPanel({
               <span className="text-[#64748b]">Tipo de producto</span>
               <span className="text-text-primary font-medium">{isService ? 'Servicio' : 'Bien'}</span>
 
-              <span className="text-[#64748b]">Uso en facturación</span>
-              <span className="text-text-primary font-medium">{producto.uso} facturas</span>
-
               <span className="text-[#64748b]">Estado del catálogo</span>
               <div>
                 <button
@@ -172,31 +186,15 @@ export function ProductDetailPanel({
       </div>
 
       {/* Footer Actions */}
-      <div className="border-t border-[#e4e7ec] p-5 flex flex-col gap-2">
+      <div className="border-t border-[#e4e7ec] p-5">
         <button
-          onClick={() => onEditar(producto)}
-          className="bg-[#0379d5] hover:bg-[#0262ad] text-white rounded-[10px] py-2.5 px-4 font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors w-full"
+          type="button"
+          onClick={() => onEliminar(producto)}
+          className="w-full border border-[#fca5a5] hover:bg-red-50 text-red-600 rounded-[10px] py-2.5 px-4 font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors focus:outline-none"
         >
-          <Edit2 size={13} />
-          Editar
+          <Trash2 size={13} />
+          Eliminar producto
         </button>
-
-        <div className="flex gap-2.5">
-          <button
-            onClick={() => onDuplicar(producto)}
-            className="flex-1 border border-[#e2e8f0] hover:bg-neutral-50 text-[#333] rounded-[10px] py-2 px-3 text-[12px] flex items-center justify-center gap-2 transition-colors"
-          >
-            <Copy size={13} />
-            duplicar
-          </button>
-          <button
-            onClick={() => onEliminar(producto)}
-            className="flex-1 border border-[#fca5a5] hover:bg-red-50 text-red-600 rounded-[10px] py-2 px-3 text-[12px] flex items-center justify-center gap-2 transition-colors"
-          >
-            <Trash2 size={13} />
-            Eliminar
-          </button>
-        </div>
       </div>
     </div>
   )

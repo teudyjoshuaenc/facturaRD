@@ -18,7 +18,6 @@ interface Producto {
   precio: number
   indicadorFacturacion: string
   precioFinal: number
-  uso: number
   estado: string
 }
 

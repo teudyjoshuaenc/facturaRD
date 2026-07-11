@@ -1,42 +1,70 @@
 'use client'
 
 import { Suspense, type JSX } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ComprobanteForm } from '@/components/nueva-factura/ComprobanteForm'
 import { useNuevaFactura } from '@/hooks/useNuevaFactura'
 import type { ComprobanteFormData } from '@/hooks/useNuevaFactura'
 import { Spinner } from '@/components/ui/spinner'
+import { api } from '@/lib/api'
 
-export default function NuevaFacturaPage(): JSX.Element {
+function NuevaFacturaContent(): JSX.Element {
   const router = useRouter()
-  const { createComprobante } = useNuevaFactura()
+  const searchParams = useSearchParams()
+  const draftId = searchParams.get('id')
+  const { createComprobante, updateComprobante } = useNuevaFactura()
 
   async function handleSubmit(data: ComprobanteFormData): Promise<void> {
-    const res = await createComprobante(data)
-    if (data.emitirConComprobante === false) {
-      toast.success('Factura creada exitosamente como borrador/factura interna', {
-        description: `Código asignado: ${res.eNCF}`,
-      })
-      router.push('/facturas')
+    if (draftId) {
+      // 1. Update the draft with the corrected values first
+      await updateComprobante(draftId, data)
+      
+      if (data.emitirConComprobante === false) {
+        toast.success('Borrador actualizado exitosamente')
+        router.push('/facturas')
+      } else {
+        // 2. Transition it to emission pipeline (real send)
+        const emitRes = await api.post(`/comprobantes/${draftId}/emitir`)
+        const emitData = emitRes.data
+        toast.success('Comprobante emitido exitosamente y enviado a la DGII', {
+          description: `e-NCF asignado: ${emitData.eNCF}`,
+        })
+        router.push(`/nueva-factura/exito?id=${emitData.id}&encf=${emitData.eNCF}&total=${emitData.montoTotal}`)
+      }
     } else {
-      toast.success('Factura enviada a la DGII, verifica el estado en unos segundos', {
-        description: `e-NCF asignado: ${res.eNCF}`,
-      })
-      router.push(`/nueva-factura/exito?id=${res.id}&encf=${res.eNCF}&total=${res.montoTotal}`)
+      // Create new comprobante
+      const res = await createComprobante(data)
+      if (data.emitirConComprobante === false) {
+        toast.success('Factura creada exitosamente como borrador/factura interna', {
+          description: `Código asignado: ${res.eNCF || 'DRAFT'}`,
+        })
+        router.push('/facturas')
+      } else {
+        toast.success('Factura enviada a la DGII, verifica el estado en unos segundos', {
+          description: `e-NCF asignado: ${res.eNCF}`,
+        })
+        router.push(`/nueva-factura/exito?id=${res.id}&encf=${res.eNCF}&total=${res.montoTotal}`)
+      }
     }
   }
 
+  return (
+    <ComprobanteForm
+      onSubmit={handleSubmit}
+      onError={(msg) => toast.error('Error al guardar', { description: msg })}
+    />
+  )
+}
+
+export default function NuevaFacturaPage(): JSX.Element {
   return (
     <Suspense fallback={
       <div className="flex h-64 items-center justify-center">
         <Spinner size={32} />
       </div>
     }>
-      <ComprobanteForm
-        onSubmit={handleSubmit}
-        onError={(msg) => toast.error('Error al emitir', { description: msg })}
-      />
+      <NuevaFacturaContent />
     </Suspense>
   )
 }
