@@ -140,7 +140,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
       precio: Number(precio),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
-      descripcion: descripcion || undefined,
+      ...(descripcion ? { descripcion } : {}),
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
     })
     reset()
