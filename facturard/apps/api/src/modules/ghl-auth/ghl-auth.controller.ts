@@ -42,29 +42,37 @@ export class GhlAuthController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Registra un nuevo tenant (RNC + P12 + passphrase) en una transacción atómica (sin JWT)',
+    summary: 'Registra un nuevo tenant (RNC/Cédula, certificado OPCIONAL) en una transacción atómica (sin JWT)',
     description:
-      'Multipart/form-data: locationId, rnc, passphrase y el archivo P12 en el campo "file". ' +
-      'Crea tenant + location + secuencias + certificado cifrado en una sola transacción. ' +
-      'Devuelve el JWT del tenant recién creado.',
+      'Multipart/form-data: locationId, rnc y opcionalmente passphrase + archivo P12 en "file". ' +
+      'Con certificado → tenant listo para emitir. Sin certificado → tenant operativo para ' +
+      'cotizar y guardar borradores, pero sin emitir hasta certificarse. Crea tenant + location + ' +
+      'secuencias (+ certificado si vino) en una sola transacción. Devuelve el JWT del tenant nuevo.',
   })
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['file', 'locationId', 'rnc', 'passphrase'],
+      required: ['locationId', 'rnc'],
       properties: {
-        file: { type: 'string', format: 'binary', description: 'Archivo .p12 / .pfx' },
+        file: { type: 'string', format: 'binary', description: 'Archivo .p12 / .pfx (opcional)' },
         locationId: { type: 'string' },
-        rnc: { type: 'string' },
-        passphrase: { type: 'string' },
+        rnc: { type: 'string', description: 'RNC (9 díg.) o Cédula (11 díg.)' },
+        tipoIdentificacion: { type: 'string', enum: ['RNC', 'CEDULA'] },
+        razonSocial: { type: 'string', description: 'Nombre manual (respaldo para cédula sin padrón)' },
+        passphrase: { type: 'string', description: 'Passphrase del P12 (obligatoria si se envía archivo)' },
       },
     },
   })
   onboarding(
-    @UploadedFile(new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: MAX_P12_SIZE })] }))
-    file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_P12_SIZE })],
+        fileIsRequired: false,
+      }),
+    )
+    file: Express.Multer.File | undefined,
     @Body() dto: GhlOnboardingDto,
   ): Promise<GhlOnboardingResult> {
-    return this.ghlAuthService.onboarding(dto, file.buffer, dto.passphrase)
+    return this.ghlAuthService.onboarding(dto, file?.buffer, dto.passphrase)
   }
 }

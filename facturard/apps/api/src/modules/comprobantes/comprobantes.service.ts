@@ -162,6 +162,29 @@ export class ComprobantesService {
     return undefined
   }
 
+  /**
+   * Barrera de emisión: un tenant solo puede ENVIAR a la DGII si tiene un
+   * certificado digital activo y vigente. Sin él, lanza 409 con un mensaje claro
+   * y accionable. NO afecta borradores (DRAFT) ni cotizaciones — esos flujos no
+   * llaman a este método. Es la protección de servidor: no basta con ocultar el
+   * botón en el front.
+   */
+  private async assertPuedeEmitir(tenantId: string): Promise<void> {
+    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
+    if (!cert) {
+      throw new ConflictException(
+        'No puedes emitir a la DGII sin un certificado digital activo. ' +
+          'Configúralo en Configuración → Certificación fiscal (o guarda el comprobante como borrador).',
+      )
+    }
+    if (cert.validoHasta.getTime() < Date.now()) {
+      throw new ConflictException(
+        `Tu certificado digital venció el ${cert.validoHasta.toLocaleDateString('es-DO')}. ` +
+          'Sube uno vigente en Configuración → Certificación fiscal para volver a emitir.',
+      )
+    }
+  }
+
   async crear(tenantId: string, dtoOriginal: CreateComprobanteDto): Promise<Comprobante> {
     // Resuelve snapshots de producto (items) y del comprador (contacto) ANTES de
     // calcular totales y persistir, para que el documento sea inmutable.
@@ -189,9 +212,8 @@ export class ComprobantesService {
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(dto, totales.montoTotal)
 
-    // 1. Verificar que el tenant tiene certificado activo
-    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
-    if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
+    // 1. Verificar que el tenant tiene certificado activo (barrera de emisión).
+    await this.assertPuedeEmitir(tenantId)
 
     // 2. Resolver FechaVencimientoSecuencia ANTES de consumir la secuencia
     //    (si falta y el tipo la exige, se lanza error sin gastar un e-NCF).
@@ -339,8 +361,7 @@ export class ComprobantesService {
       throw new ConflictException('El comprobante ya fue emitido o no es un borrador')
     }
 
-    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
-    if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
+    await this.assertPuedeEmitir(tenantId)
 
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.

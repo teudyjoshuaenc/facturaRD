@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
-import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
@@ -24,6 +25,12 @@ const WIZARD_STEPS = [
 ]
 
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
+
+// Mensaje cuando el tenant no tiene certificado digital activo: no puede emitir a
+// la DGII, pero sí guardar borradores. Enlaza a la Certificación fiscal.
+const CERT_BLOCK_MSG =
+  'Para enviar facturas a la DGII necesitas un certificado digital. Configúralo en ' +
+  'Configuración → Certificación fiscal, o contáctanos para ayudarte a certificarte.'
 
 const TIPO_ECF_LABELS: Record<TipoECF, string> = {
   E31: 'B01 - Factura de Crédito Fiscal Electrónica (E31)',
@@ -138,14 +145,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         const cert = certRes.data
         if (!cert || !cert.activo) {
           setHasCertIssue(true)
-          setBlockingReason('No hay un certificado digital activo configurado para la empresa.')
+          setBlockingReason(CERT_BLOCK_MSG)
         } else {
           const days = Math.ceil(
             (new Date(cert.validoHasta).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
           )
           if (days <= 0) {
             setHasCertIssue(true)
-            setBlockingReason('El certificado digital configurado ha expirado.')
+            setBlockingReason(CERT_BLOCK_MSG)
           }
         }
       } catch (err: any) {
@@ -155,7 +162,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           setBlockingReason(msg)
         } else if (err.response?.status === 404) {
           setHasCertIssue(true)
-          setBlockingReason('No hay un certificado digital activo configurado para la empresa.')
+          setBlockingReason(CERT_BLOCK_MSG)
         } else {
           console.error('Error checking active certificate:', err)
         }
@@ -732,9 +739,20 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 {blockingReason && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[12px] text-red-700 font-semibold leading-normal text-left font-sans flex items-start gap-2 select-none mb-1">
                     <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-[13px]">Emisión Bloqueada</p>
+                    <div className="min-w-0">
+                      <p className="font-bold text-[13px]">
+                        {hasCertIssue ? 'Necesitas un certificado digital' : 'Emisión Bloqueada'}
+                      </p>
                       <p className="font-normal mt-0.5 text-[11px] leading-snug">{blockingReason}</p>
+                      {hasCertIssue && (
+                        <Link
+                          href="/configuracion#certificacion-fiscal"
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#0379D5] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#0379D5]/90"
+                        >
+                          <ShieldCheck size={13} />
+                          Ir a Certificación fiscal
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}

@@ -6,9 +6,11 @@ import type { TenantInfo } from '@/lib/session'
 interface Props {
   tenant: TenantInfo
   onContinue: () => void
+  /** false → tenant sin certificado: podrá cotizar/borradores, no emitir aún. */
+  puedeEmitir?: boolean
 }
 
-export function SuccessStep({ tenant, onContinue }: Props): JSX.Element {
+export function SuccessStep({ tenant, onContinue, puedeEmitir = true }: Props): JSX.Element {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success-500/10">
@@ -16,7 +18,11 @@ export function SuccessStep({ tenant, onContinue }: Props): JSX.Element {
       </div>
       <div className="flex flex-col gap-1">
         <h2 className="text-h4 text-text-primary">Cuenta creada</h2>
-        <p className="text-body-sm text-text-secondary">Ya puedes emitir tu primera factura.</p>
+        <p className="text-body-sm text-text-secondary">
+          {puedeEmitir
+            ? 'Ya puedes emitir tu primera factura.'
+            : 'Empieza a cotizar y preparar tus facturas. Cuando quieras enviarlas a la DGII, actívalo en Configuración → Certificación fiscal.'}
+        </p>
       </div>
 
       <div className="w-full rounded-lg border border-border bg-background-canvas p-4 text-left">
@@ -37,7 +43,7 @@ export function SuccessStep({ tenant, onContinue }: Props): JSX.Element {
       </div>
 
       <Button variant="primary" size="lg" className="w-full" onClick={onContinue}>
-        Emitir mi primera factura
+        {puedeEmitir ? 'Emitir mi primera factura' : 'Empezar a facturar'}
         <ArrowRight size={18} />
       </Button>
     </div>

@@ -3,18 +3,16 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Check, Copy, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Check, Copy, RefreshCw, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { CertificateDropzone } from '@/components/certificados/certificate-dropzone'
 import { GhlContactosCard } from '@/components/configuracion/GhlContactosCard'
-import { api, getErrorMessage } from '@/lib/api'
-import { useCertificado } from '@/hooks/useCertificado'
-import { formatDate } from '@/lib/comprobantes'
+import { CertificacionFiscalCard } from '@/components/configuracion/CertificacionFiscalCard'
+import { api } from '@/lib/api'
 
 interface TenantFull {
   id: string
@@ -56,23 +54,6 @@ export default function ConfiguracionPage(): JSX.Element {
     queryKey: ['tenant-info'],
     queryFn: () => api.get<TenantFull[]>('/tenants').then((res) => res.data[0]),
   })
-
-  const {
-    certificado,
-    isLoading: certLoading,
-    diasParaVencer,
-    porVencer,
-    showForm,
-    setShowForm,
-    file,
-    setFile,
-    passphrase,
-    setPassphrase,
-    submitting: certSubmitting,
-    error: certError,
-    handleUpload: handleUploadCertificado,
-    handleCancel: handleCancelCert,
-  } = useCertificado()
 
   const { data: webhooks, isLoading: webhooksLoading } = useQuery({
     queryKey: ['webhooks'],
@@ -144,98 +125,8 @@ export default function ConfiguracionPage(): JSX.Element {
         </CardContent>
       </Card>
 
-      {/* 2. Certificado digital */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Certificado digital</CardTitle>
-          <CardDescription>
-            Certificado P12 usado para firmar tus comprobantes fiscales
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {certLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Spinner size={24} />
-            </div>
-          ) : certificado ? (
-            <>
-              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-ui-sm text-text-secondary">Titular</dt>
-                  <dd className="text-body-base text-text-primary">{certificado.titular}</dd>
-                </div>
-                <div>
-                  <dt className="text-ui-sm text-text-secondary">RNC</dt>
-                  <dd className="text-body-base text-text-primary">{certificado.rnc}</dd>
-                </div>
-                <div>
-                  <dt className="text-ui-sm text-text-secondary">Vigencia</dt>
-                  <dd className="text-body-base text-text-primary">
-                    {formatDate(certificado.validoDesde)} → {formatDate(certificado.validoHasta)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-ui-sm text-text-secondary">Estado</dt>
-                  <dd>
-                    <Badge variant={certificado.activo ? 'success' : 'neutral'}>
-                      {certificado.activo ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </dd>
-                </div>
-              </dl>
-
-              {porVencer && (
-                <div className="flex items-center gap-2 rounded-lg border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
-                  <AlertTriangle size={18} />
-                  <span>
-                    {diasParaVencer !== null && diasParaVencer >= 0
-                      ? `Tu certificado vence en ${diasParaVencer} días. Actualízalo para evitar interrupciones.`
-                      : 'Tu certificado ha vencido. Actualízalo lo antes posible.'}
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-body-sm text-text-secondary">
-              No hay certificado digital configurado.
-            </p>
-          )}
-
-          {!showForm ? (
-            <Button variant="secondary" className="self-start" onClick={() => setShowForm(true)}>
-              {certificado ? 'Reemplazar certificado' : 'Cargar certificado'}
-            </Button>
-          ) : (
-            <div className="flex flex-col gap-4 border-t border-border-subtle pt-4">
-              <CertificateDropzone file={file} onFileChange={setFile} />
-              <Input
-                label="Contraseña del certificado *"
-                type="password"
-                placeholder="Passphrase del .p12"
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-              />
-              {certError && <p className="text-ui-sm text-danger-600">{certError}</p>}
-              <div className="flex gap-3">
-                <Button variant="secondary" onClick={handleCancelCert} disabled={certSubmitting}>
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={!file || !passphrase || certSubmitting}
-                  onClick={handleUploadCertificado}
-                >
-                  {certSubmitting ? (
-                    <Spinner size={18} className="text-white" />
-                  ) : (
-                    'Guardar certificado'
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* 2. Certificación fiscal (certificado + secuencias) */}
+      <CertificacionFiscalCard />
 
       {/* 3. Integración GoHighLevel */}
       <Card>
