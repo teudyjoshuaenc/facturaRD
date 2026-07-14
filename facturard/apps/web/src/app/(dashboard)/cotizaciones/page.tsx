@@ -271,10 +271,8 @@ function CotizacionesPageInner(): JSX.Element {
                 return (
                   <tr
                     key={c.id}
-                    onClick={() => setSelectedId(isSelected ? null : c.id)}
-                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] cursor-pointer transition-colors h-[52px] ${
-                      isSelected ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : 'bg-white'
-                    } ${isDeleting ? 'opacity-50' : ''}`}
+                    onClick={() => router.push(`/cotizaciones/${c.id}`)}
+                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] cursor-pointer transition-colors h-[52px] bg-white ${isDeleting ? 'opacity-50' : ''}`}
                   >
                     <td className="px-4 py-3.5 font-bold text-text-primary text-[13px] align-middle">
                       {c.folio}
