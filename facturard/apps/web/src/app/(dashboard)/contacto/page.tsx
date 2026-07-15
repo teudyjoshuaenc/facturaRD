@@ -530,62 +530,187 @@ export default function ContactosPage(): JSX.Element {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-body-sm">
+                <table className="w-full text-left text-body-sm table-auto border-collapse">
                   <thead>
-                    <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
-                      <th className="px-4 py-3">Nombre / Razón social</th>
-                      <th className="px-4 py-3">RNC / Cédula</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Origen</th>
-                      <th className="px-4 py-3">Email</th>
-                      <th className="px-4 py-3">Teléfono</th>
-                      <th className="px-4 py-3">Validación</th>
-                      <th className="px-4 py-3">Estado</th>
+                    <tr className="border-b border-neutral-200 bg-[#f8fafc] text-ui-sm font-semibold text-text-secondary h-10 select-none">
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[240px] min-w-[240px]">Nombre / Razón social</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[80px]">Tipo</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">Tipo fiscal</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Identificacion</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Validación</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">e-CF sugerido</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[85px]">Origen</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Ultima actividad</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-center w-[100px]">Estado</th>
+                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-right pr-6 w-[110px]">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibles.map((c) => (
-                      <tr key={c.id} className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
-                              {c.tipo === 'CONSUMIDOR_FINAL' ? <User size={16} /> : <Building2 size={16} />}
+                    {visibles.map((c) => {
+                      // Determine tax type label and styling
+                      let taxTypeLabel = 'CF'
+                      let taxTypeClass = 'bg-[#fdf2f8] text-[#9d174d] border-[#fbcfe8]'
+                      if (c.identificadorExtranjero) {
+                        taxTypeLabel = 'ID extranjero'
+                        taxTypeClass = 'bg-[#ecfdf5] text-[#065f46] border-[#a7f3d0]'
+                      } else if (c.rnc) {
+                        const cleanRnc = c.rnc.replace(/\D/g, '')
+                        if (cleanRnc.length === 9) {
+                          taxTypeLabel = 'RNC'
+                          taxTypeClass = 'bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]'
+                        } else if (cleanRnc.length === 11) {
+                          taxTypeLabel = 'Cédula'
+                          taxTypeClass = 'bg-neutral-50 text-neutral-800 border-neutral-200'
+                        }
+                      }
+
+                      // Determine type label and styling
+                      let typeLabel = 'Cliente'
+                      let typeClass = 'bg-neutral-50 text-neutral-800 border-neutral-200'
+                      if (c.tipo === 'PROVEEDOR') {
+                        typeLabel = 'Proveedor'
+                        typeClass = 'bg-[#fdf2f8] text-[#9d174d] border-[#fbcfe8]'
+                      } else if (c.tipo === 'CONSUMIDOR_FINAL') {
+                        typeLabel = 'Ocasional'
+                        typeClass = 'bg-[#f5f3ff] text-[#5b21b6] border-[#ddd6fe]'
+                      }
+
+                      // Determine suggested e-CF
+                      let suggestedEcf = 'E31'
+                      if (c.tipo === 'PROVEEDOR') {
+                        suggestedEcf = taxTypeLabel === 'RNC' ? 'E41' : 'E42'
+                      } else {
+                        if (taxTypeLabel === 'CF' || taxTypeLabel === 'Cédula') {
+                          suggestedEcf = 'E32'
+                        } else if (taxTypeLabel === 'ID extranjero') {
+                          suggestedEcf = 'E47'
+                        }
+                      }
+
+                      // Format activity date
+                      const activityDate = c.updatedAt || c.createdAt || new Date().toISOString()
+                      const formattedActivity = formatDate(activityDate)
+
+                      return (
+                        <tr
+                          key={c.id}
+                          onClick={() => setSelectedContacto(c)}
+                          className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors h-[72px] cursor-pointer"
+                        >
+                          <td className="px-4 py-3 w-[240px] min-w-[240px]">
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
+                                  {c.tipo === 'CONSUMIDOR_FINAL' ? <User size={16} /> : <Building2 size={16} />}
+                                </div>
+                                <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-[#0f973d] ring-2 ring-white" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-text-primary line-clamp-1">{c.razonSocial}</span>
+                                <span className="text-[11px] text-text-secondary line-clamp-1">{c.tipo === 'CONSUMIDOR_FINAL' ? 'Cliente' : 'Empresa'}</span>
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-text-primary line-clamp-1">{c.razonSocial}</span>
-                              {c.nombreComercial && (
-                                <span className="text-[11px] text-text-secondary line-clamp-1">{c.nombreComercial}</span>
+                          </td>
+                          <td className="px-4 py-3 w-[80px] font-semibold">
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] font-medium border", typeClass)}>
+                              {typeLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[95px]">
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-[6px] text-[12px] font-medium border", taxTypeClass)}>
+                              {taxTypeLabel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[110px] font-semibold text-text-primary">
+                            {formatRnc(c.rnc)}
+                          </td>
+                          <td className="px-4 py-3 w-[110px]">
+                            {c.rncValidado ? (
+                              <div className="flex items-center gap-1.5 text-green-700 font-semibold text-[13px]">
+                                <CheckCircle2 size={14} className="text-green-600" />
+                                <span>Válido</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-amber-700 font-semibold text-[13px]">
+                                <AlertTriangle size={14} className="text-amber-500" />
+                                <span>No encontrado</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 w-[95px]">
+                            <span className="inline-block bg-[rgba(100,116,139,0.1)] text-[#64748b] text-[12px] font-semibold px-2.5 py-1 rounded-[10px]">
+                              {suggestedEcf}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[85px]">
+                            {c.origen === 'GHL' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]">
+                                GHL
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-neutral-50 text-neutral-800 border-neutral-200">
+                                Manual
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 w-[110px] text-text-secondary">
+                            {formattedActivity}
+                          </td>
+                          <td className="px-4 py-3 text-center w-[100px]">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleStatus(c)
+                              }}
+                              className="focus:outline-none"
+                            >
+                              {c.activo ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-green-700 hover:bg-green-100 transition-colors">
+                                  <CheckCircle2 size={11} className="text-green-600" />
+                                  Activo
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 border border-neutral-200/50 px-2.5 py-0.5 text-ui-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
+                                  <XCircle size={11} className="text-neutral-500" />
+                                  Inactivo
+                                </span>
                               )}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3.5 text-right pr-6 w-[110px]">
+                            <div className="flex items-center justify-end gap-3.5">
+                              <button
+                                type="button"
+                                title="Emitir Factura"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (!c.rnc && !c.identificadorExtranjero) {
+                                    toast.error("Error: El RNC/Cédula es requerido para emitir factura. Por favor actualice los datos del contacto.")
+                                    return
+                                  }
+                                  router.push(`/nueva-factura?clienteId=${c.id}`)
+                                }}
+                                className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                              >
+                                <Send size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                title="Editar"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingContacto(c)
+                                }}
+                                className="text-text-secondary hover:text-brand-500 transition-colors focus:outline-none"
+                              >
+                                <Edit2 size={15} />
+                              </button>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-text-primary">{formatRnc(c.rnc)}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant={c.tipo === 'CLIENTE' ? 'info' : 'neutral'}>{TIPO_LABEL[c.tipo] ?? c.tipo}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={c.origen === 'GHL' ? 'info' : 'neutral'}>
-                            {c.origen === 'GHL' ? 'GoHighLevel' : 'Manual'}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-text-secondary">{c.email || '—'}</td>
-                        <td className="px-4 py-3 text-text-secondary">{c.telefono || '—'}</td>
-                        <td className="px-4 py-3">
-                          {c.rncValidado ? (
-                            <Badge variant="success"><CheckCircle2 size={12} /> Válido</Badge>
-                          ) : (
-                            <Badge variant="warning"><AlertTriangle size={12} /> Sin validar</Badge>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {c.activo ? (
-                            <Badge variant="success"><CheckCircle2 size={12} /> Activo</Badge>
-                          ) : (
-                            <Badge variant="neutral"><XCircle size={12} /> Inactivo</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
