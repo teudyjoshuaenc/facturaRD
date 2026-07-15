@@ -56,11 +56,11 @@ export const UMBRAL_IDENTIFICACION_E32 = 250_000
 function validarIdentificacionE32(dto: CreateComprobanteDto, montoTotal: number): void {
   if (dto.tipoECF !== 'E32' || montoTotal < UMBRAL_IDENTIFICACION_E32) return
   const tieneId =
-    (dto.rncComprador !== undefined && dto.rncComprador.trim() !== '') ||
-    (dto.identificadorExtranjero !== undefined && dto.identificadorExtranjero.trim() !== '')
+      (dto.rncComprador !== undefined && dto.rncComprador.trim() !== '') ||
+      (dto.identificadorExtranjero !== undefined && dto.identificadorExtranjero.trim() !== '')
   if (!tieneId) {
     throw new BadRequestException(
-      `Falta identificación del comprador (RNC/Cédula) para una Factura de Consumo (E32) con monto total >= RD$${UMBRAL_IDENTIFICACION_E32.toLocaleString('en-US')}.`,
+        `Falta identificación del comprador (RNC/Cédula) para una Factura de Consumo (E32) con monto total >= RD$${UMBRAL_IDENTIFICACION_E32.toLocaleString('en-US')}.`,
     )
   }
 }
@@ -128,8 +128,8 @@ function calcularTotales(items: CreateItemDto[]): {
 @Injectable()
 export class ComprobantesService {
   constructor(
-    @InjectQueue('ecf-emission') private readonly ecfQueue: Queue<EcfJobData>,
-    private readonly secuenciasService: SecuenciasService,
+      @InjectQueue('ecf-emission') private readonly ecfQueue: Queue<EcfJobData>,
+      private readonly secuenciasService: SecuenciasService,
   ) {}
 
   /**
@@ -148,15 +148,15 @@ export class ComprobantesService {
    * Tipos que por norma no la llevan (E32, E34) devuelven undefined sin error.
    */
   private resolverFechaVencimiento(
-    tipoECF: string,
-    payloadFecha: string | undefined,
-    secuenciaFecha: Date | null,
+      tipoECF: string,
+      payloadFecha: string | undefined,
+      secuenciaFecha: Date | null,
   ): string | undefined {
     if (payloadFecha) return payloadFecha
     if (secuenciaFecha) return fechaVencToDDMMYYYY(secuenciaFecha)
     if (TIPOS_REQUIEREN_FECHAVENC.has(tipoECF)) {
       throw new BadRequestException(
-        `Falta la fecha de vencimiento de la secuencia para el tipo ${tipoECF}; configúrala en Empresa/Secuencias.`,
+          `Falta la fecha de vencimiento de la secuencia para el tipo ${tipoECF}; configúrala en Empresa/Secuencias.`,
       )
     }
     return undefined
@@ -173,13 +173,13 @@ export class ComprobantesService {
     const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
     if (!cert) {
       throw new ConflictException(
-        'No puedes emitir a la DGII sin un certificado digital activo. ' +
+          'No puedes emitir a la DGII sin un certificado digital activo. ' +
           'Configúralo en Configuración → Certificación fiscal (o guarda el comprobante como borrador).',
       )
     }
     if (cert.validoHasta.getTime() < Date.now()) {
       throw new ConflictException(
-        `Tu certificado digital venció el ${cert.validoHasta.toLocaleDateString('es-DO')}. ` +
+          `Tu certificado digital venció el ${cert.validoHasta.toLocaleDateString('es-DO')}. ` +
           'Sube uno vigente en Configuración → Certificación fiscal para volver a emitir.',
       )
     }
@@ -256,13 +256,13 @@ export class ComprobantesService {
     const items = await Promise.all(dto.items.map((item) => this.resolverItem(tenantId, item)))
     for (const it of items) {
       if (
-        it.nombreItem === undefined ||
-        it.indicadorFacturacion === undefined ||
-        it.indicadorBienoServicio === undefined ||
-        it.precioUnitarioItem === undefined
+          it.nombreItem === undefined ||
+          it.indicadorFacturacion === undefined ||
+          it.indicadorBienoServicio === undefined ||
+          it.precioUnitarioItem === undefined
       ) {
         throw new BadRequestException(
-          'Cada línea requiere nombre, indicadorFacturacion, indicadorBienoServicio y precio (o un productoId válido)',
+            'Cada línea requiere nombre, indicadorFacturacion, indicadorBienoServicio y precio (o un productoId válido)',
         )
       }
     }
@@ -298,9 +298,9 @@ export class ComprobantesService {
     if (!producto) throw new BadRequestException(`Producto ${item.productoId} no encontrado`)
 
     const unidadProducto =
-      producto.unidadMedida != null && producto.unidadMedida !== '' && !Number.isNaN(Number(producto.unidadMedida))
-        ? Number(producto.unidadMedida)
-        : undefined
+        producto.unidadMedida != null && producto.unidadMedida !== '' && !Number.isNaN(Number(producto.unidadMedida))
+            ? Number(producto.unidadMedida)
+            : undefined
     const unidadMedida = item.unidadMedida ?? unidadProducto
 
     return {
@@ -322,9 +322,9 @@ export class ComprobantesService {
    * borrador — un e-CF emitido es inmutable.
    */
   async actualizarDraft(
-    tenantId: string,
-    id: string,
-    dto: UpdateComprobanteDto,
+      tenantId: string,
+      id: string,
+      dto: UpdateComprobanteDto,
   ): Promise<Comprobante> {
     const comprobante = await this.findOne(tenantId, id)
     if (comprobante.estado !== 'DRAFT') {
@@ -395,9 +395,9 @@ export class ComprobantesService {
    * fechaNCFModificado, comprobanteReferenciaId). No reimplementa la emisión.
    */
   async crearNota(
-    tenantId: string,
-    sourceId: string,
-    dto: CrearNotaDto,
+      tenantId: string,
+      sourceId: string,
+      dto: CrearNotaDto,
   ): Promise<Comprobante & { avisoITBIS?: string }> {
     const source = await this.findOne(tenantId, sourceId) // 404 tenant-scoped
     if (source.estado !== 'ACEPTADO') {
@@ -422,8 +422,8 @@ export class ComprobantesService {
       indicadorNotaCredito = dias > 30 ? 1 : 0
       if (indicadorNotaCredito === 1) {
         avisoITBIS =
-          'La nota de crédito se emite a más de 30 días calendario del comprobante afectado: ' +
-          'NO rebaja ITBIS (Ley 11-92 Art. 338 párrafo; Reglamento 293-11 Art. 8).'
+            'La nota de crédito se emite a más de 30 días calendario del comprobante afectado: ' +
+            'NO rebaja ITBIS (Ley 11-92 Art. 338 párrafo; Reglamento 293-11 Art. 8).'
       }
     }
 
@@ -473,14 +473,13 @@ export class ComprobantesService {
       ...(query.tipoECF !== undefined && { tipoECF: query.tipoECF }),
       ...rangoFechas(query.fechaDesde, query.fechaHasta),
       ...(query.search !== undefined && query.search.trim() !== ''
-        ? {
+          ? {
             OR: [
               { eNCF: { contains: query.search, mode: 'insensitive' } },
               { razonSocial: { contains: query.search, mode: 'insensitive' } },
-              { rnc: { contains: query.search, mode: 'insensitive' } },
             ],
           }
-        : {}),
+          : {}),
     }
 
     const [data, total] = await prisma.$transaction([
@@ -517,11 +516,11 @@ export class ComprobantesService {
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     const datos = comprobante.datos as unknown as CreateComprobanteDto
     const pdfInput = buildEcfPdfInput(
-      datos,
-      tenant,
-      comprobante.eNCF,
-      resolveDgiiEnv(),
-      comprobante.xmlFirmado,
+        datos,
+        tenant,
+        comprobante.eNCF,
+        resolveDgiiEnv(),
+        comprobante.xmlFirmado,
     )
 
     const tmpPath = join(tmpdir(), `ecf-${id}-${Date.now()}.pdf`)

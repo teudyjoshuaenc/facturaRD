@@ -71,11 +71,11 @@ function mapEstadoDGII(estado: EstadoECF | string | null): ComprobanteEstado {
 
 function formatMensajesDGII(mensajes: { valor: string | null; codigo: number | null }[] | null): string | null {
   return (
-    mensajes
-      ?.filter((m) => m.valor)
-      .map((m) => `[${m.codigo}] ${m.valor}`)
-      .join(' | ')
-      .substring(0, 1000) ?? null
+      mensajes
+          ?.filter((m) => m.valor)
+          .map((m) => `[${m.codigo}] ${m.valor}`)
+          .join(' | ')
+          .substring(0, 1000) ?? null
   )
 }
 
@@ -85,7 +85,7 @@ function formatMensajesDGII(mensajes: { valor: string | null; codigo: number | n
 function requireFechaVenc(datos: CreateComprobanteDto): string {
   if (!datos.fechaVencimiento) {
     throw new Error(
-      `Falta FechaVencimientoSecuencia para ${datos.tipoECF}; configúrala en Empresa/Secuencias.`,
+        `Falta FechaVencimientoSecuencia para ${datos.tipoECF}; configúrala en Empresa/Secuencias.`,
     )
   }
   return datos.fechaVencimiento
@@ -132,9 +132,9 @@ export class EcfEmissionProcessor extends WorkerHost {
   private readonly logger = new Logger(EcfEmissionProcessor.name)
 
   constructor(
-    private readonly certificadosService: CertificadosService,
-    @Inject(forwardRef(() => WebhookSenderService))
-    private readonly webhookSenderService: WebhookSenderService,
+      private readonly certificadosService: CertificadosService,
+      @Inject(forwardRef(() => WebhookSenderService))
+      private readonly webhookSenderService: WebhookSenderService,
   ) {
     super()
   }
@@ -154,8 +154,8 @@ export class EcfEmissionProcessor extends WorkerHost {
       const msg = error instanceof Error ? error.message : String(error)
       this.logger.error(`[Job ${job.id}] Error: ${msg}`)
       await prisma.comprobante
-        .update({ where: { id: comprobanteId }, data: { estado: 'ERROR', mensajeDGII: msg.substring(0, 500) } })
-        .catch(() => undefined)
+          .update({ where: { id: comprobanteId }, data: { estado: 'ERROR', mensajeDGII: msg.substring(0, 500) } })
+          .catch(() => undefined)
       throw error
     }
   }
@@ -184,8 +184,8 @@ export class EcfEmissionProcessor extends WorkerHost {
     // Generar y firmar el e-CF completo. Para el flujo RFCE se usa el generador
     // "plano" (sin InformacionReferencia), idéntico a lo aceptado en certificación.
     const xml = esRFCE
-      ? generarECF32ParaRFCE(this.buildE32Input(datos, tenant, eNCF)).xml
-      : this.generateXml(datos, tenant, eNCF)
+        ? generarECF32ParaRFCE(this.buildE32Input(datos, tenant, eNCF)).xml
+        : this.generateXml(datos, tenant, eNCF)
     this.logger.log(`[${comprobanteId}] XML generado — tipo ${datos.tipoECF}${esRFCE ? ' (RFCE <250K)' : ''}`)
 
     const xmlFirmado = firmarDocumento({ p12: p12Buffer, passphrase, xml })
@@ -208,7 +208,7 @@ export class EcfEmissionProcessor extends WorkerHost {
       // del e-CF ya firmado. Con él se construye el resumen, se firma con raíz
       // <RFCE> y se envía a fc.dgii.gov.do (respuesta SINCRÓNICA, sin trackId).
       const codigoSeguridad =
-        xmlFirmado.match(/<SignatureValue[^>]*>([A-Za-z0-9+/=]+)/)?.[1]?.slice(0, 6) ?? '000000'
+          xmlFirmado.match(/<SignatureValue[^>]*>([A-Za-z0-9+/=]+)/)?.[1]?.slice(0, 6) ?? '000000'
 
       const rfceXml = generarRFCE32({
         ...this.buildE32Input(datos, tenant, eNCF),
@@ -255,10 +255,10 @@ export class EcfEmissionProcessor extends WorkerHost {
     let pdfPath: string | undefined
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
       pdfPath = await this.savePdf(comprobanteId, tenantId, datos, tenant, eNCF, env, xmlFirmado).catch(
-        (err) => {
-          this.logger.warn(`[${comprobanteId}] PDF no generado: ${(err as Error).message}`)
-          return undefined
-        },
+          (err) => {
+            this.logger.warn(`[${comprobanteId}] PDF no generado: ${(err as Error).message}`)
+            return undefined
+          },
       )
     }
 
@@ -274,38 +274,38 @@ export class EcfEmissionProcessor extends WorkerHost {
 
     if (estadoFinal === 'ACEPTADO' || estadoFinal === 'ACEPTADO_CONDICIONAL') {
       this.webhookSenderService
-        .enviarWebhook(tenantId, 'comprobante.aceptado', {
-          eNCF: eNCF,
-          tipoECF: comprobante.tipoECF,
-          montoTotal: comprobante.montoTotal,
-          trackId,
-          pdfUrl: pdfPath ?? null,
-          rncComprador: comprobante.rnc,
-          razonSocial: comprobante.razonSocial,
-        })
-        .catch((err) =>
-          this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
-        )
+          .enviarWebhook(tenantId, 'comprobante.aceptado', {
+            eNCF: eNCF,
+            tipoECF: comprobante.tipoECF,
+            montoTotal: comprobante.montoTotal,
+            trackId,
+            pdfUrl: pdfPath ?? null,
+            rncComprador: comprobante.rnc,
+            razonSocial: comprobante.razonSocial,
+          })
+          .catch((err) =>
+              this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
+          )
     } else if (estadoFinal === 'RECHAZADO') {
       this.webhookSenderService
-        .enviarWebhook(tenantId, 'comprobante.rechazado', {
-          eNCF: eNCF,
-          tipoECF: comprobante.tipoECF,
-          mensajeDGII,
-        })
-        .catch((err) =>
-          this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
-        )
+          .enviarWebhook(tenantId, 'comprobante.rechazado', {
+            eNCF: eNCF,
+            tipoECF: comprobante.tipoECF,
+            mensajeDGII,
+          })
+          .catch((err) =>
+              this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
+          )
     } else if (estadoFinal === 'ERROR') {
       this.webhookSenderService
-        .enviarWebhook(tenantId, 'comprobante.error', {
-          eNCF: eNCF,
-          tipoECF: comprobante.tipoECF,
-          mensajeDGII,
-        })
-        .catch((err) =>
-          this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
-        )
+          .enviarWebhook(tenantId, 'comprobante.error', {
+            eNCF: eNCF,
+            tipoECF: comprobante.tipoECF,
+            mensajeDGII,
+          })
+          .catch((err) =>
+              this.logger.warn(`[${comprobanteId}] Webhook saliente error: ${(err as Error).message}`),
+          )
     }
   }
 
@@ -364,14 +364,14 @@ export class EcfEmissionProcessor extends WorkerHost {
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),
       ...(datos.rncComprador || datos.razonSocialComprador
-        ? {
+          ? {
             comprador: {
               ...(datos.rncComprador !== undefined ? { rnc: datos.rncComprador } : {}),
               ...(datos.razonSocialComprador !== undefined ? { razonSocial: datos.razonSocialComprador } : {}),
               ...(datos.direccionComprador !== undefined ? { direccion: datos.direccionComprador } : {}),
             },
           }
-        : {}),
+          : {}),
       items: mapItems(datos),
     }
   }
@@ -410,7 +410,7 @@ export class EcfEmissionProcessor extends WorkerHost {
         eNCF,
         tipoPago: (datos.tipoPago ?? 1) as TipoPago,
         tipoIngresos: (datos.tipoIngresos ?? '01') as TipoIngresos,
-        ...(datos.indicadorNotaCredito !== undefined ? { indicadorNotaCredito: datos.indicadorNotaCredito as 1 | 2 } : {}),
+        ...(datos.indicadorNotaCredito !== undefined ? { indicadorNotaCredito: datos.indicadorNotaCredito } : {}),
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),
       comprador: {
@@ -541,13 +541,13 @@ export class EcfEmissionProcessor extends WorkerHost {
   }
 
   private async savePdf(
-    comprobanteId: string,
-    tenantId: string,
-    datos: CreateComprobanteDto,
-    tenant: Tenant,
-    eNCF: string,
-    env: DgiiEnv,
-    xmlFirmado: string,
+      comprobanteId: string,
+      tenantId: string,
+      datos: CreateComprobanteDto,
+      tenant: Tenant,
+      eNCF: string,
+      env: DgiiEnv,
+      xmlFirmado: string,
   ): Promise<string> {
     const outDir = join('/tmp', 'pdfs', tenantId)
     mkdirSync(outDir, { recursive: true })
