@@ -17,6 +17,10 @@ import { useContactos } from '@/hooks/useContactos'
 import { useUI } from '@/lib/context/UIContext'
 import { cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
+import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Cliente' },
@@ -72,9 +76,15 @@ interface Props {
 
 export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const baseId = useId()
+  const router = useRouter()
   const { facturacionMode } = useUI()
   const { contactos } = useContactos()
   const emisionRef = useRef<HTMLInputElement>(null)
+
+  const searchParams = useSearchParams()
+  const clienteIdParam = searchParams.get('clienteId')
+  const draftId = searchParams.get('id')
+  const cloneId = searchParams.get('cloneId')
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
@@ -82,6 +92,22 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Form state
   const [tipoECF, setTipoECF] = useState<TipoECF>('E31')
   const [selectedCliente, setSelectedCliente] = useState<Contacto | null>(null)
+
+  // Draft and Re-emission State
+  const [loadingDraft, setLoadingDraft] = useState(false)
+  const [originalEstado, setOriginalEstado] = useState<string | null>(null)
+  const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
+  const [draftData, setDraftData] = useState<any>(null)
+
+  // Auto select client from query param
+  useEffect(() => {
+    if (clienteIdParam && contactos.length > 0 && !selectedCliente) {
+      const match = contactos.find((c) => c.id === clienteIdParam)
+      if (match) {
+        setSelectedCliente(match)
+      }
+    }
+  }, [clienteIdParam, contactos, selectedCliente])
   const [tipoPago, setTipoPago] = useState<'CONTADO' | 'CREDITO' | 'GRATUITO'>('CONTADO')
   const [tipoIngreso, setTipoIngreso] = useState<string>('')
   const [terminoPago, setTerminoPago] = useState<string>('')
@@ -102,7 +128,91 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       setPaisComprador('')
     }
   }, [selectedCliente])
-  
+
+  // Helper to convert DD-MM-YYYY back to YYYY-MM-DD for date inputs
+  function parseDDMMYYYY(dateStr?: string): string {
+    if (!dateStr) return ''
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return dateStr
+    const [day, month, year] = parts
+    return `${year}-${month}-${day}`
+  }
+
+  // Load draft/rejected/error invoice data if editing or cloning
+  useEffect(() => {
+    const targetId = draftId || cloneId
+    if (targetId) {
+      setLoadingDraft(true)
+      api.get(`/comprobantes/${targetId}`)
+        .then((res) => {
+          const c = res.data
+          if (draftId && c.estado !== 'DRAFT' && c.estado !== 'RECHAZADO' && c.estado !== 'ERROR') {
+            toast.error('Este comprobante ya fue emitido y aceptado o está en proceso.')
+            router.push('/facturas')
+            return
+          }
+
+          if (draftId) {
+            setOriginalEstado(c.estado)
+          }
+          setTipoECF(c.tipoECF)
+
+          // Map backend payment condition to local tipoPago
+          // 1: CONTADO, 2: CREDITO, 3: GRATUITO
+          const cond = c.datos?.condicionPago || (c.tipoPago === 2 ? 'CREDITO' : c.tipoPago === 3 ? 'GRATUITO' : 'CONTADO')
+          setTipoPago(cond)
+          setTipoIngreso(c.datos?.tipoIngresos || '')
+          setFechaEmision(cloneId ? todayISO() : parseDDMMYYYY(c.datos?.fechaEmision || c.fechaEmision))
+          setFechaLimite(parseDDMMYYYY(c.datos?.fechaVencimiento || c.fechaVencimiento))
+          setTerminoPago(c.datos?.terminoPago || '')
+          setNotas(c.datos?.notas || '')
+
+          // Reference info
+          setNcfModificado(c.datos?.ncfModificado || '')
+          setFechaNCFModificado(parseDDMMYYYY(c.datos?.fechaNCFModificado || ''))
+          setCodigoModificacion(c.datos?.codigoModificacion ? String(c.datos.codigoModificacion) : '')
+          setIndicadorNotaCredito(c.datos?.indicadorNotaCredito ? String(c.datos.indicadorNotaCredito) : '')
+
+          // Items mapping
+          const backendItems = c.datos?.items || c.items || []
+          const mappedItems: ItemRow[] = backendItems.map((item: any, idx: number) => ({
+            key: `item-${idx}-${Date.now()}`,
+            nombreItem: item.nombreItem || '',
+            cantidad: Number(item.cantidad || 0),
+            precioUnitarioItem: Number(item.precioUnitarioItem || 0),
+            indicadorFacturacion: item.indicadorFacturacion || 'I1',
+            indicadorBienoServicio: Number(item.indicadorBienoServicio || 1) as 1 | 2,
+            descuento: Number(item.descuento || 0),
+            itbisRetenido: Number(item.itbisRetenido || 0),
+            isrRetenido: Number(item.isrRetenido || 0),
+            unidadMedida: item.unidadMedida ? Number(item.unidadMedida) : undefined,
+          }))
+          setItems(mappedItems)
+
+          // Save draft data for client matching
+          setDraftData(c)
+        })
+        .catch((err) => {
+          console.error('Error loading draft details:', err)
+          toast.error('Error al cargar los datos del comprobante')
+        })
+        .finally(() => {
+          setLoadingDraft(false)
+        })
+    }
+  }, [draftId, cloneId, router])
+
+  // Match and select the client once contacts are loaded
+  useEffect(() => {
+    if (draftData && contactos.length > 0) {
+      const rncComp = draftData.datos?.rncComprador || draftData.rnc
+      const clientMatch = contactos.find((contact) => contact.rnc === rncComp || contact.id === draftData.contactoId)
+      if (clientMatch) {
+        setSelectedCliente(clientMatch)
+      }
+    }
+  }, [draftData, contactos])
+
   // Reference Info state (E33/E34)
   const [ncfModificado, setNcfModificado] = useState('')
   const [fechaNCFModificado, setFechaNCFModificado] = useState('')
@@ -223,7 +333,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     }
   }, [items])
 
-  async function handleSubmit(emitConCF: boolean): Promise<void> {
+  async function executeSubmit(emitConCF: boolean): Promise<void> {
     setSubmitting(true)
     setError('')
     const isForeignerType = tipoECF === 'E46' || tipoECF === 'E47'
@@ -256,6 +366,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleSubmit(emitConCF: boolean): Promise<void> {
+    if (emitConCF && draftId && originalEstado && originalEstado !== 'DRAFT') {
+      setShowConfirmReemitir(true)
+      return
+    }
+    await executeSubmit(emitConCF)
   }
 
   const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
@@ -295,6 +413,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   )
 
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
+
+  if (loadingDraft) {
+    return (
+      <div className="flex h-64 items-center justify-center bg-white rounded-xl border border-neutral-200">
+        <Spinner size={32} />
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
@@ -620,7 +746,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 <Calendar size={16} className="text-[#64748B] flex-shrink-0" />
                 <span className="leading-[19.5px]">{formatDateSpanish(fechaEmision)}</span>
               </div>
-              
+
               {/* Payment Condition */}
               <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans">
                 <CreditCard size={16} className="text-[#64748B] flex-shrink-0" />
@@ -648,11 +774,10 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               </p>
               <p className="font-normal leading-[16.5px] text-[#7A8FAD] text-[11px] truncate w-full">
                 {selectedCliente && selectedCliente.rnc
-                  ? `RNC: ${
-                      selectedCliente.rnc.length === 9
-                        ? selectedCliente.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-                        : selectedCliente.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
-                    }`
+                  ? `RNC: ${selectedCliente.rnc.length === 9
+                    ? selectedCliente.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+                    : selectedCliente.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+                  }`
                   : 'RNC: -'}
               </p>
             </div>
@@ -778,7 +903,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   )}
                 </button>
               </div>
-              
+
               {/* Borrador & Limpiar buttons in quick mode */}
               {facturacionMode === 'rapido' && (
                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -830,6 +955,16 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           {error}
         </div>
       )}
+
+      {/* Confirm re-emission modal */}
+      <ConfirmReemitirModal
+        open={showConfirmReemitir}
+        onClose={() => setShowConfirmReemitir(false)}
+        onConfirm={() => {
+          setShowConfirmReemitir(false)
+          executeSubmit(true)
+        }}
+      />
     </div>
   )
 }

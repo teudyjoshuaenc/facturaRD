@@ -477,6 +477,7 @@ export class ComprobantesService {
             OR: [
               { eNCF: { contains: query.search, mode: 'insensitive' } },
               { razonSocial: { contains: query.search, mode: 'insensitive' } },
+              { rnc: { contains: query.search, mode: 'insensitive' } },
             ],
           }
         : {}),

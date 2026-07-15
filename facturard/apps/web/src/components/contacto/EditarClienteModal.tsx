@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Building2, User, CreditCard, Mail, Phone, UserPlus, MapPin, AlignLeft, ChevronDown, Check } from 'lucide-react'
+import { Building2, User, CreditCard, Mail, Phone, Edit, MapPin, AlignLeft, ChevronDown, Check } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,11 +12,11 @@ import { Select } from '@/components/ui/select'
 import { useRncValidation } from '@/hooks/useRncValidation'
 import { Spinner } from '@/components/ui/spinner'
 
-interface NuevoClienteModalProps {
+interface EditarClienteModalProps {
   open: boolean
   onClose: () => void
-  onSave: (data: NuevoContactoData) => void
-  defaultTipo?: 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
+  contacto: any | null
+  onSave: (id: string, data: NuevoContactoData) => void
 }
 
 const PROVINCIAS_MUNICIPIOS: Record<string, string[]> = {
@@ -26,14 +26,13 @@ const PROVINCIAS_MUNICIPIOS: Record<string, string[]> = {
   'La Altagracia': ['Salvaleón de Higüey', 'San Rafael del Yuma'],
   'La Romana': ['La Romana', 'Guaymate', 'Villa Hermosa'],
   'San Pedro de Macorís': ['San Pedro de Macorís', 'Consuelo', 'El Valle', 'Quisqueya', 'Ramón Santana', 'San José de los Llanos'],
-  'San Cristóbal': ['San Cristóbal', 'Bajos de Haina', 'Cambita Garabitos', 'Villa Altagracia', 'Yaguate', 'San Gregorio de Nigua', 'Los Cacaos'],
+  'San Cristóbal': ['San Cristóbal', 'Sabana Grande de Palenque', 'Bajos de Haina', 'Cambita Garabitos', 'Villa Altagracia', 'Yaguate', 'San Gregorio de Nigua', 'Los Cacaos'],
   'Duarte': ['San Francisco de Macorís', 'Arenoso', 'Castillo', 'Las Guáranas', 'Pimentel', 'Villa Riva', 'Hostos']
 }
 
 function formatRncInput(value: string): string {
   const clean = value.replace(/\D/g, '')
   if (clean.length <= 9) {
-    // Format 9 digits RNC: XXX-XXXXX-X
     return clean.replace(/(\d{3})(\d{0,5})(\d{0,1})/, (_, p1, p2, p3) => {
       let res = p1
       if (p2) res += '-' + p2
@@ -41,7 +40,6 @@ function formatRncInput(value: string): string {
       return res
     })
   } else {
-    // Format 11 digits Cédula: XXX-XXXXXXX-X
     return clean.slice(0, 11).replace(/(\d{3})(\d{0,7})(\d{0,1})/, (_, p1, p2, p3) => {
       let res = p1
       if (p2) res += '-' + p2
@@ -61,9 +59,9 @@ function formatPhoneInput(value: string): string {
   })
 }
 
-export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENTE' }: NuevoClienteModalProps): JSX.Element {
+export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarClienteModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState<'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'>(defaultTipo)
+  const [tipo, setTipo] = useState<'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'>('CLIENTE')
   const [rnc, setRnc] = useState('')
   const [idExtranjero, setIdExtranjero] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -77,18 +75,38 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
   const [nombreTouched, setNombreTouched] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setTipo(defaultTipo)
+    if (contacto) {
+      setNombre(contacto.razonSocial || contacto.nombre || '')
+      setTipo(contacto.tipo || 'CLIENTE')
+      setRnc(contacto.rnc ? formatRncInput(contacto.rnc) : '')
+      setIdExtranjero(contacto.identificadorExtranjero || contacto.idExtranjero || '')
+      setTelefono(contacto.telefono ? formatPhoneInput(contacto.telefono) : '')
+      setComentarios(contacto.comentarios || '')
+      setEmail(contacto.email || '')
+      setDireccion(contacto.direccion || '')
+      setProvincia(contacto.provincia || '')
+      setMunicipio(contacto.municipio || '')
+    } else {
+      reset()
     }
-  }, [open, defaultTipo])
+  }, [contacto, open])
 
   useEffect(() => {
-    setMunicipio('')
+    if (contacto && open) {
+      // Preserve municipio if it belongs to selected province
+      if (provincia && PROVINCIAS_MUNICIPIOS[provincia]?.includes(contacto.municipio)) {
+        setMunicipio(contacto.municipio)
+      } else {
+        setMunicipio('')
+      }
+    } else {
+      setMunicipio('')
+    }
   }, [provincia])
 
   function reset(): void {
     setNombre('')
-    setTipo(defaultTipo)
+    setTipo('CLIENTE')
     setRnc('')
     setIdExtranjero('')
     setTelefono('')
@@ -115,9 +133,9 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
   }, [rncStatus, validatedRazonSocial, isEligibleForValidation])
 
   function handleSave(): void {
-    if (!nombre.trim()) return
+    if (!nombre.trim() || !contacto) return
     const cleanRnc = rnc.replace(/\D/g, '')
-    onSave({
+    onSave(contacto.id, {
       nombre,
       rnc: cleanRnc,
       email,
@@ -129,7 +147,6 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
       municipio,
       comentarios
     })
-    reset()
     onClose()
   }
 
@@ -152,9 +169,9 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
     <Modal
       open={open}
       onClose={handleClose}
-      title="Nuevo Contacto"
-      subtitle="Registre un nuevo contacto para facturación o compras"
-      icon={<UserPlus size={20} />}
+      title="Editar Contacto"
+      subtitle="Complete o actualice la información del contacto"
+      icon={<Edit size={20} />}
       className="max-w-[740px]"
       footer={
         <>
@@ -175,17 +192,10 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
               size="md"
               disabled={!isValid}
               onClick={handleSave}
-              className="flex items-center justify-center gap-[4px] h-[42px] px-[20px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
+              className="flex items-center justify-center gap-[4px] h-[42px] px-[20px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal whitespace-nowrap"
             >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                <path d="M13.3333 17.5V15.8333C13.3333 14.9493 12.9821 14.1014 12.357 13.4763C11.7319 12.8512 10.8841 12.5 10 12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7.5 9.16667C9.34095 9.16667 10.8333 7.67428 10.8333 5.83333C10.8333 3.99238 9.34095 2.5 7.5 2.5C5.65905 2.5 4.16667 3.99238 4.16667 5.83333C4.16667 7.67428 5.65905 9.16667 7.5 9.16667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18.3333 17.5V15.8333C18.3328 15.0948 18.087 14.3773 17.6345 13.7936C17.182 13.2099 16.5484 12.793 15.8333 12.6083" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M13 2.5C13.717 2.68358 14.3525 3.10058 14.8064 3.68526C15.2602 4.26993 15.5065 4.98902 15.5065 5.72917C15.5065 6.46931 15.2602 7.1884 14.8064 7.77307C14.3525 8.35775 13.717 8.77475 13 8.95833" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2.25 14.75H7.25" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M4.75 12.25V17.25" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>Guardar Contacto</span>
+              <Edit size={16} />
+              Guardar Cambios
             </Button>
           </div>
         </>
@@ -207,7 +217,6 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
           />
         </div>
 
-        {/* 2-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           
           {/* Left Column */}
@@ -321,7 +330,7 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
             </div>
           </div>
 
-          {/* Comentarios spanning full width of the popup */}
+          {/* Comentarios */}
           <div className="col-span-1 md:col-span-2 flex flex-col gap-1.5 w-full mt-2">
             <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Comentarios</label>
             <div className="relative w-full">

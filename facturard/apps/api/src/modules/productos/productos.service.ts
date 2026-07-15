@@ -39,12 +39,12 @@ export class ProductosService {
       ...(query.categoria !== undefined && { categoria: query.categoria }),
       ...(query.search !== undefined && query.search.trim() !== ''
         ? {
-            OR: [
-              { nombre: { contains: query.search, mode: 'insensitive' } },
-              { codigo: { contains: query.search, mode: 'insensitive' } },
-              { descripcion: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { nombre: { contains: query.search, mode: 'insensitive' } },
+            { codigo: { contains: query.search, mode: 'insensitive' } },
+            { descripcion: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     }
 

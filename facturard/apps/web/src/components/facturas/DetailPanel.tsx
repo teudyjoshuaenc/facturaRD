@@ -8,12 +8,14 @@ import {
   FileText,
   Download,
   Send,
-  Ban,
   CheckCircle2,
   XCircle,
   RefreshCw,
   Clock,
   ExternalLink,
+  Pencil,
+  Mail,
+  Copy,
 } from 'lucide-react'
 import {
   type Comprobante,
@@ -33,6 +35,7 @@ interface DetailPanelProps {
   onDownload: (c: Comprobante) => void
   downloading: boolean
   onReenviar?: (c: Comprobante) => void
+  onEmitir?: (c: Comprobante) => void
 }
 
 // Convert ISO date (YYYY-MM-DD or full timestamp) to DD/MM/YYYY HH:MM
@@ -56,6 +59,7 @@ export function DetailPanel({
   onDownload,
   downloading,
   onReenviar,
+  onEmitir,
 }: DetailPanelProps): JSX.Element | null {
   const router = useRouter()
   const [shouldRender, setShouldRender] = useState(open)
@@ -169,13 +173,43 @@ export function DetailPanel({
             </p>
           </div>
         )}
-        <button
-          onClick={onClose}
-          className="flex h-[28px] w-[28px] items-center justify-center rounded-[4px] text-[#64748B] transition-colors hover:bg-neutral-100"
-          aria-label="Cerrar"
-        >
-          <X size={16} />
-        </button>
+        {loading || !comprobante ? (
+          <button
+            onClick={onClose}
+            className="flex h-[28px] w-[28px] items-center justify-center rounded-[4px] text-[#64748B] transition-colors hover:bg-neutral-100"
+            aria-label="Cerrar"
+          >
+            <X size={16} />
+          </button>
+        ) : (
+          <div className="flex items-center gap-[4px] shrink-0">
+            <button
+              type="button"
+              title="Clonar comprobante"
+              onClick={() => router.push(`/nueva-factura?cloneId=${comprobante.id}`)}
+              className="flex h-[28px] w-[28px] items-center justify-center rounded-[4px] text-[#64748B] transition-colors hover:bg-neutral-100"
+            >
+              <Copy size={15} />
+            </button>
+            {(comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR') && (
+              <button
+                type="button"
+                title="Editar comprobante"
+                onClick={() => router.push(`/nueva-factura?id=${comprobante.id}`)}
+                className="flex h-[28px] w-[28px] items-center justify-center rounded-[4px] text-[#64748B] transition-colors hover:bg-neutral-100"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex h-[28px] w-[28px] items-center justify-center rounded-[4px] text-[#64748B] transition-colors hover:bg-neutral-100"
+              aria-label="Cerrar"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Body: Figma h=662, p=20, gap=20 between sections. Scrollable. */}
@@ -189,13 +223,12 @@ export function DetailPanel({
           <>
             {/* Status Banner: Figma rounded-10, p=12, gap=4, h≈65.5 */}
             <div
-              className={`rounded-[10px] p-[12px] text-left flex flex-col gap-[4px] ${
-                comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
+              className={`rounded-[10px] p-[12px] text-left flex flex-col gap-[4px] ${comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
                   ? 'bg-[#ecfdf3] text-[#067647]'
                   : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR'
-                  ? 'bg-[#fef3f2] text-[#b42318]'
-                  : 'bg-neutral-50 text-[#64748B]'
-              }`}
+                    ? 'bg-[#fef3f2] text-[#b42318]'
+                    : 'bg-neutral-50 text-[#64748B]'
+                }`}
             >
               <div className="flex items-center gap-[8px] h-[19.5px]">
                 {comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL' ? (
@@ -219,10 +252,10 @@ export function DetailPanel({
                 {comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
                   ? 'Comprobante aceptado correctamente por DGII.'
                   : comprobante.estado === 'RECHAZADO'
-                  ? comprobante.mensajeDGII || 'El comprobante fiscal fue rechazado por la DGII.'
-                  : comprobante.estado === 'ERROR'
-                  ? comprobante.mensajeDGII || 'Hubo un error de envío en la conexión DGII.'
-                  : 'El comprobante se encuentra en cola pendiente de procesamiento.'}
+                    ? comprobante.mensajeDGII || 'El comprobante fiscal fue rechazado por la DGII.'
+                    : comprobante.estado === 'ERROR'
+                      ? comprobante.mensajeDGII || 'Hubo un error de envío en la conexión DGII.'
+                      : 'El comprobante se encuentra en cola pendiente de procesamiento.'}
               </p>
             </div>
 
@@ -326,22 +359,26 @@ export function DetailPanel({
               {downloading ? <Spinner size={12} /> : <Download size={12} />}
               <span>PDF</span>
             </button>
-            <button
-              type="button"
-              onClick={() => onReenviar && onReenviar(comprobante)}
-              className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#333] hover:bg-neutral-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all"
-            >
-              <Send size={12} />
-              <span>Reenviar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => alert('Generando nota de crédito para anular...')}
-              className="flex-1 min-w-0 h-[40px] border border-[rgba(180,35,24,0.1)] rounded-[10px] bg-white text-[#b42318] hover:bg-red-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all"
-            >
-              <Ban size={12} />
-              <span>Anular</span>
-            </button>
+
+            {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+              <button
+                type="button"
+                onClick={() => onEmitir && onEmitir(comprobante)}
+                className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#0379d5] hover:bg-blue-50 flex items-center justify-center gap-[4px] text-[12px] font-semibold leading-[19.5px] transition-all"
+              >
+                <Send size={12} />
+                <span>Emitir</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onReenviar && onReenviar(comprobante)}
+                className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#333] hover:bg-neutral-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all"
+              >
+                <Mail size={12} />
+                <span>Reenviar</span>
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -13,12 +13,13 @@ export interface Producto {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  activo?: boolean
   unidadMedida?: number
   descuento?: number
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
-  activo: boolean
+  descripcion?: string
 }
 
 export interface NuevoProductoData {
@@ -33,17 +34,22 @@ export interface NuevoProductoData {
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
+  descripcion?: string
+}
+
+export interface UseProductosParams {
+  activo?: boolean
 }
 
 // options.activo controla el filtro de 3 estados del backend:
 //   undefined → todos (activos e inactivos) — usado por la GESTIÓN del catálogo.
 //   true → sólo activos — usado por el SELECTOR de emisión (no se factura con bajas).
 //   false → sólo inactivos.
-export function useProductos(options?: { activo?: boolean }) {
+export function useProductos(options?: UseProductosParams) {
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: productos = [], isLoading } = useQuery({
+  const { data: productos = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['productos', searchQuery, options?.activo],
     queryFn: async () => {
       const res = await api.get('/productos', {
@@ -117,12 +123,85 @@ export function useProductos(options?: { activo?: boolean }) {
     [crearProductoMutation],
   )
 
+  const actualizarProductoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<NuevoProductoData> & { activo?: boolean } }) => {
+      const body = {
+        ...(data.tipo !== undefined && { tipo: data.tipo }),
+        ...(data.nombre !== undefined && { nombre: data.nombre }),
+        ...(data.precio !== undefined && { precioUnitario: data.precio }),
+        ...(data.indicadorFacturacion !== undefined && {
+          tratamientoITBIS: data.indicadorFacturacion === 'E' || data.indicadorFacturacion === 'I4' ? 'EXENTO' : data.indicadorFacturacion,
+        }),
+        ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida ? String(data.unidadMedida) : null }),
+        ...(data.codigo !== undefined && { codigo: data.codigo || null }),
+        ...(data.activo !== undefined && { activo: data.activo }),
+      }
+      const res = await api.patch(`/productos/${id}`, body)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productos'] })
+      toast.success('Producto actualizado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al actualizar el producto', { description: msg })
+    },
+  })
+
+  const actualizarProducto = useCallback(
+    async (id: string, data: Partial<NuevoProductoData> & { activo?: boolean }): Promise<Producto> => {
+      const result = await actualizarProductoMutation.mutateAsync({ id, data })
+      const p: Producto = {
+        id: result.id,
+        nombre: result.nombre,
+        tipo: result.tipo as 'BIEN' | 'SERVICIO',
+        codigo: result.codigo || '',
+        precio: Number(result.precioUnitario),
+        indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
+        precioIncluyeItbis: false,
+        activo: result.activo !== false,
+      }
+      if (result.unidadMedida) {
+        p.unidadMedida = Number(result.unidadMedida)
+      }
+      return p
+    },
+    [actualizarProductoMutation],
+  )
+
+  const eliminarProductoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/productos/${id}`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productos'] })
+      toast.success('Producto eliminado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al eliminar el producto', { description: msg })
+    },
+  })
+
+  const eliminarProducto = useCallback(
+    async (id: string): Promise<void> => {
+      await eliminarProductoMutation.mutateAsync(id)
+    },
+    [eliminarProductoMutation],
+  )
+
   return {
     productos,
     allProductos: productos,
     searchQuery,
     setSearchQuery,
     crearProducto,
+    actualizarProducto,
+    eliminarProducto,
     isLoading,
+    isFetching,
+    refetch,
   }
 }

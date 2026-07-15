@@ -126,7 +126,7 @@ export function StepCliente({
   isQuickMode,
 }: StepClienteProps): JSX.Element {
   const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
-  const contactos: Contacto[] = rawContactos as any
+  const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
 
   const limiteRef = useRef<HTMLInputElement>(null)
@@ -594,6 +594,13 @@ export function StepCliente({
         open={showNuevoCliente}
         onClose={() => setShowNuevoCliente(false)}
         onSave={handleNuevoCliente}
+        defaultTipo={
+          tipoECF === 'E41' || tipoECF === 'E47'
+            ? 'PROVEEDOR'
+            : tipoECF === 'E32'
+              ? 'CONSUMIDOR_FINAL'
+              : 'CLIENTE'
+        }
       />
     </>
   )

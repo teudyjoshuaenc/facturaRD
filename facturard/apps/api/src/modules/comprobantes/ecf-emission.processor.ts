@@ -410,7 +410,7 @@ export class EcfEmissionProcessor extends WorkerHost {
         eNCF,
         tipoPago: (datos.tipoPago ?? 1) as TipoPago,
         tipoIngresos: (datos.tipoIngresos ?? '01') as TipoIngresos,
-        ...(datos.indicadorNotaCredito !== undefined ? { indicadorNotaCredito: datos.indicadorNotaCredito } : {}),
+        ...(datos.indicadorNotaCredito !== undefined ? { indicadorNotaCredito: datos.indicadorNotaCredito as 1 | 2 } : {}),
       },
       emisor: this.buildEmisor(tenant, datos.fechaEmision),
       comprador: {

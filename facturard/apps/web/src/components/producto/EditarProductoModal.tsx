@@ -7,16 +7,25 @@ import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
-import type { NuevoProductoData } from '@/hooks/useProductos'
-import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { Select } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/comprobantes'
 
-interface NuevoProductoModalProps {
+interface Producto {
+  id: string
+  nombre: string
+  tipo: 'BIEN' | 'SERVICIO'
+  codigo: string
+  precio: number
+  indicadorFacturacion: string
+  precioFinal: number
+  estado: string
+}
+
+interface EditarProductoModalProps {
   open: boolean
+  producto: Producto | null
   onClose: () => void
-  onSave: (data: NuevoProductoData) => void
-  tipoECF?: TipoECF | undefined
+  onSave: (id: string, data: any) => void
 }
 
 const TIPO_OPTIONS = [
@@ -100,11 +109,17 @@ const UNIDADES_MEDIDA = [
   { value: '58', label: 'Servicio' },
 ]
 
-export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProductoModalProps): JSX.Element {
+export function EditarProductoModal({
+  open,
+  producto,
+  onClose,
+  onSave,
+}: EditarProductoModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
   const [nombreTouched, setNombreTouched] = useState(false)
   const [tipo, setTipo] = useState<'BIEN' | 'SERVICIO'>('BIEN')
   const [codigo, setCodigo] = useState('')
+  const [codigoTouched, setCodigoTouched] = useState(false)
   const [unidadMedida, setUnidadMedida] = useState('')
   const [precio, setPrecio] = useState('')
   const [precioTouched, setPrecioTouched] = useState(false)
@@ -112,35 +127,48 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
   const [precioIncluyeItbis, setPrecioIncluyeItbis] = useState(false)
   const [descripcion, setDescripcion] = useState('')
 
+  // Populate state when product prop changes
   useEffect(() => {
-    if (open && (tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47')) {
-      setIndicadorFacturacion('I4')
+    if (producto) {
+      setNombre(producto.nombre)
+      setTipo(producto.tipo)
+      const rawCode = producto.codigo.split(' · ')[0] || producto.codigo
+      setCodigo(rawCode === 'GEN-001' || rawCode === 'SRV-001' || rawCode === 'SRV-002' || rawCode === 'SRV-003' ? '' : rawCode)
+      setPrecio(String(producto.precio))
+      setIndicadorFacturacion(
+        producto.indicadorFacturacion === 'EXENTO' || producto.indicadorFacturacion === 'E'
+          ? 'I4'
+          : (producto.indicadorFacturacion as any)
+      )
+      setPrecioIncluyeItbis(false)
+      setDescripcion('')
     }
-  }, [open, tipoECF])
+  }, [producto, open])
 
   function reset(): void {
     setNombre('')
     setNombreTouched(false)
     setTipo('BIEN')
     setCodigo('')
+    setCodigoTouched(false)
     setUnidadMedida('')
     setPrecio('')
     setPrecioTouched(false)
-    setIndicadorFacturacion(tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47' ? 'I4' : 'I1')
+    setIndicadorFacturacion('I1')
     setPrecioIncluyeItbis(false)
     setDescripcion('')
   }
 
   function handleSave(): void {
-    if (!nombre.trim() || !precio) return
-    onSave({
+    if (!producto || !nombre.trim() || !precio) return
+    onSave(producto.id, {
       nombre,
       tipo,
-      codigo,
+      codigo: codigo || undefined,
       precio: Number(precio),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
-      ...(descripcion ? { descripcion } : {}),
+      descripcion: descripcion || undefined,
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
     })
     reset()
@@ -157,7 +185,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
   const showNombreError = nombreTouched && !nombre.trim()
   const showPrecioError = precioTouched && (!precio || Number(precio) <= 0)
 
-  // Calculations for preview
+  // Calculations for real-time preview
   const rateKey = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
   const rate = ITBIS_RATES[rateKey] ?? 0.18
   const itbisLabel = rateKey === 'I1' ? '18%' : rateKey === 'I2' ? '16%' : rateKey === 'I3' ? '0%' : 'Exento'
@@ -181,8 +209,8 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
     <Modal
       open={open}
       onClose={handleClose}
-      title="Nuevo Producto"
-      subtitle="Registre un nuevo producto para facturación"
+      title="Editar Producto"
+      subtitle="Actualice los datos del producto o servicio"
       icon={<PackagePlus size={20} />}
       className="max-w-[800px]"
       footer={
@@ -206,7 +234,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
               onClick={handleSave}
               className="flex items-center justify-center gap-1 h-[42px] w-[168px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
             >
-              Agregar
+              Guardar Cambios
             </Button>
           </div>
         </>
@@ -218,7 +246,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
           {/* Nombre / Descripción */}
           <div className="w-full">
             <Input
-              label="Descripción *"
+              label="Nombre del Producto / Servicio *"
               placeholder="Ej: Salami Induveca 1lb"
               leftIcon={<Package size={16} className="text-[#64748B]" />}
               value={nombre}
@@ -238,7 +266,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
             <ToggleGroup variant="modal" options={TIPO_OPTIONS} value={tipo} onChange={setTipo} />
           </div>
 
-          {/* Código / SKU */}
+          {/* SKU / Código */}
           <div className="w-full">
             <Input
               label="Código / SKU"
@@ -253,7 +281,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
           <div className="grid grid-cols-2 gap-4">
             <div className="w-full">
               <Input
-                label="Precio (RD$) *"
+                label="Precio (DOP) *"
                 placeholder="0.00"
                 type="number"
                 min={0}
@@ -270,15 +298,11 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
               />
             </div>
             <div className="flex flex-col gap-[6px] text-left">
-              <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">Itbis</label>
+              <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">ITBIS</label>
               <ToggleGroup
                 variant="modal"
-                options={
-                  tipoECF === 'E44' || tipoECF === 'E43' || tipoECF === 'E47'
-                    ? [{ value: 'I4' as const, label: 'Exento' }]
-                    : ITBIS_OPTIONS
-                }
-                value={indicadorFacturacion as 'I1' | 'I2' | 'I3' | 'I4'}
+                options={ITBIS_OPTIONS}
+                value={indicadorFacturacion as any}
                 onChange={(v) => setIndicadorFacturacion(v)}
               />
             </div>
@@ -297,7 +321,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
 
           {/* Unidad de Medida */}
           <div className="flex flex-col gap-[6px] text-left">
-            <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">Unidad de Medida</label>
+            <label className="text-[14px] font-semibold text-[#64748B] leading-[20px] font-sans">Unidad</label>
             <Select
               value={unidadMedida}
               onChange={setUnidadMedida}
@@ -306,7 +330,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
             />
           </div>
 
-          {/* Descripción */}
+          {/* Descripción / Comentarios */}
           <div className="flex flex-col gap-1.5 w-full">
             <label className="text-ui-sm font-semibold text-[#64748B] font-sans">Descripción</label>
             <div className="relative w-full">

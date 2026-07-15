@@ -28,7 +28,7 @@ export interface NuevoContactoData {
   rnc: string
   email: string
   telefono: string
-  tipo: 'EMPRESA' | 'PERSONA'
+  tipo: 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
   idExtranjero?: string
   direccion?: string
   provincia?: string
@@ -79,10 +79,9 @@ export function useContactos() {
   const crearContactoMutation = useMutation({
     mutationFn: async (data: NuevoContactoData) => {
       const cleanRnc = data.rnc.replace(/\D/g, '')
-      const resolvedTipo = cleanRnc.length === 9 || cleanRnc.length === 11 ? 'CLIENTE' : 'CONSUMIDOR_FINAL'
 
       const body = {
-        tipo: resolvedTipo,
+        tipo: data.tipo,
         rnc: cleanRnc || undefined,
         razonSocial: data.nombre,
         email: data.email || undefined,
@@ -128,12 +127,23 @@ export function useContactos() {
     [crearContactoMutation],
   )
 
+  const actualizarContactoMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await api.patch(`/contactos/${id}`, data)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactos'] })
+    },
+  })
+
   return {
     contactos,
     frecuentes,
     searchQuery,
     setSearchQuery,
     crearContacto,
+    actualizarContacto: actualizarContactoMutation,
     isLoading,
   }
 }

@@ -9,8 +9,9 @@ import {
   type PaginatedResponse,
 } from '@/lib/comprobantes'
 import { useUI } from '@/lib/context/UIContext'
+import { useSearchParams } from 'next/navigation'
 
-export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT'
+export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT' | 'COTIZACION_CONVERTIDA'
 
 const PAGE_SIZE = 10
 
@@ -86,9 +87,11 @@ export function useMonthMetrics({ fechaDesde, fechaHasta }: UseMonthMetricsOptio
 
 export function useComprobantes() {
   const { globalSearch } = useUI()
+  const searchParams = useSearchParams()
+  const initialSearch = searchParams.get('search') || ''
   const [page, setPage] = useState(1)
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [tipoFilter, setTipoFilter] = useState<string>('todos')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -109,7 +112,7 @@ export function useComprobantes() {
   // Determine if any client-side-only filter is active (amount range, estado grouping)
   const hasClientFilter = minAmount !== '' || maxAmount !== '' || estadoFilter !== 'todos'
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [
       'comprobantes-lista',
       page,
@@ -155,6 +158,8 @@ export function useComprobantes() {
             c.estado === 'EN_COLA' ||
             c.estado === 'ENVIANDO'
         )
+      } else if (estadoFilter === 'COTIZACION_CONVERTIDA') {
+        all = all.filter((c) => !!c.cotizacionId)
       } else {
         all = all.filter((c) => c.estado === estadoFilter)
       }
@@ -246,6 +251,8 @@ export function useComprobantes() {
     comprobantes: paginatedComprobantes,
     paginationData: customPaginationData,
     isLoading,
+    isFetching,
+    refetch,
     page,
     setPage,
     estadoFilter,
