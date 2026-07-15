@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, Suspense } from 'react'
 import type { JSX } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { api } from '@/lib/api'
 import {
   Search,
   ChevronRight,
@@ -11,7 +12,7 @@ import {
   AlertTriangle,
   Copy,
   Pencil,
-  Trash2,
+  FileCheck,
   Clock
 } from 'lucide-react'
 import { Select } from '@/components/ui/select'
@@ -22,6 +23,7 @@ import { toast } from 'sonner'
 import { useCotizaciones } from '@/hooks/useCotizaciones'
 import type { Cotizacion } from '@/hooks/useCotizaciones'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
 const LIMIT = 10
 
@@ -117,10 +119,125 @@ function CotizacionesPageInner(): JSX.Element {
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
   const [page, setPage] = useState(1)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const { cotizaciones, loading, error, total, totalPages, fetchCotizaciones, deleteCotizacion } = useCotizaciones()
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedIds(new Set())
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (cotizaciones.length === 0) return
+    const allSelected = cotizaciones.every(c => selectedIds.has(c.id))
+    if (allSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        cotizaciones.forEach(c => next.delete(c.id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        cotizaciones.forEach(c => next.add(c.id))
+        return next
+      })
+    }
+  }
+
+  const handleBulkSend = () => {
+    toast.success(`Enviando ${selectedIds.size} cotizaciones seleccionadas...`)
+  }
+
+  const handleBulkDownload = () => {
+    toast.success(`Descargando ${selectedIds.size} cotizaciones seleccionadas...`)
+  }
+
+  const handleBulkExport = () => {
+    const selectedList = cotizaciones.filter(c => selectedIds.has(c.id))
+    if (selectedList.length === 0) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error('Por favor permita las ventanas emergentes para exportar a PDF')
+      return
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Exportación de Cotizaciones</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 40px; color: #333; }
+            h1 { font-size: 22px; margin-bottom: 24px; border-bottom: 2px solid #eaeaea; padding-bottom: 12px; color: #111; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #eaeaea; padding: 12px 10px; text-align: left; font-size: 13px; }
+            th { background-color: #fafafa; font-weight: 600; color: #666; border-top: 1px solid #eaeaea; }
+            .total-row { font-weight: bold; background-color: #fafafa; }
+            .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Cotizaciones</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Cliente</th>
+                <th>RNC</th>
+                <th>Fecha</th>
+                <th>Vencimiento</th>
+                <th>Estado</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${selectedList.map(c => `
+                <tr>
+                  <td><b>${c.folio}</b></td>
+                  <td>${c.contacto?.nombre || '—'}</td>
+                  <td>${c.contacto?.rnc || '—'}</td>
+                  <td>${formatCotDate(c.createdAt)}</td>
+                  <td>${formatCotDate(c.fechaVigencia)}</td>
+                  <td>${c.estado}</td>
+                  <td>${formatCurrency(c.total)}</td>
+                </tr>
+              `).join('')}
+              <tr class="total-row">
+                <td colspan="6" style="text-align: right;">Total General:</td>
+                <td>${formatCurrency(selectedList.reduce((sum, c) => sum + Number(c.total || 0), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="footer">
+            Generado automáticamente el ${new Date().toLocaleDateString()}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+  }
 
   // Debounced search fetch
   const doFetch = useCallback(() => {
@@ -128,6 +245,7 @@ function CotizacionesPageInner(): JSX.Element {
     if (search.trim()) q.search = search.trim()
     if (estadoFilter !== 'todos') q.estado = estadoFilter
     fetchCotizaciones(q)
+    setSelectedIds(new Set())
   }, [fetchCotizaciones, page, search, estadoFilter])
 
   useEffect(() => {
@@ -141,7 +259,7 @@ function CotizacionesPageInner(): JSX.Element {
 
   // Compute metrics from live data
   const metrics = useMemo(() => {
-    const totalAmount = cotizaciones.reduce((acc, c) => acc + (c.total || 0), 0)
+    const totalAmount = cotizaciones.reduce((acc, c) => acc + Number(c.total || 0), 0)
     const totalCount = total
     const pendientes = cotizaciones.filter((c) => c.estado === 'BORRADOR' || c.estado === 'ENVIADA').length
     const aprobadas = cotizaciones.filter((c) => c.estado === 'APROBADA').length
@@ -150,35 +268,20 @@ function CotizacionesPageInner(): JSX.Element {
     return { totalAmount, totalCount, pendientes, aprobadas, convertidas, vencidas }
   }, [cotizaciones, total])
 
-  const handleDelete = async (c: Cotizacion, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!confirm(`¿Está seguro de que desea rechazar la cotización ${c.folio}?`)) return
-    setDeletingId(c.id)
-    const ok = await deleteCotizacion(c.id)
-    setDeletingId(null)
-    if (ok) {
-      toast.success(`Cotización ${c.folio} rechazada`)
-      doFetch()
-    } else {
-      toast.error('No se pudo rechazar la cotización')
-    }
-  }
+
 
   return (
     <div className="flex flex-col gap-6 text-left w-full">
-      {/* Header and CTA */}
       <CotizacionesHeader
         onRefresh={handleRefresh}
         isRefreshing={loading}
-        onExport={() => toast.info('Exportando cotizaciones...')}
+        onExport={handleBulkExport}
         onNew={() => router.push('/cotizaciones/nueva')}
-        onEditSelected={() => {
-          if (!selectedId) {
-            toast.error('Seleccione una cotización para editar')
-            return
-          }
-          router.push(`/cotizaciones/nueva?id=${selectedId}`)
-        }}
+        isSelectionMode={isSelectionMode}
+        onToggleSelectionMode={toggleSelectionMode}
+        selectedCount={selectedIds.size}
+        onBulkSend={handleBulkSend}
+        onBulkDownload={handleBulkDownload}
       />
 
       {/* Summary Cards Row */}
@@ -226,6 +329,19 @@ function CotizacionesPageInner(): JSX.Element {
           <table className="w-full text-left text-body-sm min-w-[1000px] select-none">
             <thead>
               <tr className="border-b border-[#f1f5f9] bg-neutral-50/50 text-[13px] font-semibold text-text-secondary h-10">
+                <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9] bg-neutral-50/50", isSelectionMode ? "w-10" : "w-0")}>
+                  <div className={cn(
+                    "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-10 pl-4 origin-left",
+                    isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                  )}>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                      checked={cotizaciones.length > 0 && cotizaciones.every(c => selectedIds.has(c.id))}
+                      onChange={handleSelectAll}
+                    />
+                  </div>
+                </th>
                 <th className="px-4 py-2 font-semibold">Folio</th>
                 <th className="px-4 py-2 font-semibold">Cliente</th>
                 <th className="px-4 py-2 font-semibold">Fecha</th>
@@ -239,7 +355,7 @@ function CotizacionesPageInner(): JSX.Element {
             <tbody>
               {loading && cotizaciones.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                  <td colSpan={9} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
                       <Spinner size={24} />
                     </div>
@@ -248,7 +364,7 @@ function CotizacionesPageInner(): JSX.Element {
               )}
               {!loading && cotizaciones.length === 0 && !error && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-body-sm text-text-secondary">
+                  <td colSpan={9} className="px-4 py-12 text-center text-body-sm text-text-secondary">
                     <div className="flex flex-col items-center gap-2">
                       <Clock size={28} className="text-neutral-300" />
                       <p>No se encontraron cotizaciones.</p>
@@ -264,16 +380,34 @@ function CotizacionesPageInner(): JSX.Element {
                 </tr>
               )}
               {cotizaciones.map((c) => {
-                const isSelected = selectedId === c.id
-                const isDeleting = deletingId === c.id
+                const isSelected = selectedIds.has(c.id)
                 const clienteNombre = c.contacto?.nombre ?? '—'
                 const clienteRnc = c.contacto?.rnc ?? ''
                 return (
                   <tr
                     key={c.id}
-                    onClick={() => router.push(`/cotizaciones/${c.id}`)}
-                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] cursor-pointer transition-colors h-[52px] bg-white ${isDeleting ? 'opacity-50' : ''}`}
+                    onClick={() => {
+                      if (isSelectionMode) {
+                        toggleSelect(c.id)
+                      } else {
+                        router.push(`/cotizaciones/${c.id}`)
+                      }
+                    }}
+                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] cursor-pointer transition-colors h-[52px] bg-white`}
                   >
+                    <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9]", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
+                      <div className={cn(
+                        "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[52px] pl-4 origin-left",
+                        isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(c.id)}
+                        />
+                      </div>
+                    </td>
                     <td className="px-4 py-3.5 font-bold text-text-primary text-[13px] align-middle">
                       {c.folio}
                     </td>
@@ -325,12 +459,22 @@ function CotizacionesPageInner(): JSX.Element {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => handleDelete(c, e)}
-                          className="text-[#b42318] hover:text-red-700 transition-colors focus:outline-none disabled:opacity-30"
-                          title="Rechazar"
-                          disabled={isDeleting || c.estado === 'CONVERTIDA'}
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              const res = await api.post(`/cotizaciones/${c.id}/convertir`, { emitir: false })
+                              const comp = res.data.comprobante
+                              toast.success('Cotización convertida a borrador de factura')
+                              router.push(`/nueva-factura?id=${comp.id}`)
+                            } catch (err) {
+                              toast.error('Error al convertir la cotización')
+                            }
+                          }}
+                          className="text-[#0379d5] hover:text-[#0262ad] transition-colors focus:outline-none"
+                          title="Convertir en factura"
+                          disabled={c.estado === 'CONVERTIDA'}
                         >
-                          <Trash2 size={14} />
+                          <FileCheck size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
                         </button>
                       </div>
                     </td>

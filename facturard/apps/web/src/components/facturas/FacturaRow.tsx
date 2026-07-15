@@ -30,7 +30,15 @@ interface Props {
   onEmitir?: (c: Comprobante) => void
 }
 
-function getStatusBadge(estado: string): JSX.Element {
+function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Element {
+  if (cotizacionId) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(3,121,213,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#0379d5] font-sans">
+        <CheckCircle2 size={14} className="text-[#0379d5] flex-shrink-0" />
+        Cotización convertida
+      </span>
+    )
+  }
   if (estado === 'ACEPTADO') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(6,118,71,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#067647] font-sans">
@@ -136,7 +144,7 @@ const FacturaRow = React.memo(function FacturaRow({
         onClick={() => onViewDetail(c.id)}
         className="px-[16px] py-[16px] w-[106px] min-w-[106px] text-left align-middle cursor-pointer whitespace-nowrap"
       >
-        {getStatusBadge(c.estado)}
+        {getStatusBadge(c.estado, c.cotizacionId)}
       </td>
       <td className="px-[16px] py-[16px] w-[112px] min-w-[112px] text-left align-middle">
         <div className="flex items-center gap-[4px] w-full">

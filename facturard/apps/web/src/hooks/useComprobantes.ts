@@ -11,7 +11,7 @@ import {
 import { useUI } from '@/lib/context/UIContext'
 import { useSearchParams } from 'next/navigation'
 
-export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT'
+export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT' | 'COTIZACION_CONVERTIDA'
 
 const PAGE_SIZE = 10
 
@@ -158,6 +158,8 @@ export function useComprobantes() {
             c.estado === 'EN_COLA' ||
             c.estado === 'ENVIANDO'
         )
+      } else if (estadoFilter === 'COTIZACION_CONVERTIDA') {
+        all = all.filter((c) => !!c.cotizacionId)
       } else {
         all = all.filter((c) => c.estado === estadoFilter)
       }

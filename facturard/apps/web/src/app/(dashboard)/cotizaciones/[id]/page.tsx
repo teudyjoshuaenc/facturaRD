@@ -18,8 +18,8 @@ import {
   Mail,
   AlertTriangle,
   FileText,
-  Upload,
   RefreshCw,
+  Info,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/comprobantes'
 import { Button } from '@/components/ui/button'
@@ -238,48 +238,7 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
 
   const isLoading = isCotizacionLoading || isContactoLoading || isTenantLoading
 
-  const handleEnviar = async () => {
-    setUpdatingEstado(true)
-    try {
-      await api.patch(`/cotizaciones/${id}/estado`, { estado: 'ENVIADA' })
-      toast.success('Cotización enviada correctamente')
-      refetch()
-    } catch (err) {
-      toast.error('Error al enviar la cotización', { description: getErrorMessage(err) })
-    } finally {
-      setUpdatingEstado(false)
-    }
-  }
 
-  const handleRechazar = async () => {
-    if (!confirm('¿Está seguro de que desea rechazar esta cotización?')) return
-    setUpdatingEstado(true)
-    try {
-      await api.patch(`/cotizaciones/${id}/estado`, { estado: 'RECHAZADA' })
-      toast.success('Cotización rechazada')
-      refetch()
-    } catch (err) {
-      toast.error('Error al rechazar la cotización', { description: getErrorMessage(err) })
-    } finally {
-      setUpdatingEstado(false)
-    }
-  }
-
-  const handleConvertir = async () => {
-    setConverting(true)
-    try {
-      const res = await api.post(`/cotizaciones/${id}/convertir`, { emitir: false })
-      toast.success('Cotización convertida a factura en borrador')
-      refetch()
-      if (res.data?.comprobante?.id) {
-        router.push(`/facturas/${res.data.comprobante.id}`)
-      }
-    } catch (err) {
-      toast.error('Error al convertir la cotización', { description: getErrorMessage(err) })
-    } finally {
-      setConverting(false)
-    }
-  }
 
   if (isLoading) {
     return (
@@ -431,32 +390,6 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2.5 items-center">
-          {/* Convert to Invoice */}
-          {cotizacion.estado !== 'CONVERTIDA' && (
-            <Button
-              variant="secondary"
-              onClick={handleConvertir}
-              disabled={converting || updatingEstado}
-              className="h-[40px] px-4 rounded-[8px] border border-[#d0d5dd] bg-white text-[#344054] hover:bg-neutral-50 text-[14px] font-semibold gap-2 flex items-center shadow-sm transition-colors cursor-pointer"
-            >
-              {converting ? <Spinner size={14} /> : <CustomFileCheckIcon className="text-[#475467]" />}
-              <span>Convertir a factura</span>
-            </Button>
-          )}
-
-          {/* Send */}
-          {['BORRADOR', 'ENVIADA'].includes(cotizacion.estado) && (
-            <Button
-              variant="secondary"
-              onClick={handleEnviar}
-              disabled={updatingEstado || converting}
-              className="h-[40px] px-4 rounded-[8px] border border-[#d0d5dd] bg-white text-[#344054] hover:bg-neutral-50 text-[14px] font-semibold gap-2 flex items-center shadow-sm transition-colors cursor-pointer"
-            >
-              {updatingEstado ? <Spinner size={14} /> : <Send size={16} className="text-[#475467]" />}
-              <span>Enviar</span>
-            </Button>
-          )}
-
           {/* Edit */}
           {cotizacion.estado !== 'CONVERTIDA' && (
             <Button
@@ -469,21 +402,15 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
               <span>Editar</span>
             </Button>
           )}
-
-          {/* Reject/Delete */}
-          {cotizacion.estado !== 'CONVERTIDA' && cotizacion.estado !== 'RECHAZADA' && (
-            <Button
-              variant="secondary"
-              onClick={handleRechazar}
-              disabled={updatingEstado || converting}
-              className="h-[40px] px-4 rounded-[8px] border border-[#d0d5dd] bg-white text-[#b42318] hover:bg-red-50 text-[14px] font-semibold gap-2 flex items-center shadow-sm transition-colors cursor-pointer"
-            >
-              <Trash2 size={16} className="text-[#b42318]" />
-              <span>Eliminar</span>
-            </Button>
-          )}
         </div>
       </div>
+
+      {cotizacion.estado === 'CONVERTIDA' && (
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-[10px] bg-blue-50/50 border border-[#bfdbfe] text-[#0379d5] text-[13px] font-medium leading-normal w-full">
+          <Info size={16} className="text-[#0379d5] shrink-0" />
+          <span>Esta cotización ya fue convertida en factura y está vinculada a ella.</span>
+        </div>
+      )}
 
       {/* Main Two-Column Layout */}
       <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
@@ -500,23 +427,23 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
               <div className="flex flex-col gap-2.5 text-[14px] leading-[19.5px]">
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">RNC</span>
-                  <span className="text-[#344054] font-medium">{formatRnc(tenant?.rnc)}</span>
+                  <span className="text-[#344054] font-medium">{formatRnc(tenant?.rnc) || 'missing data'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Razón social</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.razonSocial || '—'}</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.razonSocial || 'missing data'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Dirección</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.direccion || 'Av. Winston Churchill #45, Sto. Dgo.'}</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.direccion || 'missing data'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Teléfono</span>
-                  <span className="text-[#344054] font-medium">809-555-0101</span>
+                  <span className="text-[#344054] font-medium">{(tenant as any)?.telefono || 'missing data'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Correo</span>
-                  <span className="text-[#344054] font-medium">facturacion@martinez.com.do</span>
+                  <span className="text-[#344054] font-medium">{(tenant as any)?.email || 'missing data'}</span>
                 </div>
               </div>
             </div>
@@ -619,39 +546,10 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
                   {formatHighlightText(cotizacion.notas || '50% de anticipo para iniciar el proyecto.')}
                 </div>
               </div>
-
-              {/* Nota para el cliente */}
-              <div className="bg-[#f1f5f9]/40 border border-[#e2e8f0] rounded-[6px] p-[13px] text-left flex flex-col gap-[2px] w-full">
-                <span className="text-[12px] font-normal text-[#64748b] leading-[16px]">Nota para el cliente</span>
-                <div className="text-[14px] text-[#0f172a] font-semibold leading-[20px]">
-                  {formatHighlightText('Incluye capacitación para 5 usuarios.')}
-                </div>
-              </div>
-
-              {/* Nota interna */}
-              <div className="bg-[#0379d5]/10 border border-[#e2e8f0] rounded-[6px] p-[13px] text-left flex flex-col gap-[2px] w-full">
-                <span className="text-[12px] font-normal text-[#0379d5] leading-[16px]">Nota interna</span>
-                <div className="text-[14px] text-[#0f172a] font-normal leading-[20px]">
-                  Cliente recurrente, prioridad alta.
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Archivos adjuntos */}
-          <div className="bg-white border border-[#eaecf0] rounded-[16px] p-6 flex flex-col gap-4 w-full shadow-[0_1px_3px_rgba(16,24,40,0.05)]">
-            <h3 className="text-[16px] font-semibold text-[#1d2939]">Archivos adjuntos</h3>
-            
-            <div className="border-2 border-dashed border-neutral-200 rounded-[12px] p-8 flex flex-col items-center justify-center text-center hover:border-neutral-300 transition-colors cursor-pointer bg-[#fafafa]">
-              <div className="bg-white border border-[#e2e8f0] rounded-full p-2.5 text-neutral-400 mb-3 shadow-sm">
-                <Upload size={20} />
-              </div>
-              <p className="text-[13px] font-medium text-neutral-600">
-                Arrastra documentos, imágenes o PDF, o <span className="text-[#0379d5] hover:underline font-semibold">búscalos en tu equipo</span>
-              </p>
-              <p className="text-[11px] text-neutral-400 mt-1 font-normal">Hasta 10 MB por archivo</p>
-            </div>
-          </div>
+
 
         </div>
 

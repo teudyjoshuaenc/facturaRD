@@ -75,6 +75,12 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
     enabled: !!id,
   })
 
+  // Fetch Tenant details
+  const { data: tenant } = useQuery<any>({
+    queryKey: ['tenant-info'],
+    queryFn: () => api.get<any[]>('/tenants').then((res) => res.data[0] || null),
+  })
+
   const handleDownload = async () => {
     if (!comprobante) return
     setDownloading(true)
@@ -307,23 +313,23 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
                 <div className="flex flex-col gap-[8px] text-[14px] text-normal leading-[19.5px]">
                   <div className="flex justify-between items-center w-full">
                     <span className="text-[#64748b]">RNC</span>
-                    <span className="text-[#333] font-normal">130-12345-6</span>
+                    <span className="text-[#333] font-normal">{formatRnc(tenant?.rnc) || 'missing data'}</span>
                   </div>
                   <div className="flex justify-between items-center w-full">
                     <span className="text-[#64748b]">Razón social</span>
-                    <span className="text-[#333] font-normal">Distribuidora Martínez SRL</span>
+                    <span className="text-[#333] font-normal">{tenant?.razonSocial || 'missing data'}</span>
                   </div>
                   <div className="flex justify-between items-center w-full">
                     <span className="text-[#64748b]">Dirección</span>
-                    <span className="text-[#333] font-normal">Av. Winston Churchill #45, Sto. Dgo.</span>
+                    <span className="text-[#333] font-normal">{tenant?.direccion || 'missing data'}</span>
                   </div>
                   <div className="flex justify-between items-center w-full">
                     <span className="text-[#64748b]">Teléfono</span>
-                    <span className="text-[#333] font-normal">809-555-0101</span>
+                    <span className="text-[#333] font-normal">{tenant?.telefono || 'missing data'}</span>
                   </div>
                   <div className="flex justify-between items-center w-full">
                     <span className="text-[#64748b]">Correo</span>
-                    <span className="text-[#333] font-normal">facturacion@martinez.com.do</span>
+                    <span className="text-[#333] font-normal">{tenant?.email || 'missing data'}</span>
                   </div>
                 </div>
               </div>

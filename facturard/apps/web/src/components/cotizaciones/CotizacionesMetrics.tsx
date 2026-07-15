@@ -34,6 +34,16 @@ function MetricCard({
   iconBg: string
   iconColor: string
 }): JSX.Element {
+  const valStr = String(value)
+  let fontSizeClass = 'text-[24px]'
+  if (valStr.length > 18) {
+    fontSizeClass = 'text-[15px]'
+  } else if (valStr.length > 15) {
+    fontSizeClass = 'text-[18px]'
+  } else if (valStr.length > 12) {
+    fontSizeClass = 'text-[20px]'
+  }
+
   return (
     <Card className="bg-white border border-neutral-200 p-5 rounded-[12px] shadow-sm flex flex-col gap-2.5 text-left font-sans">
       <div className="flex items-center gap-2">
@@ -43,7 +53,7 @@ function MetricCard({
         <span className="text-[12px] font-semibold text-[#475467]">{title}</span>
       </div>
       <div className="flex flex-col gap-1 mt-1">
-        <span className="text-[24px] font-bold text-[#101828] leading-tight">{value}</span>
+        <span className={`${fontSizeClass} font-bold text-[#101828] leading-tight truncate`} title={valStr}>{value}</span>
         <span className="text-[12px] text-[#475467] font-normal leading-normal">{description}</span>
       </div>
     </Card>

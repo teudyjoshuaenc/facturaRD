@@ -8,7 +8,6 @@ import {
   Search,
   Plus,
   Trash2,
-  UploadCloud,
   FileText,
   Calendar,
   CreditCard,
@@ -94,15 +93,9 @@ export function CotizacionForm(): JSX.Element {
   const [condicionPago, setCondicionPago] = useState('CONTADO')
   const [validezCotizacion, setValidezCotizacion] = useState('15')
   const [terminosCondiciones, setTerminosCondiciones] = useState('')
-  const [notasCliente, setNotasCliente] = useState('')
-  const [comentarioInterno, setComentarioInterno] = useState('')
 
   // Items State
   const [items, setItems] = useState<ItemRow[]>([])
-
-  // Attachments Mockup State
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: string }[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
@@ -275,16 +268,7 @@ export function CotizacionForm(): JSX.Element {
     setItems(items.filter((it) => it.key !== key))
   }
 
-  // Handle mock file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const list = Array.from(e.target.files).map((f) => ({
-        name: f.name,
-        size: `${(f.size / (1024 * 1024)).toFixed(2)} MB`
-      }))
-      setAttachedFiles([...attachedFiles, ...list])
-    }
-  }
+
 
   // Submit quote to DB
   const [submitting, setSubmitting] = useState(false)
@@ -812,79 +796,10 @@ export function CotizacionForm(): JSX.Element {
                 />
               </div>
 
-              {/* Notas Cliente */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-[#344054]">Notas para el cliente (visibles)</label>
-                <input
-                  type="text"
-                  value={notasCliente}
-                  onChange={(e) => setNotasCliente(e.target.value)}
-                  placeholder="Comentario que verá el cliente"
-                  className="border border-[#E2E8F0] rounded-[10px] h-[44px] px-3.5 text-[14px] focus:outline-none focus:border-brand-500 transition-colors w-full bg-white"
-                />
-              </div>
-
-              {/* Comentario Interno */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-[#344054]">Comentario para el equipo</label>
-                <input
-                  type="text"
-                  value={comentarioInterno}
-                  onChange={(e) => setComentarioInterno(e.target.value)}
-                  placeholder="Solo visible para tu equipo"
-                  className="border border-[#E2E8F0] rounded-[10px] h-[44px] px-3.5 text-[14px] focus:outline-none focus:border-brand-500 transition-colors w-full bg-white"
-                />
-              </div>
             </div>
           </Card>
 
-          {/* Card 4: Archivos adjuntos */}
-          <Card className="p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px] gap-5 text-left select-none">
-            <h3 className="font-bold text-[#101828] text-[16px] border-b border-neutral-100 pb-3">
-              Archivos adjuntos
-            </h3>
-            
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-neutral-200 rounded-xl p-8 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-300 transition-colors bg-neutral-50/30"
-            >
-              <UploadCloud size={28} className="text-neutral-400" />
-              <p className="font-semibold text-text-primary text-[14px] text-center">
-                Arrastra documentos, imágenes o PDF, o <span className="text-[#0379d5] hover:underline">búscalos en tu equipo</span>
-              </p>
-              <p className="text-[11px] text-[#64748b]">Hasta 10 MB por archivo</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
 
-            {attachedFiles.length > 0 && (
-              <div className="flex flex-col gap-2 mt-2">
-                <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Archivos seleccionados</span>
-                <div className="flex flex-wrap gap-2">
-                  {attachedFiles.map((f, idx) => (
-                    <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-[12px] font-semibold text-text-primary">
-                      <span>{f.name} ({f.size})</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setAttachedFiles(attachedFiles.filter((_, i) => i !== idx))
-                        }}
-                        className="text-neutral-400 hover:text-red-500 transition-colors cursor-pointer"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
 
         </div>
 

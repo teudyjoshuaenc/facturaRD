@@ -24,6 +24,7 @@ const estadoOptions = [
   { value: 'PENDIENTE', label: 'En proceso' },
   { value: 'RECHAZADO', label: 'Rechazado' },
   { value: 'DRAFT', label: 'Borrador' },
+  { value: 'COTIZACION_CONVERTIDA', label: 'Cotización convertida' },
 ]
 
 interface Props {

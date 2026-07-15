@@ -25,6 +25,7 @@ export interface Comprobante {
   createdAt: string
   updatedAt: string
   datos?: any
+  cotizacionId?: string | null
 }
 
 export interface PaginatedResponse<T> {
