@@ -116,6 +116,10 @@ APP_URL=http://localhost:3000
 - ✅ PlanActivoGuard — trial 14 días, HTTP 402 si vence
 - ✅ ecf-engine — firma XMLDSig, generadores XML, cliente DGII, PDF
 - ✅ Receptor DGII (Paso 7) — /fe/autenticacion, /fe/recepcion, /fe/aprobacioncomercial (fuera de api/v1)
+- ✅ Onboarding sin certificado — usuarios NO certificados ante la DGII pueden registrarse (RNC o
+  Cédula), cotizar y guardar borradores; se certifican después. `POST /ghl/onboarding` con P12
+  opcional; `assertPuedeEmitir` bloquea la emisión sin cert; `puedeEmitir`/`motivoNoEmite` en
+  `GET /tenants` y `/cumplimiento`; sección "Certificación fiscal" en Configuración (Sprint 11)
 
 ---
 
@@ -208,6 +212,54 @@ van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos po
 
 ---
 
+## 8ter. ONBOARDING SIN CERTIFICADO (Sprint 11)
+
+Un e-CF **ES** el envío a la DGII: sin certificado digital no existe factura fiscal. Pero un usuario
+NO certificado SÍ puede usar FacturaRD para **cotizar** (no fiscal) y **guardar borradores** (DRAFT, no
+consume e-NCF ni toca la DGII). Lo único vetado sin certificado es **EMITIR**. Este sprint habilita ese
+flujo de principio a fin y protege la emisión en el backend (no basta con ocultar el botón).
+
+- ✅ **Onboarding con certificado OPCIONAL.** `POST /ghl/onboarding` (multipart) acepta `file` +
+  `passphrase` **opcionales**. Con ellos → tenant CON certificado (listo para emitir). Sin ellos →
+  tenant SIN certificado (operativo para cotizar/borradores). En AMBOS casos la creación es una
+  **transacción atómica** (tenant + GhlLocation + secuencias base [+ certificado si vino]); si algo
+  falla, rollback total. `POST /certificados/upload` sigue vigente para certificar/renovar después.
+- ✅ **Identificación por RNC o Cédula.** DTO acepta `tipoIdentificacion: 'RNC' | 'CEDULA'`. Se valida
+  contra la DGII (mismo servicio `DgiiContribuyentesService.buscarPorRNC`, que funciona para ambos por
+  el endpoint `/rnc/{valor}`). Para **cédula** fuera del padrón (persona física), si el usuario envía un
+  `razonSocial` manual se acepta **sin validar** (con `logger.warn`); un **RNC de empresa** SIEMPRE debe
+  validar (sin respaldo manual). La cédula **NO reemplaza** la certificación: solo es otra forma de
+  identificarse. Lógica en `GhlAuthService.resolverIdentidad`.
+- ✅ **Barrera de emisión en el backend — `ComprobantesService.assertPuedeEmitir(tenantId)`.** Un tenant
+  solo puede ENVIAR a la DGII con certificado **activo Y vigente**. Sin él (o vencido) → **409** con
+  mensaje claro y accionable ("No puedes emitir a la DGII sin un certificado digital activo…").
+  - `POST /comprobantes` con `emitir=true` sin cert → 409. Con `emitir=false` (DRAFT) → **201** (guarda
+    borrador, no pasa por la barrera). `POST /comprobantes/:id/emitir` sin cert → 409 **sin gastar
+    e-NCF** (la barrera corre antes de consumir la secuencia). Cotizaciones → funcionan siempre.
+- ✅ **Estado "listo para emitir" — `puedeEmitir` + `motivoNoEmite`.** Helper puro compartido en
+  `apps/api/src/common/emision-status.ts`: `puedeEmitir` = cert activo + vigente + secuencias;
+  `motivoNoEmite ∈ { 'sinCertificado' | 'certificadoVencido' | 'sinSecuencias' | null }`. Expuesto en
+  `GET /tenants` (SafeTenant, calculado en O(1) consultas para N tenants) y en `GET /cumplimiento`.
+- ✅ **Frontend — onboarding simplificado (3 fases: Identifícate · Certificación · Listo).**
+  `IdentificacionStep` (toggle RNC/Cédula + nombre manual de respaldo), `CertificacionChoiceStep`
+  ("¿Ya facturas electrónicamente ante la DGII?"). Rama "Todavía no" → crea tenant sin certificado y
+  entra (mensaje positivo, aterriza en `/cotizaciones`). Rama "Sí" → `CertificadoStep` + `SecuenciasStep`.
+  `CrearCuentaStep` maneja ambos casos (P12 opcional). (`RncStep` eliminado, reemplazado por
+  `IdentificacionStep`.)
+- ✅ **Frontend — emisión bloqueada con enlace.** En `/nueva-factura`, sin certificado el botón *Emitir
+  e-CF* queda deshabilitado con el mensaje pedido + enlace directo a **Configuración → Certificación
+  fiscal** (`#certificacion-fiscal`). *Guardar borrador* sigue habilitado; cotizaciones sin bloqueo.
+- ✅ **Frontend — "Certificación fiscal" en Configuración** (`CertificacionFiscalCard`, ancla
+  `certificacion-fiscal`). Estado visible ("No certificado" / "Certificado activo · vence en X días"),
+  subida del P12 (mismo dropzone del onboarding) + configuración de secuencias (mismo `SecuenciasStep`),
+  ayuda ("qué es el certificado / contacto DMAIA"). Al subir el P12, `puedeEmitir` pasa a true y el botón
+  de Emitir se desbloquea.
+- **Tests:** `apps/api/test/sin-certificado.e2e-spec.ts` (11 casos: onboarding sin P12, cédula, cédula
+  fuera de padrón con nombre manual, DRAFT/emitir/cotización sin cert, subir P12 desbloquea, regresión
+  del tenant certificado). **101 e2e + 118 ecf-engine, build 0.** No cambia el path de emisión de DMAIA.
+
+---
+
 ## 9. DGII — NOTAS CRÍTICAS
 - `normalizeXml()` SIEMPRE antes de firmar cualquier XML
 - Filename multipart DEBE ser: `{RNCEmisor}{eNCF}.xml`
@@ -272,18 +324,21 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 **Rutas (App Router, route group `(dashboard)`):**
 ```
 /                → entry point: lee ?location_id, decide onboarding o dashboard
-/onboarding      → wizard 4 pasos + éxito: 1) Negocio (RNC vs DGII) →
-                   2) Certificado (captura .p12/.pfx + passphrase) →
-                   3) Cuenta (POST /ghl/onboarding multipart transaccional, guarda JWT;
-                      un 400 vuelve al paso 2 sin perder el RNC validado) →
-                   4) Secuencias (opcional: POST /secuencias/sincronizar; "Omitir" visible) →
-                   éxito → CTA a /nueva-factura
+/onboarding      → wizard 3 fases (Identifícate · Certificación · Listo). Certificado OPCIONAL
+                   (Sprint 11): 1) Identifícate (RNC o Cédula vs DGII; nombre manual de respaldo
+                   para cédula fuera de padrón) → 2) "¿Ya facturas ante la DGII?": (a) "Sí" →
+                   .p12/.pfx + passphrase + secuencias; (b) "Todavía no" → crea tenant SIN
+                   certificado y entra (aterriza en /cotizaciones) → POST /ghl/onboarding multipart
+                   (P12 opcional), guarda JWT → 3) Listo
 /dashboard       → métricas del mes + facturas recientes
 /facturas        → lista paginada con filtros por estado y búsqueda
-/nueva-factura   → formulario emitir comprobante (E31/E32)
-/configuracion   → empresa, certificado P12, webhook GHL (emisión entrante),
-                   y "Integración con GoHighLevel" para IMPORTAR contactos
-                   (PATCH /contactos/configurar-ghl: Private Integration Token + ghlRncFieldKey)
+/nueva-factura   → formulario emitir comprobante (E31/E32). Sin certificado: *Emitir e-CF* queda
+                   deshabilitado con enlace a Configuración → Certificación fiscal; *Guardar
+                   borrador* sigue habilitado (DRAFT)
+/configuracion   → empresa, "Certificación fiscal" (CertificacionFiscalCard, ancla
+                   #certificacion-fiscal: estado + subir P12 + secuencias + ayuda/contacto DMAIA),
+                   webhook GHL (emisión entrante), y "Integración con GoHighLevel" para IMPORTAR
+                   contactos (PATCH /contactos/configurar-ghl: Private Integration Token + ghlRncFieldKey)
 /contacto        → directorio de contactos + "Sincronizar con GoHighLevel"
                    (POST /contactos/sincronizar-ghl → resumen importados/actualizados/sinRnc)
 ```

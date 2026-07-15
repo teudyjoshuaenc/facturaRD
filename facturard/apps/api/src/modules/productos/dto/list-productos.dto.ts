@@ -18,7 +18,7 @@ export class ListProductosDto {
   @IsOptional()
   tipo?: string
 
-  @ApiPropertyOptional({ description: 'Por defecto sólo activos. Envía false para ver los desactivados.' })
+  @ApiPropertyOptional({ description: 'Filtro de 3 estados: omitir → todos; true → sólo activos; false → sólo inactivos.' })
   @Transform(({ value }) => (value === undefined ? undefined : value === 'true' || value === true))
   @IsBoolean()
   @IsOptional()

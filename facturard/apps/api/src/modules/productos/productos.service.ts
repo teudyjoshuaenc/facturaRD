@@ -32,17 +32,19 @@ export class ProductosService {
 
     const where: Prisma.ProductoWhereInput = {
       tenantId,
+      // Filtro de 3 estados: sin parámetro → todos (activos e inactivos);
+      // activo=true → sólo activos; activo=false → sólo inactivos (soft-deleted).
       ...(query.activo !== undefined && { activo: query.activo }),
       ...(query.tipo !== undefined && { tipo: query.tipo }),
       ...(query.categoria !== undefined && { categoria: query.categoria }),
       ...(query.search !== undefined && query.search.trim() !== ''
         ? {
-            OR: [
-              { nombre: { contains: query.search, mode: 'insensitive' } },
-              { codigo: { contains: query.search, mode: 'insensitive' } },
-              { descripcion: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+          OR: [
+            { nombre: { contains: query.search, mode: 'insensitive' } },
+            { codigo: { contains: query.search, mode: 'insensitive' } },
+            { descripcion: { contains: query.search, mode: 'insensitive' } },
+          ],
+        }
         : {}),
     }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
-import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
@@ -28,6 +29,12 @@ const WIZARD_STEPS = [
 ]
 
 const ITBIS_RATES: Record<string, number> = { I1: 0.18, I2: 0.16, I3: 0, I4: 0, E: 0 }
+
+// Mensaje cuando el tenant no tiene certificado digital activo: no puede emitir a
+// la DGII, pero sí guardar borradores. Enlaza a la Certificación fiscal.
+const CERT_BLOCK_MSG =
+  'Para enviar facturas a la DGII necesitas un certificado digital. Configúralo en ' +
+  'Configuración → Certificación fiscal, o contáctanos para ayudarte a certificarte.'
 
 const TIPO_ECF_LABELS: Record<TipoECF, string> = {
   E31: 'B01 - Factura de Crédito Fiscal Electrónica (E31)',
@@ -85,7 +92,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Form state
   const [tipoECF, setTipoECF] = useState<TipoECF>('E31')
   const [selectedCliente, setSelectedCliente] = useState<Contacto | null>(null)
-  
+
   // Draft and Re-emission State
   const [loadingDraft, setLoadingDraft] = useState(false)
   const [originalEstado, setOriginalEstado] = useState<string | null>(null)
@@ -149,7 +156,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             setOriginalEstado(c.estado)
           }
           setTipoECF(c.tipoECF)
-          
+
           // Map backend payment condition to local tipoPago
           // 1: CONTADO, 2: CREDITO, 3: GRATUITO
           const cond = c.datos?.condicionPago || (c.tipoPago === 2 ? 'CREDITO' : c.tipoPago === 3 ? 'GRATUITO' : 'CONTADO')
@@ -237,7 +244,42 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const { blockingReason, isPlanExpired, hasCertIssue } = useEmissionStatus()
+  const [blockingReason, setBlockingReason] = useState<string | null>(null)
+  const [isPlanExpired, setIsPlanExpired] = useState(false)
+  const [hasCertIssue, setHasCertIssue] = useState(false)
+
+  useEffect(() => {
+    async function checkBlockingStatus() {
+      try {
+        const certRes = await api.get('/certificados/active')
+        const cert = certRes.data
+        if (!cert || !cert.activo) {
+          setHasCertIssue(true)
+          setBlockingReason(CERT_BLOCK_MSG)
+        } else {
+          const days = Math.ceil(
+            (new Date(cert.validoHasta).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+          )
+          if (days <= 0) {
+            setHasCertIssue(true)
+            setBlockingReason(CERT_BLOCK_MSG)
+          }
+        }
+      } catch (err: any) {
+        if (err.response?.status === 402) {
+          setIsPlanExpired(true)
+          const msg = getErrorMessage(err, 'El período de prueba o su plan ha vencido.')
+          setBlockingReason(msg)
+        } else if (err.response?.status === 404) {
+          setHasCertIssue(true)
+          setBlockingReason(CERT_BLOCK_MSG)
+        } else {
+          console.error('Error checking active certificate:', err)
+        }
+      }
+    }
+    checkBlockingStatus()
+  }, [])
 
 
 
@@ -822,9 +864,20 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 {blockingReason && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[12px] text-red-700 font-semibold leading-normal text-left font-sans flex items-start gap-2 select-none mb-1">
                     <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-[13px]">Emisión Bloqueada</p>
+                    <div className="min-w-0">
+                      <p className="font-bold text-[13px]">
+                        {hasCertIssue ? 'Necesitas un certificado digital' : 'Emisión Bloqueada'}
+                      </p>
                       <p className="font-normal mt-0.5 text-[11px] leading-snug">{blockingReason}</p>
+                      {hasCertIssue && (
+                        <Link
+                          href="/configuracion#certificacion-fiscal"
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#0379D5] px-2.5 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#0379D5]/90"
+                        >
+                          <ShieldCheck size={13} />
+                          Ir a Certificación fiscal
+                        </Link>
+                      )}
                     </div>
                   </div>
                 )}

@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import type { Queue } from 'bullmq'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { readFile, unlink } from 'node:fs/promises'
 import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
+import { generarRepresentacionImpresa, resolveDgiiEnv } from '@facturard/ecf-engine'
+import { buildEcfPdfInput } from './pdf-input.builder'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import type { CrearNotaDto } from './dto/crear-nota.dto'
@@ -157,6 +162,29 @@ export class ComprobantesService {
     return undefined
   }
 
+  /**
+   * Barrera de emisión: un tenant solo puede ENVIAR a la DGII si tiene un
+   * certificado digital activo y vigente. Sin él, lanza 409 con un mensaje claro
+   * y accionable. NO afecta borradores (DRAFT) ni cotizaciones — esos flujos no
+   * llaman a este método. Es la protección de servidor: no basta con ocultar el
+   * botón en el front.
+   */
+  private async assertPuedeEmitir(tenantId: string): Promise<void> {
+    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
+    if (!cert) {
+      throw new ConflictException(
+        'No puedes emitir a la DGII sin un certificado digital activo. ' +
+          'Configúralo en Configuración → Certificación fiscal (o guarda el comprobante como borrador).',
+      )
+    }
+    if (cert.validoHasta.getTime() < Date.now()) {
+      throw new ConflictException(
+        `Tu certificado digital venció el ${cert.validoHasta.toLocaleDateString('es-DO')}. ` +
+          'Sube uno vigente en Configuración → Certificación fiscal para volver a emitir.',
+      )
+    }
+  }
+
   async crear(tenantId: string, dtoOriginal: CreateComprobanteDto): Promise<Comprobante> {
     // Resuelve snapshots de producto (items) y del comprador (contacto) ANTES de
     // calcular totales y persistir, para que el documento sea inmutable.
@@ -184,9 +212,8 @@ export class ComprobantesService {
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(dto, totales.montoTotal)
 
-    // 1. Verificar que el tenant tiene certificado activo
-    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
-    if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
+    // 1. Verificar que el tenant tiene certificado activo (barrera de emisión).
+    await this.assertPuedeEmitir(tenantId)
 
     // 2. Resolver FechaVencimientoSecuencia ANTES de consumir la secuencia
     //    (si falta y el tipo la exige, se lanza error sin gastar un e-NCF).
@@ -334,8 +361,7 @@ export class ComprobantesService {
       throw new ConflictException('El comprobante ya fue emitido o no es un borrador')
     }
 
-    const cert = await prisma.certificado.findFirst({ where: { tenantId, activo: true } })
-    if (!cert) throw new ConflictException('El tenant no tiene certificado activo. Sube un P12 antes de emitir.')
+    await this.assertPuedeEmitir(tenantId)
 
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
@@ -469,6 +495,43 @@ export class ComprobantesService {
     const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId } })
     if (!comprobante) throw new NotFoundException(`Comprobante ${id} no encontrado`)
     return comprobante
+  }
+
+  /**
+   * Regenera el PDF del comprobante AL VUELO desde los datos persistidos
+   * (`datos` + `xmlFirmado`), en vez de servir el archivo guardado en disco.
+   * Motivos: (a) el /tmp de Railway es efímero (se borra en cada redeploy), y
+   * (b) así el QR/consultatimbre lleva siempre el set correcto (e-NCF en MAYÚS,
+   * fechafirma y codigoseguridad), sin depender de PDFs viejos ya horneados ni
+   * reemitir el e-CF. No consume secuencia ni contacta a la DGII.
+   */
+  async regenerarPdfBuffer(tenantId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const comprobante = await this.findOne(tenantId, id)
+    if (comprobante.estado !== 'ACEPTADO' && comprobante.estado !== 'ACEPTADO_CONDICIONAL') {
+      throw new NotFoundException('El PDF sólo está disponible para comprobantes aceptados')
+    }
+    if (!comprobante.eNCF || !comprobante.xmlFirmado) {
+      throw new NotFoundException('El comprobante no tiene datos suficientes para regenerar el PDF')
+    }
+
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
+    const datos = comprobante.datos as unknown as CreateComprobanteDto
+    const pdfInput = buildEcfPdfInput(
+      datos,
+      tenant,
+      comprobante.eNCF,
+      resolveDgiiEnv(),
+      comprobante.xmlFirmado,
+    )
+
+    const tmpPath = join(tmpdir(), `ecf-${id}-${Date.now()}.pdf`)
+    try {
+      await generarRepresentacionImpresa(pdfInput, tmpPath)
+      const buffer = await readFile(tmpPath)
+      return { buffer, filename: `${comprobante.eNCF}.pdf` }
+    } finally {
+      await unlink(tmpPath).catch(() => undefined)
+    }
   }
 
   async resumen(tenantId: string, query: ResumenComprobantesDto): Promise<ResumenComprobantes> {

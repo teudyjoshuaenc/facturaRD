@@ -40,12 +40,16 @@ export function useContactos() {
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Este hook alimenta el SELECTOR de emisión (nueva-factura): pide sólo activos
+  // para no permitir facturar con contactos dados de baja. La GESTIÓN del
+  // directorio usa useContactosDirectorio (sin filtro → ve todos).
   const { data: contactos = [], isLoading } = useQuery({
-    queryKey: ['contactos', searchQuery],
+    queryKey: ['contactos', 'emision', searchQuery],
     queryFn: async () => {
       const res = await api.get('/contactos', {
         params: {
           search: searchQuery.trim() || undefined,
+          activo: true,
           limit: 100,
         },
       })

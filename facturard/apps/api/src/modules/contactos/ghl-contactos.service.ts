@@ -145,6 +145,14 @@ export class GhlContactosService {
     return res
   }
 
+  /**
+   * REGLA DE DISEÑO: en una re-sincronización, GHL puede AGREGAR o MEJORAR datos,
+   * pero NUNCA degradar ni revertir lo que el usuario editó a mano en FacturaRD.
+   *  - CREATE inicial: aplica los defaults (tipo CLIENTE, origen GHL, fallback de nombre).
+   *  - UPDATE de un contacto existente: solo escribe los campos que GHL trae con dato
+   *    real; conserva rnc/rncValidado si GHL viene sin RNC, no pisa el nombre si GHL no
+   *    trae uno útil y NO toca el tipo (respeta PROVEEDOR/CONSUMIDOR_FINAL manuales).
+   */
   private async upsertContacto(
     tenantId: string,
     c: GhlContacto,
@@ -154,42 +162,63 @@ export class GhlContactosService {
     const rnc = this.extraerRnc(c, rncFieldIds)
     if (!rnc) resultado.sinRnc += 1
 
-    let rncValidado = false
-    if (rnc) {
-      try {
-        await this.dgii.buscarPorRNC(rnc)
-        rncValidado = true
-      } catch {
-        rncValidado = false
-      }
-    }
+    // rncValidado solo se calcula (llamada a DGII) cuando GHL trae un RNC. Refleja
+    // el RNC que llega de GHL, no un vacío.
+    const rncValidado = rnc !== undefined ? await this.validarRnc(rnc) : false
 
     // Nombre: empresa → nombre completo (versión "Raw" con mayúsculas) → contactName.
+    // undefined si GHL no trae nada útil (no forzamos '(sin nombre)' en el update).
     const nombreCompleto = [c.firstNameRaw ?? c.firstName, c.lastNameRaw ?? c.lastName]
       .map((s) => s?.trim())
       .filter(Boolean)
       .join(' ')
       .trim()
-    const razonSocial =
-      c.companyName?.trim() || nombreCompleto || c.contactName?.trim() || c.name?.trim() || '(sin nombre)'
+    const razonSocialGhl =
+      c.companyName?.trim() || nombreCompleto || c.contactName?.trim() || c.name?.trim() || undefined
 
+    const existing = await prisma.contacto.findFirst({ where: { tenantId, ghlContactId: c.id } })
+
+    if (!existing) {
+      // CREATE inicial → defaults.
+      await prisma.contacto.create({
+        data: {
+          tenantId,
+          ghlContactId: c.id,
+          tipo: 'CLIENTE',
+          origen: 'GHL',
+          razonSocial: razonSocialGhl ?? '(sin nombre)',
+          rncValidado,
+          ...(rnc !== undefined && { rnc }),
+          ...(c.email ? { email: c.email } : {}),
+          ...(c.phone ? { telefono: c.phone } : {}),
+        },
+      })
+      resultado.importados += 1
+      return
+    }
+
+    // UPDATE → solo agrega/mejora, nunca degrada:
+    //  - rnc + rncValidado: solo si GHL trae RNC (vacío → se conservan ambos).
+    //  - razonSocial: solo si GHL trae un nombre real (vacío → se conserva el manual).
+    //  - email/telefono: solo si GHL los trae.
+    //  - tipo/origen: NO se tocan.
     const data = {
-      tipo: 'CLIENTE',
-      origen: 'GHL',
-      razonSocial,
-      rncValidado,
-      ...(rnc !== undefined && { rnc }),
+      ...(rnc !== undefined && { rnc, rncValidado }),
+      ...(razonSocialGhl !== undefined && { razonSocial: razonSocialGhl }),
       ...(c.email ? { email: c.email } : {}),
       ...(c.phone ? { telefono: c.phone } : {}),
     }
+    await prisma.contacto.update({ where: { id: existing.id }, data })
+    resultado.actualizados += 1
+  }
 
-    const existing = await prisma.contacto.findFirst({ where: { tenantId, ghlContactId: c.id } })
-    if (existing) {
-      await prisma.contacto.update({ where: { id: existing.id }, data })
-      resultado.actualizados += 1
-    } else {
-      await prisma.contacto.create({ data: { tenantId, ghlContactId: c.id, ...data } })
-      resultado.importados += 1
+  /** true si la DGII valida el RNC; false si no existe o la DGII no responde. */
+  private async validarRnc(rnc: string): Promise<boolean> {
+    try {
+      await this.dgii.buscarPorRNC(rnc)
+      return true
+    } catch {
+      return false
     }
   }
 

@@ -137,7 +137,7 @@ function tipoLabel(tipoECF: string): string {
  * - Tipo 32 < RD$250,000       → fc.dgii.gov.do/consultatimbrefc
  * - Tipo 32 ≥ RD$250,000       → ecf.dgii.gov.do/consultatimbre (igual que E31)
  */
-function buildQrUrl(ecf: EcfPdfInput): string {
+export function buildQrUrl(ecf: EcfPdfInput): string {
   const ambiente = ecf.ambiente ?? 'certecf';
   const tipoCode = ecf.tipoECF.replace(/^[Ee]/, '');
   const isRfce = tipoCode === '32' && ecf.montoTotal < 250_000;
@@ -156,7 +156,10 @@ function buildQrUrl(ecf: EcfPdfInput): string {
   }
 
   params.push(
-    ['encf', ecf.eNCF.toLowerCase()],
+    // El e-NCF DEBE ir en MAYÚSCULAS: el consultatimbre de la DGII hace match
+    // exacto y case-sensitive sobre este valor (verificado en producción con
+    // E310000000011 — en minúscula responde "No fue encontrada la factura").
+    ['encf', ecf.eNCF],
     ['fechaemision', ecf.fechaEmision],
     ['montototal', ecf.montoTotal.toFixed(2)],
   );

@@ -1,5 +1,5 @@
-import { IsOptional, IsIn, IsString, IsNumber, Min, Max } from 'class-validator'
-import { Type } from 'class-transformer'
+import { IsOptional, IsIn, IsString, IsNumber, IsBoolean, Min, Max } from 'class-validator'
+import { Type, Transform } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
 export class ListContactosDto {
@@ -17,6 +17,12 @@ export class ListContactosDto {
   @IsIn(['MANUAL', 'GHL'])
   @IsOptional()
   origen?: string
+
+  @ApiPropertyOptional({ description: 'Filtro de 3 estados: omitir → todos; true → sólo activos; false → sólo inactivos.' })
+  @Transform(({ value }) => (value === undefined ? undefined : value === 'true' || value === true))
+  @IsBoolean()
+  @IsOptional()
+  activo?: boolean
 
   @ApiPropertyOptional({ default: 1 })
   @Type(() => Number)

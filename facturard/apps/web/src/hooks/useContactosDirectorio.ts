@@ -26,6 +26,7 @@ export interface ContactosDirParams {
   search?: string | undefined
   tipo?: string | undefined
   origen?: string | undefined
+  // Filtro de 3 estados de la gestión: undefined → todos; true → activos; false → inactivos.
   activo?: boolean | undefined
   page?: number | undefined
   limit?: number | undefined

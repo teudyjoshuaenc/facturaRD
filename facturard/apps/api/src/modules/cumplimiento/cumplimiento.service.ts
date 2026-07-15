@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@facturard/database'
+import { computeEmisionStatus, type MotivoNoEmite } from '../../common/emision-status'
 
 const DIA_MS = 24 * 60 * 60 * 1000
 const RECHAZADOS_DIAS = 30
@@ -7,6 +8,8 @@ const RECHAZADOS_DIAS = 30
 export interface Cumplimiento {
   certificado: { existe: boolean; vigente: boolean; vencido: boolean; diasRestantes: number | null }
   bloqueaEmision: boolean
+  puedeEmitir: boolean
+  motivoNoEmite: MotivoNoEmite
   secuencias: Array<{ tipoECF: string; ultimaSecuencia: number; disponibles: number | null; porAgotarse: boolean; venceEn: Date | null }>
   comprobantesConProblema: { count: number; ids: string[] }
   reportesPendientes: { periodo: string; pendientes: string[] }
@@ -44,6 +47,11 @@ export class CumplimientoService {
     }
     // Sin certificado activo o vencido → no se puede emitir.
     const bloqueaEmision = !cert || certificado.vencido
+    // Estado explícito "listo para emitir" (certificado vigente + secuencias).
+    const { puedeEmitir, motivoNoEmite } = computeEmisionStatus(
+      cert?.validoHasta ?? null,
+      secuencias.length > 0,
+    )
 
     // ── Secuencias ───────────────────────────────────────────────────────────
     // No hay tope de rango almacenado, así que `disponibles` es null; `porAgotarse`
@@ -80,6 +88,6 @@ export class CumplimientoService {
       indicadorGeneral = 'WARN'
     }
 
-    return { certificado, bloqueaEmision, secuencias: secs, comprobantesConProblema, reportesPendientes, indicadorGeneral }
+    return { certificado, bloqueaEmision, puedeEmitir, motivoNoEmite, secuencias: secs, comprobantesConProblema, reportesPendientes, indicadorGeneral }
   }
 }

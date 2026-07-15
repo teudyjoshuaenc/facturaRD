@@ -81,166 +81,22 @@ export default function ProductosPage(): JSX.Element {
   const [localMockOverrides, setLocalMockOverrides] = useState<Record<string, any>>({})
   const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
 
-  // Mock initial dataset matching Foto 2 to make it high-fidelity
-  const extendedProductos = useMemo(() => {
-    const list = [
-      { id: 'mock-p1', nombre: 'Consultoría tecnológica', codigo: 'SRV-001 · Hora', tipo: 'SERVICIO' as const, precio: 84999.99, indicadorFacturacion: 'I1', precioFinal: 100299.99, estado: 'ACTIVO' },
-      { id: 'mock-p2', nombre: 'Licencia de software anual', codigo: 'SRV-002 · Hora', tipo: 'BIEN' as const, precio: 21271.19, indicadorFacturacion: 'I1', precioFinal: 25100.00, estado: 'ACTIVO' },
-      { id: 'mock-p3', nombre: 'Soporte técnico mensual', codigo: 'SRV-003 · Hora', tipo: 'SERVICIO' as const, precio: 15000.00, indicadorFacturacion: 'I1', precioFinal: 17700.00, estado: 'ACTIVO' },
-    ]
-
-    // Apply mock deletions
-    let visibleList = list.filter(item => !deletedMockIds.includes(item.id))
-
-    // Apply mock overrides
-    visibleList = visibleList.map(item => {
-      if (localMockOverrides[item.id]) {
-        const overrides = localMockOverrides[item.id]
-        const precio = overrides.precio !== undefined ? overrides.precio : item.precio
-        const indicadorFacturacion = overrides.indicadorFacturacion !== undefined ? overrides.indicadorFacturacion : item.indicadorFacturacion
-        const rate = indicadorFacturacion === 'I1' ? 0.18 : indicadorFacturacion === 'I2' ? 0.16 : 0
-        return {
-          ...item,
-          ...overrides,
-          precio,
-          indicadorFacturacion,
-          precioFinal: precio * (1 + rate),
-        }
-      }
-      return item
-    })
-
-    // Append user-registered products
-    allProductos.forEach((p) => {
-      if (!visibleList.some((item) => item.id === p.id)) {
-        const rate = p.indicadorFacturacion === 'I1' ? 0.18 : p.indicadorFacturacion === 'I2' ? 0.16 : 0
-        visibleList.push({
-          id: p.id,
-          nombre: p.nombre,
-          codigo: p.codigo ? `${p.codigo} · SKU` : 'GEN-001 · Unidad',
-          tipo: p.tipo,
-          precio: p.precio,
-          indicadorFacturacion: p.indicadorFacturacion,
-          precioFinal: p.precio * (1 + rate),
-          estado: p.activo !== false ? 'ACTIVO' : 'INACTIVO',
-        })
-      }
-    })
-    return visibleList
-  }, [allProductos, deletedMockIds, localMockOverrides])
-
-  async function handleToggleEstado(p: any) {
-    setTogglingProducto(p)
-  }
-
-  async function confirmToggleEstado() {
-    if (!togglingProducto) return
-    const p = togglingProducto
-    const nuevoEstado = p.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
-    const nuevoActivo = nuevoEstado === 'ACTIVO'
-
-    if (p.id.startsWith('mock-')) {
-      setLocalMockOverrides((prev) => ({
-        ...prev,
-        [p.id]: {
-          ...prev[p.id],
-          estado: nuevoEstado,
-        },
-      }))
-      if (selectedProducto && selectedProducto.id === p.id) {
-        setSelectedProducto((prev: any) => ({ ...prev, estado: nuevoEstado }))
-      }
-      toast.success('Estado del producto actualizado')
-    } else {
-      try {
-        await actualizarProducto(p.id, { activo: nuevoActivo })
-        if (selectedProducto && selectedProducto.id === p.id) {
-          setSelectedProducto((prev: any) => ({ ...prev, estado: nuevoEstado }))
-        }
-      } catch (error) {
-        // error toast handled by mutation
-      }
-    }
-    setTogglingProducto(null)
-  }
-
-  async function handleEditSave(id: string, data: any) {
-    const isMock = id.startsWith('mock-')
-    if (isMock) {
-      const nuevoEstado = data.activo !== undefined ? (data.activo ? 'ACTIVO' : 'INACTIVO') : undefined
-      setLocalMockOverrides((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          nombre: data.nombre,
-          tipo: data.tipo,
-          codigo: data.codigo ? `${data.codigo} · SKU` : undefined,
-          precio: data.precio,
-          indicadorFacturacion: data.indicadorFacturacion,
-          ...(nuevoEstado && { estado: nuevoEstado }),
-        },
-      }))
-      if (selectedProducto && selectedProducto.id === id) {
-        setSelectedProducto((prev: any) => ({
-          ...prev,
-          nombre: data.nombre,
-          tipo: data.tipo,
-          codigo: data.codigo ? `${data.codigo} · SKU` : prev.codigo,
-          precio: data.precio,
-          indicadorFacturacion: data.indicadorFacturacion,
-        }))
-      }
-      toast.success('Producto actualizado correctamente')
-    } else {
-      await actualizarProducto(id, data)
-      if (selectedProducto && selectedProducto.id === id) {
-        const rate = data.indicadorFacturacion === 'I1' ? 0.18 : data.indicadorFacturacion === 'I2' ? 0.16 : 0
-        setSelectedProducto((prev: any) => ({
-          ...prev,
-          nombre: data.nombre,
-          tipo: data.tipo,
-          codigo: data.codigo ? `${data.codigo} · SKU` : prev.codigo,
-          precio: data.precio,
-          indicadorFacturacion: data.indicadorFacturacion,
-          precioFinal: data.precio * (1 + rate),
-        }))
-      }
-    }
-  }
-
-  async function handleDeleteConfirm() {
-    if (!deletingProducto) return
-    const id = deletingProducto.id
-    if (id.startsWith('mock-')) {
-      setDeletedMockIds((prev) => [...prev, id])
-      toast.success('Producto eliminado correctamente')
-    } else {
-      await eliminarProducto(id)
-    }
-    if (selectedProducto && selectedProducto.id === id) {
-      setSelectedProducto(null)
-    }
-    setDeletingProducto(null)
-  }
-
-  async function handleDuplicar(p: any) {
-    const rawCode = p.codigo.split(' · ')[0] || p.codigo
-    const cleanCode = rawCode === 'GEN-001' || rawCode === 'SRV-001' || rawCode === 'SRV-002' || rawCode === 'SRV-003' ? '' : rawCode
-
-    try {
-      await crearProducto({
-        nombre: `${p.nombre} (Copia)`,
+  // Sólo productos reales de GET /productos (sin fallback mock).
+  const extendedProductos = useMemo(
+    () =>
+      allProductos.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        codigo: p.codigo ? `${p.codigo} · SKU` : 'GEN-001 · Unidad',
         tipo: p.tipo,
-        codigo: cleanCode ? `${cleanCode}-COPIA` : '',
         precio: p.precio,
-        indicadorFacturacion: p.indicadorFacturacion === 'I4' ? 'E' : (p.indicadorFacturacion as any),
-        precioIncluyeItbis: false,
-      })
-      toast.success('Producto duplicado correctamente')
-    } catch (error) {
-      // error handled by mutation
-    }
-  }
+        indicadorFacturacion: p.indicadorFacturacion,
+        precioFinal: p.precio * (p.indicadorFacturacion === 'I1' ? 1.18 : 1),
+        uso: 5,
+        estado: p.activo ? 'ACTIVO' : 'INACTIVO',
+      })),
+    [allProductos],
+  )
 
   // Filter logic
   const filtered = useMemo(() => {

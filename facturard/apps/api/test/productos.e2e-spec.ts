@@ -52,21 +52,44 @@ describe('Productos (e2e)', () => {
     await request(app.getHttpServer()).post('/api/v1/productos').set(auth(tenantA)).send(nuevo({ precioUnitario: 0 })).expect(400)
   })
 
-  it('soft delete: oculto de la lista por defecto, accesible por id', async () => {
+  it('soft delete + filtro 3 estados: default=todos, activo=true excluye, activo=false incluye', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/productos').set(auth(tenantA)).send(nuevo({ codigo: 'SOFT' })).expect(201)
     const id = created.body.id
 
     await request(app.getHttpServer()).delete(`/api/v1/productos/${id}`).set(auth(tenantA)).expect(200)
 
-    const list = await request(app.getHttpServer()).get('/api/v1/productos').set(auth(tenantA)).expect(200)
-    expect(list.body.data.some((p: { id: string }) => p.id === id)).toBe(false)
-
+    // soft delete: sigue accesible por id con activo=false
     const byId = await request(app.getHttpServer()).get(`/api/v1/productos/${id}`).set(auth(tenantA)).expect(200)
     expect(byId.body.activo).toBe(false)
 
+    // default (sin parámetro) → trae activos E inactivos
+    const listTodos = await request(app.getHttpServer()).get('/api/v1/productos').set(auth(tenantA)).expect(200)
+    expect(listTodos.body.data.some((p: { id: string }) => p.id === id)).toBe(true)
+
+    // activo=true → sólo activos (no aparece el soft-deleted)
+    const listActivos = await request(app.getHttpServer()).get('/api/v1/productos?activo=true').set(auth(tenantA)).expect(200)
+    expect(listActivos.body.data.some((p: { id: string }) => p.id === id)).toBe(false)
+    expect(listActivos.body.data.every((p: { activo: boolean }) => p.activo === true)).toBe(true)
+
+    // activo=false → sólo inactivos (aparece el soft-deleted)
     const listInactivos = await request(app.getHttpServer()).get('/api/v1/productos?activo=false').set(auth(tenantA)).expect(200)
     expect(listInactivos.body.data.some((p: { id: string }) => p.id === id)).toBe(true)
+    expect(listInactivos.body.data.every((p: { activo: boolean }) => p.activo === false)).toBe(true)
+  })
+
+  it('reactivar: PATCH activo=true devuelve el producto a la lista de activos', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/productos').set(auth(tenantA)).send(nuevo({ codigo: 'REACT' })).expect(201)
+    const id = created.body.id
+
+    await request(app.getHttpServer()).delete(`/api/v1/productos/${id}`).set(auth(tenantA)).expect(200)
+    const upd = await request(app.getHttpServer())
+      .patch(`/api/v1/productos/${id}`).set(auth(tenantA)).send({ activo: true }).expect(200)
+    expect(upd.body.activo).toBe(true)
+
+    const listActivos = await request(app.getHttpServer()).get('/api/v1/productos?activo=true').set(auth(tenantA)).expect(200)
+    expect(listActivos.body.data.some((p: { id: string }) => p.id === id)).toBe(true)
   })
 
   it('aislamiento multi-tenant: B no lee ni actualiza el producto de A (404)', async () => {

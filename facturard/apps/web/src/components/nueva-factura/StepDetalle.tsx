@@ -50,6 +50,7 @@ export function StepDetalle({
   tipoECF,
 }: StepDetalleProps): JSX.Element {
   const baseId = useId()
+  // Selector de emisión: sólo productos activos (no se factura con productos dados de baja).
   const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
   const [productSearch, setProductSearch] = useState('')
@@ -140,7 +141,7 @@ export function StepDetalle({
         {/* Products catalog & search */}
         <div className="flex flex-col gap-4">
           {!isQuickMode && <h3 className="text-h4 font-bold text-text-primary">Detalle de Factura</h3>}
-          
+
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -394,19 +395,19 @@ export function StepDetalle({
         {/* Navigation */}
         {!isQuickMode && (
           <div className="flex items-center gap-[24px] w-[904px] h-[48px] select-none">
-            <Button 
-              variant="secondary" 
-              size="lg" 
-              onClick={onBack} 
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={onBack}
               className="w-[114px] h-[48px] rounded-[14px] border border-[#F5F5F5] text-black font-normal text-[16px] font-sans hover:bg-neutral-50"
             >
               Atrás
             </Button>
-            <Button 
-              variant="primary" 
-              size="lg" 
-              disabled={!hasValidItems} 
-              onClick={onNext} 
+            <Button
+              variant="primary"
+              size="lg"
+              disabled={!hasValidItems}
+              onClick={onNext}
               className="flex-1 h-[48px] rounded-[14px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-[16px] font-normal text-white font-sans flex items-center justify-center gap-2"
             >
               <span>siguiente</span>

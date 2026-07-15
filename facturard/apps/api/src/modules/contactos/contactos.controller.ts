@@ -42,6 +42,7 @@ export class ContactosController {
   @ApiQuery({ name: 'tipo', enum: ['CLIENTE', 'PROVEEDOR', 'CONSUMIDOR_FINAL'], required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'origen', enum: ['MANUAL', 'GHL'], required: false })
+  @ApiQuery({ name: 'activo', type: Boolean, required: false })
   @ApiQuery({ name: 'page', type: Number, required: false })
   @ApiQuery({ name: 'limit', type: Number, required: false })
   findAll(@CurrentTenant() tenantId: string, @Query() query: ListContactosDto) {

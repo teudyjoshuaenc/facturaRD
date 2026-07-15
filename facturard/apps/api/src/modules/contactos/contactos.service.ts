@@ -58,7 +58,9 @@ export class ContactosService {
 
     const where: Prisma.ContactoWhereInput = {
       tenantId,
-      activo: true,
+      // Filtro de 3 estados: sin parámetro → todos (activos e inactivos);
+      // activo=true → sólo activos; activo=false → sólo inactivos (soft-deleted).
+      ...(query.activo !== undefined && { activo: query.activo }),
       ...(query.tipo !== undefined && { tipo: query.tipo }),
       ...(query.origen !== undefined && { origen: query.origen }),
       ...(query.search !== undefined && query.search.trim() !== ''
