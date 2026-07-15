@@ -68,7 +68,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
 
   const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SHOW_WIP_TABS !== 'true'
   const wipRoutes = [
-    '/cotizaciones',
     '/compras',
     '/reportes',
     '/empresa',
