@@ -13,9 +13,13 @@ import {
   Copy,
   Pencil,
   FileCheck,
+  FileText,
+  ArrowRight,
   Clock
 } from 'lucide-react'
 import { Select } from '@/components/ui/select'
+import { Modal } from '@/components/ui/modal'
+import { Button } from '@/components/ui/button'
 import { CotizacionesHeader } from '@/components/cotizaciones/CotizacionesHeader'
 import { CotizacionesMetrics } from '@/components/cotizaciones/CotizacionesMetrics'
 import { formatCurrency } from '@/lib/comprobantes'
@@ -33,7 +37,7 @@ const estadoOptions = [
   { value: 'ENVIADA', label: 'Enviada' },
   { value: 'APROBADA', label: 'Aprobada' },
   { value: 'RECHAZADA', label: 'Rechazada' },
-  { value: 'CONVERTIDA', label: 'Convertida en factura' },
+  { value: 'CONVERTIDA', label: 'Facturada' },
   { value: 'VENCIDA', label: 'Vencida' },
 ]
 
@@ -87,7 +91,8 @@ function EstadoBadge({ estado }: { estado: Cotizacion['estado'] }): JSX.Element 
     case 'CONVERTIDA':
       return (
         <span className="inline-flex items-center gap-1 bg-[#eff6ff] text-[#1e40af] border border-[#bfdbfe] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
-          Convertida en factura
+          <FileText size={11} className="text-[#1e40af]" />
+          Facturada
         </span>
       )
     case 'VENCIDA':
@@ -121,8 +126,26 @@ function CotizacionesPageInner(): JSX.Element {
   const [page, setPage] = useState(1)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [convertTarget, setConvertTarget] = useState<Cotizacion | null>(null)
+  const [converting, setConverting] = useState(false)
 
   const { cotizaciones, loading, error, total, totalPages, fetchCotizaciones, deleteCotizacion } = useCotizaciones()
+
+  const handleConvertir = async () => {
+    if (!convertTarget) return
+    setConverting(true)
+    try {
+      const res = await api.post(`/cotizaciones/${convertTarget.id}/convertir`, { emitir: false })
+      const comp = res.data.comprobante
+      setConvertTarget(null)
+      toast.success('Cotización convertida a borrador de factura')
+      router.push(`/nueva-factura?id=${comp.id}`)
+    } catch {
+      toast.error('Error al convertir la cotización')
+    } finally {
+      setConverting(false)
+    }
+  }
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
@@ -457,25 +480,34 @@ function CotizacionesPageInner(): JSX.Element {
                         >
                           <Pencil size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
                         </button>
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            try {
-                              const res = await api.post(`/cotizaciones/${c.id}/convertir`, { emitir: false })
-                              const comp = res.data.comprobante
-                              toast.success('Cotización convertida a borrador de factura')
-                              router.push(`/nueva-factura?id=${comp.id}`)
-                            } catch (err) {
-                              toast.error('Error al convertir la cotización')
-                            }
-                          }}
-                          className="text-[#0379d5] hover:text-[#0262ad] transition-colors focus:outline-none"
-                          title="Convertir en factura"
-                          disabled={c.estado === 'CONVERTIDA'}
-                        >
-                          <FileCheck size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
-                        </button>
+                        {c.estado === 'CONVERTIDA' ? (
+                          c.comprobanteId ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/facturas/${c.comprobanteId}`)
+                              }}
+                              className="inline-flex items-center gap-1 text-[#0379d5] hover:text-[#0262ad] transition-colors focus:outline-none text-[12px] font-semibold"
+                              title="Ver factura vinculada"
+                            >
+                              Ver factura
+                              <ArrowRight size={13} />
+                            </button>
+                          ) : null
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setConvertTarget(c)
+                            }}
+                            className="text-[#0379d5] hover:text-[#0262ad] transition-colors focus:outline-none"
+                            title="Convertir en factura"
+                          >
+                            <FileCheck size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -511,6 +543,30 @@ function CotizacionesPageInner(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Confirmación de conversión */}
+      <Modal
+        open={convertTarget !== null}
+        onClose={() => (converting ? undefined : setConvertTarget(null))}
+        title="¿Convertir esta cotización en factura?"
+        subtitle={convertTarget ? `${convertTarget.folio} · ${formatCurrency(convertTarget.total)}` : ''}
+        icon={<FileText size={20} />}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConvertTarget(null)} disabled={converting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={handleConvertir} disabled={converting}>
+              {converting ? <Spinner size={16} className="text-white" /> : 'Sí, convertir'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[14px] text-[#475467] leading-relaxed">
+          Se creará una factura (comprobante en borrador) con los mismos ítems. La cotización quedará
+          marcada como <strong>Facturada</strong> y vinculada a la factura; no podrás editarla después.
+        </p>
+      </Modal>
     </div>
   )
 }

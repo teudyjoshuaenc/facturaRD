@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import type { JSX } from 'react'
-import { AlertCircle, Building2, FileCheck2, Hash, Sparkles } from 'lucide-react'
+import { AlertCircle, Building2, FileCheck2, Hash, Sparkles, MapPin, Phone, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { api, getErrorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/context/AuthContext'
@@ -39,8 +40,12 @@ export function CrearCuentaStep({
   const { setAuth } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [direccion, setDireccion] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [email, setEmail] = useState('')
 
   const conCertificado = file !== null
+  const emailInvalid = email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   async function handleSubmit(): Promise<void> {
     setSubmitting(true)
@@ -52,6 +57,10 @@ export function CrearCuentaStep({
       form.append('tipoIdentificacion', tipo)
       // El nombre manual solo se envía como respaldo (cédula fuera del padrón).
       if (razonSocialManual) form.append('razonSocial', razonSocial)
+      // Datos de contacto opcionales del emisor.
+      if (direccion.trim()) form.append('direccion', direccion.trim())
+      if (telefono.trim()) form.append('telefono', telefono.trim())
+      if (email.trim()) form.append('email', email.trim())
       if (conCertificado) {
         form.append('file', file)
         form.append('passphrase', passphrase)
@@ -99,6 +108,41 @@ export function CrearCuentaStep({
         )}
       </div>
 
+      {/* Datos de contacto del emisor (opcionales). */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-body-sm font-medium text-text-primary">Datos de contacto (opcional)</span>
+          <span className="text-ui-xs text-text-secondary">
+            Aparecen en tus facturas y cotizaciones. Puedes completarlos ahora o luego en Empresa.
+          </span>
+        </div>
+        <Input
+          id="ob-direccion"
+          leftIcon={<MapPin size={15} />}
+          placeholder="Dirección fiscal"
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            id="ob-telefono"
+            leftIcon={<Phone size={15} />}
+            placeholder="Teléfono"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+          />
+          <Input
+            id="ob-email"
+            type="email"
+            leftIcon={<Mail size={15} />}
+            placeholder="Correo"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={emailInvalid ? 'Correo no válido' : ''}
+          />
+        </div>
+      </div>
+
       {!conCertificado && (
         <div className="flex items-start gap-3 rounded-lg border border-success-500/30 bg-success-500/10 p-4">
           <Sparkles size={18} className="mt-0.5 shrink-0 text-success-600" />
@@ -130,7 +174,7 @@ export function CrearCuentaStep({
         <Button variant="secondary" size="lg" onClick={onBack} disabled={submitting}>
           Atrás
         </Button>
-        <Button variant="primary" size="lg" className="flex-1" disabled={submitting} onClick={handleSubmit}>
+        <Button variant="primary" size="lg" className="flex-1" disabled={submitting || emailInvalid} onClick={handleSubmit}>
           {submitting ? <Spinner size={18} className="text-white" /> : conCertificado ? 'Crear cuenta' : 'Crear cuenta y empezar'}
         </Button>
       </div>

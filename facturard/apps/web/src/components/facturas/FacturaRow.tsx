@@ -149,23 +149,25 @@ const FacturaRow = React.memo(function FacturaRow({
       <td className="px-[16px] py-[16px] w-[112px] min-w-[112px] text-left align-middle">
         <div className="flex items-center gap-[4px] w-full">
 
-          <button
-            type="button"
-            title="Descargar PDF"
-            disabled={downloadingId === c.id}
-            onClick={() => onDownload(c)}
-            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] disabled:opacity-50 transition-colors focus:outline-none flex-shrink-0"
-          >
-            {downloadingId === c.id ? (
-              <Spinner size={14} />
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
-                <path d="M14 10V12.6667C14 13.403 13.403 14 12.6667 14H3.33333C2.597 14 2 13.403 2 12.6667V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M8 2V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M4.66666 6.66667L8 10L11.3333 6.66667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
+          {c.estado !== 'RECHAZADO' && c.estado !== 'ERROR' && (
+            <button
+              type="button"
+              title="Descargar PDF"
+              disabled={downloadingId === c.id}
+              onClick={() => onDownload(c)}
+              className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] disabled:opacity-50 transition-colors focus:outline-none flex-shrink-0"
+            >
+              {downloadingId === c.id ? (
+                <Spinner size={14} />
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+                  <path d="M14 10V12.6667C14 13.403 13.403 14 12.6667 14H3.33333C2.597 14 2 13.403 2 12.6667V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M8 2V10" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M4.66666 6.66667L8 10L11.3333 6.66667" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          )}
 
           {c.estado === 'DRAFT' || c.estado === 'RECHAZADO' || c.estado === 'ERROR' ? (
             <>

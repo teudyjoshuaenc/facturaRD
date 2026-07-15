@@ -11,7 +11,6 @@ import {
   FileText,
   Calendar,
   CreditCard,
-  Send,
   Eye,
   X,
   Check,
@@ -30,7 +29,7 @@ import { useProductos } from '@/hooks/useProductos'
 import type { Producto, NuevoProductoData } from '@/hooks/useProductos'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { NuevoProductoModal } from '@/components/nueva-factura/NuevoProductoModal'
-import { formatCurrency } from '@/lib/comprobantes'
+import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -272,7 +271,9 @@ export function CotizacionForm(): JSX.Element {
 
   // Submit quote to DB
   const [submitting, setSubmitting] = useState(false)
-  const handleSaveQuote = async (enviar: boolean) => {
+  // Guardar SIEMPRE deja la cotización como BORRADOR. El envío (marcar ENVIADA) es una
+  // acción aparte desde el detalle: el front no envía nada automáticamente al cliente.
+  const handleSaveQuote = async () => {
     if (!clienteNombre.trim()) {
       toast.error('El nombre del cliente es obligatorio')
       return
@@ -294,22 +295,14 @@ export function CotizacionForm(): JSX.Element {
 
     setSubmitting(true)
     try {
-      let quoteId = id
       if (id) {
         // Edit existing
         await api.patch(`/cotizaciones/${id}`, payload)
         toast.success('Borrador de cotización actualizado')
       } else {
-        // Create new
-        const res = await api.post('/cotizaciones', payload)
-        quoteId = res.data.id
-        toast.success('Cotización guardada exitosamente')
-      }
-
-      if (enviar && quoteId) {
-        // Transition state to ENVIADA
-        await api.patch(`/cotizaciones/${quoteId}/estado`, { estado: 'ENVIADA' })
-        toast.success('Cotización enviada al cliente')
+        // Create new (queda como BORRADOR)
+        await api.post('/cotizaciones', payload)
+        toast.success('Cotización guardada como borrador')
       }
 
       router.push('/cotizaciones')
@@ -343,7 +336,7 @@ export function CotizacionForm(): JSX.Element {
         <div className="flex flex-col gap-0.5">
           <h2 className="text-h4 font-bold text-[#101828] text-[22px] leading-tight">Nueva cotización</h2>
           <p className="text-[12px] text-[#64748b] leading-normal">
-            {folio} · Guarda como borrador o envía al cliente cuando esté lista.
+            {folio} · Se guarda como borrador. Podrás enviarla y descargar su PDF desde el detalle.
           </p>
         </div>
       </div>
@@ -817,8 +810,18 @@ export function CotizacionForm(): JSX.Element {
               <div className="flex items-center gap-[12px]">
                 <button
                   type="button"
-                  title="Vista Previa"
-                  onClick={() => toast.info('Generando vista previa de la cotización...')}
+                  title={id ? 'Descargar PDF' : 'Guarda la cotización para generar su PDF'}
+                  onClick={async () => {
+                    if (!id) {
+                      toast.info('Guarda la cotización primero para generar su PDF')
+                      return
+                    }
+                    try {
+                      await downloadCotizacionPdf(api, id, folio || 'cotizacion')
+                    } catch {
+                      toast.error('No se pudo generar el PDF')
+                    }
+                  }}
                   className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors cursor-pointer"
                 >
                   <Eye size={18} />
@@ -827,7 +830,7 @@ export function CotizacionForm(): JSX.Element {
                   type="button"
                   title="Guardar Borrador"
                   disabled={submitting}
-                  onClick={() => handleSaveQuote(false)}
+                  onClick={() => handleSaveQuote()}
                   className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <Save size={18} />
@@ -895,15 +898,15 @@ export function CotizacionForm(): JSX.Element {
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => handleSaveQuote(true)}
+                  onClick={() => handleSaveQuote()}
                   className="w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:bg-[#0262ad] transition-colors shadow-sm focus:outline-none cursor-pointer disabled:opacity-50"
                 >
                   {submitting ? (
                     <Spinner size={18} className="text-white" />
                   ) : (
                     <>
-                      <Send size={15} />
-                      <span>Guardar y enviar</span>
+                      <Save size={15} />
+                      <span>{id ? 'Guardar cambios' : 'Guardar cotización'}</span>
                     </>
                   )}
                 </button>
@@ -918,7 +921,8 @@ export function CotizacionForm(): JSX.Element {
 
               {/* Info text */}
               <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 text-[11px] text-[#64748b] leading-normal text-left">
-                Puedes guardar sin enviar. El cliente solo verá la cotización cuando la envíes.
+                Se guarda como borrador. Podrás marcarla como enviada y descargar su PDF desde el
+                detalle de la cotización.
               </div>
             </div>
           </Card>

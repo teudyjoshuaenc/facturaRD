@@ -29,6 +29,7 @@ export interface Cotizacion {
   fechaVigencia?: string
   createdAt: string
   updatedAt: string
+  comprobanteId?: string | null
   items: CotizacionItem[]
   // Enriched by the list (from contact join, if any)
   contacto?: {

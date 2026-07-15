@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn, Length, MinLength } from 'class-validator'
+import { IsString, IsOptional, IsIn, IsEmail, Length, MinLength, MaxLength, ValidateIf } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 
 export class GhlOnboardingDto {
@@ -43,4 +43,24 @@ export class GhlOnboardingDto {
   @IsString()
   @MinLength(4)
   passphrase?: string
+
+  // ── Datos de contacto del emisor (opcionales, se completan luego en Empresa) ──
+  @ApiPropertyOptional({ description: 'Dirección fiscal del emisor (opcional; aparece en el PDF)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  direccion?: string
+
+  @ApiPropertyOptional({ description: 'Teléfono de contacto del emisor (opcional)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  telefono?: string
+
+  @ApiPropertyOptional({ description: 'Correo del emisor (opcional; aparece en el PDF)' })
+  @IsOptional()
+  @ValidateIf((o) => o.email !== '')
+  @IsEmail({}, { message: 'email debe ser un correo válido' })
+  @MaxLength(120)
+  email?: string
 }

@@ -17,7 +17,6 @@ import {
   RefreshCw,
   Mail,
   AlertTriangle,
-  Shield,
   Pencil,
 } from 'lucide-react'
 import {
@@ -26,7 +25,6 @@ import {
   ESTADO_LABELS,
   ESTADO_BADGE_VARIANT,
   formatCurrency,
-  formatDate,
   downloadComprobantePdf,
 } from '@/lib/comprobantes'
 import { Button } from '@/components/ui/button'
@@ -86,6 +84,8 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
     setDownloading(true)
     try {
       await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+    } catch {
+      toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {
       setDownloading(false)
     }
@@ -142,6 +142,146 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
     const s = pad(date.getSeconds())
     return `${d}/${m}/${y} ${h}:${min}:${s}`
   }
+
+  // Historial con SOLO eventos reales y verificables (nada de pasos con horas
+  // inventadas). Fuente: createdAt, updatedAt, estado, trackId y mensajeDGII.
+  const buildHistorial = (c: Comprobante) => {
+    const eventos: {
+      fecha: string
+      estado: string
+      icon: JSX.Element
+      codigo: string
+      descr: string
+      trackId: string
+    }[] = []
+
+    const esAceptado = c.estado === 'ACEPTADO' || c.estado === 'ACEPTADO_CONDICIONAL'
+    const esError = c.estado === 'RECHAZADO' || c.estado === 'ERROR'
+    const enProceso = c.estado === 'PENDIENTE' || c.estado === 'EN_COLA' || c.estado === 'ENVIANDO'
+
+    // Respuesta / estado actual de la DGII (evento más reciente → primero).
+    if (esAceptado) {
+      eventos.push({
+        fecha: formatDateTime(c.updatedAt),
+        estado: ESTADO_LABELS[c.estado],
+        icon: <CheckCircle2 size={14} className="text-[#067647] shrink-0" />,
+        codigo: c.estado === 'ACEPTADO' ? '0' : '—',
+        descr: c.mensajeDGII || 'Aceptado por la DGII',
+        trackId: c.trackId || '—',
+      })
+    } else if (esError) {
+      eventos.push({
+        fecha: formatDateTime(c.updatedAt),
+        estado: ESTADO_LABELS[c.estado],
+        icon: <XCircle size={14} className="text-[#f04438] shrink-0" />,
+        codigo: '—',
+        descr: c.mensajeDGII || (c.estado === 'RECHAZADO' ? 'Rechazado por la DGII' : 'Error de envío'),
+        trackId: c.trackId || '—',
+      })
+    } else if (enProceso) {
+      eventos.push({
+        fecha: formatDateTime(c.updatedAt),
+        estado: ESTADO_LABELS[c.estado],
+        icon: <Clock size={14} className="text-[#0379d5] shrink-0" />,
+        codigo: '—',
+        descr: 'En proceso ante la DGII',
+        trackId: c.trackId || '—',
+      })
+    }
+
+    // Creación / emisión (siempre). Si tiene e-NCF, ya fue emitido.
+    eventos.push({
+      fecha: formatDateTime(c.createdAt),
+      estado: c.eNCF ? 'Comprobante emitido' : 'Borrador creado',
+      icon: <FileText size={14} className="text-[#64748b] shrink-0" />,
+      codigo: '—',
+      descr: c.eNCF ? `e-NCF ${c.eNCF} asignado` : 'Registro creado en el sistema',
+      trackId: '—',
+    })
+
+    return eventos
+  }
+
+  // Tarjeta "Estado DGII" derivada del estado REAL (nada hardcodeado). Nunca muestra
+  // "Aceptado" para un comprobante rechazado/pendiente/borrador.
+  const toneStyles = {
+    green: { card: 'border-[#a6f4c5] bg-[#f6fef9]', iconWrap: 'bg-[#ecfdf3] text-[#067647]', title: 'text-[#067647]' },
+    red: { card: 'border-[#fecaca] bg-[#fef2f2]', iconWrap: 'bg-[#fee2e2] text-[#d92d20]', title: 'text-[#b42318]' },
+    amber: { card: 'border-[#fed7aa] bg-[#fff7ed]', iconWrap: 'bg-[#ffedd5] text-[#c2410c]', title: 'text-[#c2410c]' },
+    neutral: { card: 'border-[#e2e8f0] bg-[#f8fafc]', iconWrap: 'bg-[#eff6ff] text-[#0379d5]', title: 'text-[#333]' },
+    draft: { card: 'border-[#e2e8f0] bg-[#f8fafc]', iconWrap: 'bg-[#f1f5f9] text-[#64748b]', title: 'text-[#333]' },
+  }
+
+  const estadoDgii = ((): {
+    tone: keyof typeof toneStyles
+    icon: JSX.Element
+    title: string
+    desc: string
+    codigo: string
+    showDetalle: boolean
+    actions: { title: string; body: string } | null
+  } => {
+    const e = comprobante.estado
+    if (e === 'ACEPTADO' || e === 'ACEPTADO_CONDICIONAL') {
+      const cond = e === 'ACEPTADO_CONDICIONAL'
+      return {
+        tone: 'green',
+        icon: <CheckCircle2 size={20} />,
+        title: cond ? 'Aceptado con observaciones' : 'Aceptado por la DGII',
+        desc: cond
+          ? 'La DGII aceptó el comprobante con observaciones.'
+          : 'El comprobante fue aceptado exitosamente.',
+        codigo: cond ? '202 - Aceptado condicional' : '0 - Aceptado',
+        showDetalle: true,
+        actions: cond
+          ? { title: 'Observaciones de la DGII', body: comprobante.mensajeDGII || 'Revise las observaciones reportadas por la DGII en el comprobante.' }
+          : null,
+      }
+    }
+    if (e === 'RECHAZADO') {
+      return {
+        tone: 'red',
+        icon: <XCircle size={20} />,
+        title: 'Rechazado por la DGII',
+        desc: 'La DGII rechazó el comprobante. No tiene validez fiscal.',
+        codigo: '—',
+        showDetalle: true,
+        actions: { title: 'Motivo del rechazo', body: comprobante.mensajeDGII || 'La DGII no detalló el motivo del rechazo.' },
+      }
+    }
+    if (e === 'ERROR') {
+      return {
+        tone: 'amber',
+        icon: <AlertTriangle size={20} />,
+        title: 'Error de envío',
+        desc: 'Ocurrió un error técnico al enviar el comprobante a la DGII.',
+        codigo: '—',
+        showDetalle: true,
+        actions: { title: 'Detalle del error', body: comprobante.mensajeDGII || 'Excepción técnica en la conexión con la DGII.' },
+      }
+    }
+    if (e === 'PENDIENTE' || e === 'EN_COLA' || e === 'ENVIANDO') {
+      return {
+        tone: 'neutral',
+        icon: <Clock size={20} />,
+        title: 'En proceso',
+        desc: 'El comprobante está pendiente de respuesta de la DGII.',
+        codigo: '—',
+        showDetalle: true,
+        actions: null,
+      }
+    }
+    // DRAFT
+    return {
+      tone: 'draft',
+      icon: <FileText size={20} />,
+      title: 'Borrador — no enviado a la DGII',
+      desc: 'Este comprobante es un borrador. Aún no se ha enviado a la DGII y no tiene validez fiscal.',
+      codigo: '—',
+      showDetalle: false,
+      actions: null,
+    }
+  })()
 
   return (
     <div className="flex flex-col gap-6 font-sans select-none text-left w-full">
@@ -201,15 +341,17 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
 
       {/* Horizontal Action Buttons Row */}
       <div className="flex flex-wrap gap-[8px] items-center w-full">
-        <Button
-          variant="secondary"
-          onClick={handleDownload}
-          disabled={downloading}
-          className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all disabled:opacity-50"
-        >
-          {downloading ? <Spinner size={14} /> : <Download size={14} className="shrink-0 text-[#64748b]" />}
-          <span>Descargar PDF</span>
-        </Button>
+        {comprobante.estado !== 'RECHAZADO' && comprobante.estado !== 'ERROR' && (
+          <Button
+            variant="secondary"
+            onClick={handleDownload}
+            disabled={downloading}
+            className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all disabled:opacity-50"
+          >
+            {downloading ? <Spinner size={14} /> : <Download size={14} className="shrink-0 text-[#64748b]" />}
+            <span>Descargar PDF</span>
+          </Button>
+        )}
         {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
           <>
             <Button
@@ -413,65 +555,64 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           </div>
         )}
 
-        {/* ESTADO DGII TAB */}
+        {/* ESTADO DGII TAB — refleja el estado REAL del comprobante */}
         {activeTab === 'estado_dgii' && (
           <div className="flex flex-col gap-6 w-full">
-            {/* DGII Acceptance Details */}
-            <div className="bg-white border border-[#e2e8f0] rounded-[14px] p-[24px] flex flex-col gap-[16px] w-full text-left">
+            {/* Tarjeta de estado (color según estado real) */}
+            <div className={`border rounded-[14px] p-[24px] flex flex-col gap-[16px] w-full text-left ${toneStyles[estadoDgii.tone].card}`}>
               <div className="flex gap-[16px] items-start w-full">
-                <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#ecfdf3] text-[#067647] shrink-0">
-                  <CheckCircle2 size={20} />
+                <div className={`flex h-[34px] w-[34px] items-center justify-center rounded-full shrink-0 ${toneStyles[estadoDgii.tone].iconWrap}`}>
+                  {estadoDgii.icon}
                 </div>
                 <div className="flex flex-col gap-[12px] w-full">
                   <div className="flex flex-col">
-                    <h3 className="text-[16px] font-semibold text-[#333]">Aceptado por DGII</h3>
-                    <p className="text-[12px] text-[#64748b] mt-0.5 font-normal">El comprobante fue aceptado exitosamente.</p>
+                    <h3 className={`text-[16px] font-semibold ${toneStyles[estadoDgii.tone].title}`}>{estadoDgii.title}</h3>
+                    <p className="text-[12px] text-[#64748b] mt-0.5 font-normal">{estadoDgii.desc}</p>
                   </div>
 
-                  <div className="flex flex-col gap-[8px] text-[12px] leading-[19.5px] w-full md:w-[400px]">
-                    <div className="flex justify-between items-center w-full">
-                      <span className="text-[#333]">TrackId</span>
-                      <span className="text-[#64748b] font-mono">{comprobante.trackId || 'TRK-2026042000001'}</span>
+                  {estadoDgii.showDetalle && (
+                    <div className="flex flex-col gap-[8px] text-[12px] leading-[19.5px] w-full md:w-[400px]">
+                      <div className="flex justify-between items-center w-full">
+                        <span className="text-[#333]">TrackId</span>
+                        <span className="text-[#64748b] font-mono">{comprobante.trackId || '—'}</span>
+                      </div>
+                      <div className="flex justify-between items-center w-full">
+                        <span className="text-[#333]">Fecha respuesta</span>
+                        <span className="text-[#64748b]">{formatDateTime(comprobante.updatedAt)}</span>
+                      </div>
+                      <div className="flex justify-between items-center w-full">
+                        <span className="text-[#333]">Código DGII</span>
+                        <span className="text-[#64748b]">{estadoDgii.codigo}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center w-full">
-                      <span className="text-[#333]">Fecha respuesta</span>
-                      <span className="text-[#64748b]">{formatDate(comprobante.updatedAt)} 10:32:15</span>
-                    </div>
-                    <div className="flex justify-between items-center w-full">
-                      <span className="text-[#333]">Código DGII</span>
-                      <span className="text-[#64748b]">0 - Aceptado</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Recommended Actions Alert Box */}
-            <div className="bg-[rgba(3,121,213,0.05)] border border-[#0379d5] rounded-[14px] p-[24px] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 w-full text-left">
-              <div className="flex gap-[16px] items-start">
-                <div className="flex h-[34px] w-[34px] items-center justify-center text-[#0379d5] shrink-0">
-                  <AlertTriangle size={24} />
-                </div>
-                <div className="flex flex-col gap-[12px]">
-                  <div className="flex flex-col">
-                    <h3 className="text-[16px] font-semibold text-[#333]">Acciones recomendadas</h3>
-                    <p className="text-[12px] text-[#64748b] mt-0.5 font-normal">El comprobante fue aceptado exitosamente.</p>
+            {/* Caja de acciones / motivo — solo cuando hay algo real que mostrar */}
+            {estadoDgii.actions && (
+              <div className="bg-[rgba(3,121,213,0.05)] border border-[#0379d5] rounded-[14px] p-[24px] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 w-full text-left">
+                <div className="flex gap-[16px] items-start">
+                  <div className="flex h-[34px] w-[34px] items-center justify-center text-[#0379d5] shrink-0">
+                    <AlertTriangle size={24} />
                   </div>
-                  <ul className="list-disc pl-4 flex flex-col gap-1 text-[12px] text-[#333] font-normal leading-[19.5px]">
-                    <li>Revise las observaciones reportadas por DGII en el mensaje.</li>
-                    <li>Verifique los datos fiscales y la configuración del comprobante.</li>
-                    <li>Realice las correcciones necesarias y reenvíe el comprobante si aplica.</li>
-                  </ul>
+                  <div className="flex flex-col gap-[8px]">
+                    <h3 className="text-[16px] font-semibold text-[#333]">{estadoDgii.actions.title}</h3>
+                    <p className="text-[13px] text-[#333] font-normal leading-[19.5px] whitespace-pre-wrap">
+                      {estadoDgii.actions.body}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <Button
-                onClick={() => router.push('/cumplimiento')}
-                className="h-[40px] px-[16px] py-[10px] rounded-[10px] bg-[#0379d5] hover:bg-[#0379d5]/90 text-white text-[13px] font-semibold leading-[19.5px] shrink-0 transition-all cursor-pointer border-0"
-              >
-                Ver en cumplimiento
-              </Button>
-            </div>
+                <Button
+                  onClick={() => router.push('/cumplimiento')}
+                  className="h-[40px] px-[16px] py-[10px] rounded-[10px] bg-[#0379d5] hover:bg-[#0379d5]/90 text-white text-[13px] font-semibold leading-[19.5px] shrink-0 transition-all cursor-pointer border-0"
+                >
+                  Ver en cumplimiento
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -543,40 +684,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      fecha: formatDateTime(comprobante.updatedAt),
-                      estado: ESTADO_LABELS[comprobante.estado] || 'Aceptado',
-                      icon: <CheckCircle2 size={14} className="text-[#067647] shrink-0" />,
-                      codigo: comprobante.estado === 'ACEPTADO' ? '0' : comprobante.estado === 'ACEPTADO_CONDICIONAL' ? '202' : '—',
-                      descr: comprobante.mensajeDGII || 'Aceptado por la DGII',
-                      trackId: comprobante.trackId || '—',
-                    },
-                    {
-                      fecha: formatDateTime(comprobante.updatedAt),
-                      estado: 'Enviando a DGII',
-                      icon: <Send size={14} className="text-[#0379d5] shrink-0" />,
-                      codigo: '—',
-                      descr: 'Petición enviada al WS de la DGII',
-                      trackId: comprobante.trackId || '—',
-                    },
-                    {
-                      fecha: formatDateTime(comprobante.createdAt),
-                      estado: 'XML firmado digitalmente',
-                      icon: <Shield size={14} className="text-[#0379d5] shrink-0" />,
-                      codigo: '—',
-                      descr: 'Firma digital insertada exitosamente',
-                      trackId: '—',
-                    },
-                    {
-                      fecha: formatDateTime(comprobante.createdAt),
-                      estado: 'Comprobante creado',
-                      icon: <FileText size={14} className="text-[#64748b] shrink-0" />,
-                      codigo: '—',
-                      descr: 'Registro creado en el sistema',
-                      trackId: '—',
-                    },
-                  ].map((ev, index) => (
+                  {buildHistorial(comprobante).map((ev, index) => (
                     <tr key={index} className="border-b border-[#f1f5f9] text-[12px] text-normal leading-[19.5px]">
                       <td className="py-[16px] text-[rgba(51,51,51,0.5)] w-[115px] min-w-[115px] truncate">{ev.fecha}</td>
                       <td className="py-[16px] w-[170px] min-w-[170px] truncate">

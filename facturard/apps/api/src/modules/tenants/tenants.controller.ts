@@ -4,6 +4,7 @@ import { TenantsService } from './tenants.service'
 import { DgiiContribuyentesService } from './dgii-contribuyentes.service'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 import { BrandingDto } from './dto/branding.dto'
+import { UpdateEmpresaDto } from './dto/update-empresa.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { SameTenantGuard } from '../../common/guards/same-tenant.guard'
@@ -52,6 +53,17 @@ export class TenantsController {
   @ApiOperation({ summary: 'Actualiza el branding (logo/colores) del tenant autenticado' })
   updateBranding(@CurrentTenant() tenantId: string, @Body() dto: BrandingDto) {
     return this.service.updateBranding(tenantId, dto)
+  }
+
+  @Patch('empresa')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary:
+      'Actualiza datos de contacto del emisor (dirección/teléfono/correo/logo). RNC y razón social no son editables.',
+  })
+  updateEmpresa(@CurrentTenant() tenantId: string, @Body() dto: UpdateEmpresaDto) {
+    return this.service.updateEmpresa(tenantId, dto)
   }
 
   @Get(':id')

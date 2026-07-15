@@ -106,18 +106,36 @@ export function formatDate(value: string): string {
   return `${day}-${month}-${year}`
 }
 
+async function downloadPdfBlob(
+  api: { get: (url: string, config: object) => Promise<{ data: Blob }> },
+  url: string,
+  filename: string,
+): Promise<void> {
+  const res = await api.get(url, { responseType: 'blob' })
+  const objectUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
 export async function downloadComprobantePdf(
   api: { get: (url: string, config: object) => Promise<{ data: Blob }> },
   id: string,
   eNCF: string,
 ): Promise<void> {
-  const res = await api.get(`/comprobantes/${id}/pdf`, { responseType: 'blob' })
-  const url = URL.createObjectURL(res.data)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${eNCF}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+  // eNCF puede venir vacío en borradores; el backend nombra el archivo, aquí sólo
+  // damos un nombre de descarga razonable.
+  await downloadPdfBlob(api, `/comprobantes/${id}/pdf`, `${eNCF || 'borrador'}.pdf`)
+}
+
+export async function downloadCotizacionPdf(
+  api: { get: (url: string, config: object) => Promise<{ data: Blob }> },
+  id: string,
+  folio: string,
+): Promise<void> {
+  await downloadPdfBlob(api, `/cotizaciones/${id}/pdf`, `${folio || 'cotizacion'}.pdf`)
 }

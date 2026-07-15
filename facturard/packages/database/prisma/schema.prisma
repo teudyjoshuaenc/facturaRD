@@ -60,6 +60,10 @@ model Tenant {
   razonSocial     String
   nombreComercial String?
   direccion       String?
+  // Datos de contacto del emisor que aparecen en la representación impresa
+  // (PDF/cotización). Editables en Empresa; RNC/razonSocial NO (vienen de DGII).
+  telefono        String?
+  email           String?
   plan            Plan         @default(BASICO)
   estado          TenantEstado @default(ACTIVO)
   planActivo      Boolean      @default(true)

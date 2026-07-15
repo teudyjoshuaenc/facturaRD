@@ -14,6 +14,14 @@ export interface EcfItem {
 
 export type DgiiAmbiente = 'certecf' | 'ecf';
 
+/**
+ * Modo de la representación impresa:
+ * - 'ECF'        → e-CF fiscal con QR/timbre DGII (comportamiento por defecto).
+ * - 'BORRADOR'   → borrador aún no emitido: sin QR, badge "sin valor fiscal".
+ * - 'COTIZACION' → cotización (no fiscal): sin QR, título "COTIZACIÓN", folio COT-xxxx.
+ */
+export type PdfModo = 'ECF' | 'BORRADOR' | 'COTIZACION';
+
 export interface EcfPdfInput {
   // Emisor
   rncEmisor: string;
@@ -21,6 +29,12 @@ export interface EcfPdfInput {
   nombreComercial?: string;
   direccionEmisor?: string;
   telefonoEmisor?: string;
+  emailEmisor?: string;
+
+  /** Tipo de documento a representar. Default 'ECF'. */
+  modo?: PdfModo;
+  /** Folio interno de la cotización (COT-xxxx). Solo se usa con modo 'COTIZACION'. */
+  folio?: string;
 
   // Identificación
   eNCF: string;
@@ -190,23 +204,36 @@ export async function generarRepresentacionImpresa(
   const HEADER_BG = ecf.colorSecundario && HEX_RE.test(ecf.colorSecundario) ? ecf.colorSecundario : GRAY_HEADER;
   const logoBuffer = await loadLogo(ecf.logoUrl);
 
-  const qrContent = buildQrUrl(ecf);
+  const modo: PdfModo = ecf.modo ?? 'ECF';
+  const esFiscal = modo === 'ECF';
 
-  // QR con nivel de corrección M según spec DGII.
-  // Version auto-seleccionada: la URL completa requiere versión 10+ dependiendo de la longitud.
-  const qrDataUrl = await QRCode.toDataURL(qrContent, {
-    errorCorrectionLevel: 'M',
-    width: 150,
-    margin: 1,
-  });
-  const qrBuffer = Buffer.from(qrDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+  // El QR/timbre sólo existe para e-CF fiscales. Borradores y cotizaciones no lo llevan
+  // (un timbre que resuelve a "no encontrada" en la DGII confundiría al usuario).
+  let qrContent = '';
+  let qrBuffer: Buffer | undefined;
+  if (esFiscal) {
+    qrContent = buildQrUrl(ecf);
+    // QR con nivel de corrección M según spec DGII.
+    // Version auto-seleccionada: la URL completa requiere versión 10+ dependiendo de la longitud.
+    const qrDataUrl = await QRCode.toDataURL(qrContent, {
+      errorCorrectionLevel: 'M',
+      width: 150,
+      margin: 1,
+    });
+    qrBuffer = Buffer.from(qrDataUrl.replace(/^data:image\/png;base64,/, ''), 'base64');
+  }
 
   // No bufferPages: avoids blank second page caused by footer text at y > usable
   // bottom triggering pdfkit auto-pagination inside the page-loop.
+  const tituloDoc =
+    modo === 'COTIZACION' ? `Cotización ${ecf.folio ?? ''}`.trim()
+    : modo === 'BORRADOR' ? `Borrador ${ecf.eNCF ?? ''}`.trim()
+    : `e-CF ${ecf.eNCF}`;
+
   const doc = new PDFDocument({
     size: 'A4',
     margin: 40,
-    info: { Title: `e-CF ${ecf.eNCF}` },
+    info: { Title: tituloDoc },
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -270,12 +297,26 @@ export async function generarRepresentacionImpresa(
       curY += dirH + 3;
     }
 
+    // Contacto del emisor (tel / correo) — una línea compacta si hay alguno.
+    const contactoEmisor = [ecf.telefonoEmisor, ecf.emailEmisor].filter(Boolean).join('  ·  ');
+    if (contactoEmisor) {
+      doc.font('Helvetica').fontSize(9).fillColor(TEXT);
+      const cH = doc.heightOfString(contactoEmisor, { width: LEFT_W });
+      doc.text(contactoEmisor, margin, curY, { width: LEFT_W });
+      curY += cH + 3;
+    }
+
     doc.font('Helvetica').fontSize(9).fillColor(TEXT)
        .text(`Fecha Emisión: ${ecf.fechaEmision}`, margin, curY, { width: LEFT_W });
     const leftEndY = curY + 13;
 
     // ── HEADER RIGHT: (Logo) + Tipo + e-NCF ───────────────────────────────────
-    const tipo     = tipoLabel(ecf.tipoECF);
+    // Título del documento según el modo. En cotización/borrador NO se llama al
+    // documento "e-CF" (no lo es); en fiscal se usa la etiqueta oficial del tipo.
+    const tipo =
+      modo === 'COTIZACION' ? 'COTIZACIÓN'
+      : modo === 'BORRADOR' ? `${tipoLabel(ecf.tipoECF)} (Borrador)`
+      : tipoLabel(ecf.tipoECF);
     const tipoCode = ecf.tipoECF.replace(/^[Ee]/, '');
 
     // Logo opcional arriba a la derecha; el tipo baja para no solaparse.
@@ -296,17 +337,32 @@ export async function generarRepresentacionImpresa(
     doc.text(tipo, RIGHT_X, tipoTopY, { width: RIGHT_W, align: 'right' });
     let rY = tipoTopY + tipoH + 5;
 
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
-       .text(`e-NCF: ${ecf.eNCF}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
-    rY += 13;
+    if (modo === 'COTIZACION') {
+      // Cotización: folio interno en vez de e-NCF; sin vencimiento de secuencia.
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
+         .text(`Cotización No.: ${ecf.folio ?? '—'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+      rY += 13;
+    } else {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
+         .text(`e-NCF: ${ecf.eNCF || '(pendiente de emisión)'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+      rY += 13;
 
-    if (ecf.fechaVencimiento) {
-      doc.font('Helvetica').fontSize(9).fillColor(TEXT)
-         .text(`Fecha Vencimiento: ${ecf.fechaVencimiento}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+      if (ecf.fechaVencimiento) {
+        doc.font('Helvetica').fontSize(9).fillColor(TEXT)
+           .text(`Fecha Vencimiento: ${ecf.fechaVencimiento}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+        rY += 13;
+      }
+    }
+
+    // Badge de advertencia para documentos NO fiscales.
+    if (modo !== 'ECF') {
+      const badge = modo === 'COTIZACION' ? 'DOCUMENTO NO FISCAL' : 'BORRADOR · SIN VALOR FISCAL';
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#B45309')
+         .text(badge, RIGHT_X, rY + 1, { width: RIGHT_W, align: 'right' });
       rY += 13;
     }
 
-    if ((tipoCode === '33' || tipoCode === '34') && ecf.eNCFReferencia) {
+    if (modo === 'ECF' && (tipoCode === '33' || tipoCode === '34') && ecf.eNCFReferencia) {
       doc.font('Helvetica').fontSize(9).fillColor(TEXT)
          .text(`NCF Modificado: ${ecf.eNCFReferencia}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
       rY += 12;
@@ -386,21 +442,24 @@ export async function generarRepresentacionImpresa(
     const LABEL_COL = TOTALS_W * 0.57;
     const VALUE_COL = TOTALS_W * 0.43;
 
-    doc.image(qrBuffer, margin, curY, { width: QR_SIZE });
+    // QR + timbre sólo en documentos fiscales (modo 'ECF').
+    if (esFiscal && qrBuffer) {
+      doc.image(qrBuffer, margin, curY, { width: QR_SIZE });
 
-    const qrLabelY = curY + QR_SIZE + 4;
-    doc.font('Helvetica').fontSize(6.5).fillColor(MUTED);
-    // Mostrar URL del timbre bajo el QR (truncada para que entre en el espacio)
-    const qrUrl = qrContent;
-    const urlCorta = qrUrl.length > 80 ? qrUrl.substring(0, 77) + '...' : qrUrl;
-    doc.text(urlCorta, margin, qrLabelY, { width: 180 });
-    if (ecf.codigoSeguridad) {
-      doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-         .text(`Cód. Seguridad: ${ecf.codigoSeguridad}`, margin, qrLabelY + 20, { width: 180 });
-    }
-    if (ecf.fechaHoraFirma) {
-      doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-         .text(`Fecha Firma: ${ecf.fechaHoraFirma}`, margin, qrLabelY + 31, { width: 180 });
+      const qrLabelY = curY + QR_SIZE + 4;
+      doc.font('Helvetica').fontSize(6.5).fillColor(MUTED);
+      // Mostrar URL del timbre bajo el QR (truncada para que entre en el espacio)
+      const qrUrl = qrContent;
+      const urlCorta = qrUrl.length > 80 ? qrUrl.substring(0, 77) + '...' : qrUrl;
+      doc.text(urlCorta, margin, qrLabelY, { width: 180 });
+      if (ecf.codigoSeguridad) {
+        doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
+           .text(`Cód. Seguridad: ${ecf.codigoSeguridad}`, margin, qrLabelY + 20, { width: 180 });
+      }
+      if (ecf.fechaHoraFirma) {
+        doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
+           .text(`Fecha Firma: ${ecf.fechaHoraFirma}`, margin, qrLabelY + 31, { width: 180 });
+      }
     }
 
     let totY = curY;
@@ -444,11 +503,15 @@ export async function generarRepresentacionImpresa(
     doc.moveTo(margin, footerY).lineTo(margin + contentW, footerY)
        .strokeColor(BORDER).lineWidth(0.5).stroke();
 
+    const footerText =
+      modo === 'COTIZACION'
+        ? 'COTIZACIÓN — Este documento NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
+        : modo === 'BORRADOR'
+          ? 'BORRADOR — Vista previa sin validez fiscal. Este documento no ha sido emitido ni aceptado por la DGII.'
+          : 'Representación impresa de Comprobante Fiscal Electrónico (e-CF) — Conserve este documento';
+
     doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-       .text(
-         'Representación impresa de Comprobante Fiscal Electrónico (e-CF) — Conserve este documento',
-         margin, footerY + 5, { align: 'center', width: contentW },
-       );
+       .text(footerText, margin, footerY + 5, { align: 'center', width: contentW });
 
     margins.bottom = savedBottom;
 

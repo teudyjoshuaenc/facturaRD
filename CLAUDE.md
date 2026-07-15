@@ -120,6 +120,18 @@ APP_URL=http://localhost:3000
   Cédula), cotizar y guardar borradores; se certifican después. `POST /ghl/onboarding` con P12
   opcional; `assertPuedeEmitir` bloquea la emisión sin cert; `puedeEmitir`/`motivoNoEmite` en
   `GET /tenants` y `/cumplimiento`; sección "Certificación fiscal" en Configuración (Sprint 11)
+- ✅ Datos del emisor + Empresa + PDFs (Ajustes UI 2026-07-15) — `Tenant.telefono`/`email` nuevos
+  (migración `20260715000000_add_tenant_emisor_contacto`); `PATCH /tenants/empresa`
+  (dirección/teléfono/correo/logoUrl; **RNC y razón social NO editables**, vienen de DGII). El bloque
+  emisor del PDF ahora incluye dirección/teléfono/correo. **Logo por URL**: `logoUrl` es una URL http(s)
+  pública que el motor PDF descarga; **subida de archivo real (blob storage) queda PENDIENTE/futuro**.
+  Motor PDF con `modo: 'ECF'|'BORRADOR'|'COTIZACION'`: `GET /comprobantes/:id/pdf` sirve borradores/
+  pendientes como vista previa (sin QR) además de los aceptados (rechazado/error → 404);
+  `GET /cotizaciones/:id/pdf` genera el PDF de cotización (folio COT-xxxx, sin e-NCF/QR, leyenda no
+  fiscal). Cotizaciones: crear = "Guardar" (BORRADOR), *Enviar*/*Convertir con confirmación*/*PDF* en el
+  detalle, badge CONVERTIDA→"Facturada" con enlace a la factura. Historial de detalle limpiado a eventos
+  reales (factura) / eliminado el inventado (cotización). Sidebar sin bloque de usuario; header sin chip
+  de automatización ni campana.
 
 ---
 
@@ -331,7 +343,13 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
                    certificado y entra (aterriza en /cotizaciones) → POST /ghl/onboarding multipart
                    (P12 opcional), guarda JWT → 3) Listo
 /dashboard       → métricas del mes + facturas recientes
-/facturas        → lista paginada con filtros por estado y búsqueda
+/facturas        → lista paginada con filtros por estado y búsqueda. Descarga de PDF disponible para
+                   cualquier estado sin error (aceptado = e-CF fiscal; borrador/pendiente = vista previa)
+/empresa         → datos del emisor (ACTIVO en prod): editable dirección/teléfono/correo + logo por URL
+                   (vista previa + validación); RNC/razón social solo-lectura (vienen de DGII);
+                   "Vista previa" con datos reales. PATCH /tenants/empresa
+/cotizaciones/[id] → detalle: Descargar PDF, Marcar enviada, Convertir en factura (con confirmación),
+                   badge "Facturada" + enlace a la factura; sin historial inventado
 /nueva-factura   → formulario emitir comprobante (E31/E32). Sin certificado: *Emitir e-CF* queda
                    deshabilitado con enlace a Configuración → Certificación fiscal; *Guardar
                    borrador* sigue habilitado (DRAFT)

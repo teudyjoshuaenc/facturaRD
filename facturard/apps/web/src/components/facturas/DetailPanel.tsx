@@ -102,53 +102,45 @@ export function DetailPanel({
   const total = Number(comprobante?.montoTotal || 0)
   const itbis = Math.max(0, total - subtotal)
 
-  // Timeline list generator
-  const historyEvents = []
+  // Historial con SOLO eventos reales (createdAt/updatedAt/estado/trackId/mensajeDGII).
+  // Sin timestamps intermedios inventados: creación + respuesta DGII.
+  const historyEvents: { title: string; description: string; date: string; status: string }[] = []
   if (comprobante) {
-    // 1. Emitido
+    // 1. Creación / emisión (createdAt real).
     historyEvents.push({
-      title: 'Emitido',
-      description: 'Comprobante generado y firmado',
+      title: comprobante.eNCF ? 'Emitido' : 'Borrador creado',
+      description: comprobante.eNCF ? `e-NCF ${comprobante.eNCF}` : 'Registro creado en el sistema',
       date: formatTimelineDate(comprobante.createdAt),
       status: 'success',
     })
 
-    // 2. Enviado a DGII (if trackId present)
-    if (comprobante.trackId) {
-      historyEvents.push({
-        title: 'Enviado a DGII',
-        description: `TrackId: ${comprobante.trackId}`,
-        date: formatTimelineDate(comprobante.createdAt),
-        status: 'info',
-      })
-    }
-
-    // 3. Current DGII Response Status
+    // 2. Respuesta / estado de la DGII (updatedAt real), con trackId si existe.
+    const track = comprobante.trackId ? ` · TrackId ${comprobante.trackId}` : ''
     if (comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL') {
       historyEvents.push({
         title: 'Aceptado',
-        description: 'Código 0 — Operación exitosa',
+        description: (comprobante.mensajeDGII || 'Aceptado por la DGII') + track,
         date: formatTimelineDate(comprobante.updatedAt),
         status: 'success',
       })
     } else if (comprobante.estado === 'RECHAZADO') {
       historyEvents.push({
         title: 'Rechazado',
-        description: comprobante.mensajeDGII || 'Código 99 — Rechazado por la DGII',
+        description: (comprobante.mensajeDGII || 'Rechazado por la DGII') + track,
         date: formatTimelineDate(comprobante.updatedAt),
         status: 'danger',
       })
     } else if (comprobante.estado === 'ERROR') {
       historyEvents.push({
-        title: 'Error de Envío',
-        description: comprobante.mensajeDGII || 'Excepción técnica en la conexión',
+        title: 'Error de envío',
+        description: (comprobante.mensajeDGII || 'Excepción técnica en la conexión') + track,
         date: formatTimelineDate(comprobante.updatedAt),
         status: 'danger',
       })
     } else if (comprobante.estado !== 'DRAFT') {
       historyEvents.push({
         title: 'En proceso',
-        description: 'Pendiente de respuesta de la DGII',
+        description: 'Pendiente de respuesta de la DGII' + track,
         date: formatTimelineDate(comprobante.updatedAt),
         status: 'neutral',
       })
@@ -350,15 +342,17 @@ export function DetailPanel({
 
           {/* Actions: Figma h=40, each ~100.67px, gap=8 */}
           <div className="flex gap-[8px] items-center w-full h-[40px]">
-            <button
-              type="button"
-              disabled={downloading}
-              onClick={() => onDownload(comprobante)}
-              className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#333] hover:bg-neutral-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all disabled:opacity-50"
-            >
-              {downloading ? <Spinner size={12} /> : <Download size={12} />}
-              <span>PDF</span>
-            </button>
+            {comprobante.estado !== 'RECHAZADO' && comprobante.estado !== 'ERROR' && (
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => onDownload(comprobante)}
+                className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#333] hover:bg-neutral-50 flex items-center justify-center gap-[4px] text-[12px] font-normal leading-[19.5px] transition-all disabled:opacity-50"
+              >
+                {downloading ? <Spinner size={12} /> : <Download size={12} />}
+                <span>PDF</span>
+              </button>
+            )}
 
             {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
               <button

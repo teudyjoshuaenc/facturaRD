@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
+import type { Response } from 'express'
 import { CotizacionesService } from './cotizaciones.service'
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto'
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto'
@@ -38,6 +39,21 @@ export class CotizacionesController {
   @ApiOperation({ summary: 'Detalle de una cotización con sus líneas' })
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.findOne(tenantId, id)
+  }
+
+  @Get(':id/pdf')
+  @Header('Content-Type', 'application/pdf')
+  @ApiOperation({
+    summary: 'Descarga el PDF de la cotización (mismo diseño fiscal, marcado como documento NO fiscal).',
+  })
+  async downloadPdf(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, filename } = await this.service.regenerarPdfBuffer(tenantId, id)
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(buffer)
   }
 
   @Patch(':id')

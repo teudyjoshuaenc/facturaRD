@@ -7,6 +7,7 @@ import { readFile, unlink } from 'node:fs/promises'
 import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
 import { generarRepresentacionImpresa, resolveDgiiEnv } from '@facturard/ecf-engine'
+import type { EcfPdfInput } from '@facturard/ecf-engine'
 import { buildEcfPdfInput } from './pdf-input.builder'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
@@ -506,28 +507,40 @@ export class ComprobantesService {
    */
   async regenerarPdfBuffer(tenantId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
     const comprobante = await this.findOne(tenantId, id)
-    if (comprobante.estado !== 'ACEPTADO' && comprobante.estado !== 'ACEPTADO_CONDICIONAL') {
-      throw new NotFoundException('El PDF sólo está disponible para comprobantes aceptados')
+
+    // Los comprobantes con error/rechazo no tienen PDF descargable (no llegaron a
+    // representar nada válido). El resto sí: aceptados salen como e-CF fiscal con QR;
+    // borradores/pendientes salen como VISTA PREVIA (modo BORRADOR, sin QR/timbre).
+    if (comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR') {
+      throw new NotFoundException('No hay PDF disponible: el comprobante fue rechazado o falló su envío')
     }
-    if (!comprobante.eNCF || !comprobante.xmlFirmado) {
-      throw new NotFoundException('El comprobante no tiene datos suficientes para regenerar el PDF')
+    if (!comprobante.datos) {
+      throw new NotFoundException('El comprobante no tiene datos suficientes para generar el PDF')
     }
+
+    const esFiscal = comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
 
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     const datos = comprobante.datos as unknown as CreateComprobanteDto
-    const pdfInput = buildEcfPdfInput(
+    const base = buildEcfPdfInput(
         datos,
         tenant,
-        comprobante.eNCF,
+        comprobante.eNCF ?? '',
         resolveDgiiEnv(),
-        comprobante.xmlFirmado,
+        esFiscal ? (comprobante.xmlFirmado ?? undefined) : undefined,
     )
+    // Sólo el aceptado se representa como e-CF fiscal (con QR/timbre). Cualquier otro
+    // estado emitible (DRAFT/PENDIENTE/EN_COLA/ENVIANDO) es una vista previa.
+    const pdfInput: EcfPdfInput = esFiscal ? base : { ...base, modo: 'BORRADOR' }
 
     const tmpPath = join(tmpdir(), `ecf-${id}-${Date.now()}.pdf`)
     try {
       await generarRepresentacionImpresa(pdfInput, tmpPath)
       const buffer = await readFile(tmpPath)
-      return { buffer, filename: `${comprobante.eNCF}.pdf` }
+      const filename = comprobante.eNCF
+        ? `${comprobante.eNCF}${esFiscal ? '' : '-borrador'}.pdf`
+        : `borrador-${id.slice(0, 8)}.pdf`
+      return { buffer, filename }
     } finally {
       await unlink(tmpPath).catch(() => undefined)
     }

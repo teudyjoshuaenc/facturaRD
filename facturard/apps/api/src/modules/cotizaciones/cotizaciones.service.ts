@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
+import { readFile, unlink } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { Prisma, prisma } from '@facturard/database'
-import type { Cotizacion, CotizacionItem } from '@facturard/database'
+import type { Cotizacion, CotizacionItem, Tenant } from '@facturard/database'
+import { generarRepresentacionImpresa } from '@facturard/ecf-engine'
+import type { EcfPdfInput, EcfItem } from '@facturard/ecf-engine'
 import { ComprobantesService } from '../comprobantes/comprobantes.service'
 import type { CreateComprobanteDto, CreateItemDto } from '../comprobantes/dto/create-comprobante.dto'
 import { CotizacionFolioService } from './cotizacion-folio.service'
@@ -181,6 +186,85 @@ export class CotizacionesService {
 
     const comprobanteFinal = await prisma.comprobante.findUniqueOrThrow({ where: { id: comprobante.id } })
     return { cotizacion, comprobante: comprobanteFinal }
+  }
+
+  /**
+   * Genera el PDF de la cotización REUTILIZANDO el motor del ecf-engine en modo
+   * 'COTIZACION': mismo diseño que la factura fiscal pero sin e-NCF ni QR/timbre,
+   * con el folio COT-xxxx y la leyenda de "documento no fiscal". No toca la DGII.
+   */
+  async regenerarPdfBuffer(tenantId: string, id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const cot = await this.findOne(tenantId, id)
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
+    const contacto = cot.contactoId
+      ? await prisma.contacto.findFirst({ where: { id: cot.contactoId, tenantId } })
+      : null
+
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    let gravado = 0
+    let exento = 0
+    const items: EcfItem[] = cot.items.map((it) => {
+      const cantidad = Number(it.cantidad)
+      const precioUnitario = Number(it.precioUnitario)
+      const valor = r2(cantidad * precioUnitario)
+      const esExento = it.tratamientoITBIS === 'EXENTO'
+      if (esExento) exento += valor
+      else gravado += valor
+      return {
+        descripcion: it.nombre,
+        cantidad,
+        precioUnitario,
+        valor,
+        itbis: esExento ? 0 : r2(valor * 0.18),
+        ...(it.unidadMedida !== null ? { unidadMedida: it.unidadMedida } : {}),
+      }
+    })
+
+    const pdfInput: EcfPdfInput = {
+      modo: 'COTIZACION',
+      folio: cot.folio,
+      rncEmisor: tenant.rnc,
+      nombreEmisor: tenant.razonSocial,
+      eNCF: '',
+      tipoECF: '',
+      fechaEmision: this.fechaDDMMYYYY(cot.createdAt),
+      montoTotal: Number(cot.total),
+      itbisTotal: Number(cot.itbis),
+      montoGravadoTotal: r2(gravado),
+      ...(exento > 0 ? { montoExentoTotal: r2(exento) } : {}),
+      items,
+      ...(contacto?.razonSocial ? { nombreComprador: contacto.razonSocial } : {}),
+      ...(contacto?.rnc ? { rncComprador: contacto.rnc } : {}),
+      ...this.brandingEmisor(tenant),
+    }
+
+    const tmpPath = join(tmpdir(), `cot-${id}-${Date.now()}.pdf`)
+    try {
+      await generarRepresentacionImpresa(pdfInput, tmpPath)
+      const buffer = await readFile(tmpPath)
+      return { buffer, filename: `${cot.folio}.pdf` }
+    } finally {
+      await unlink(tmpPath).catch(() => undefined)
+    }
+  }
+
+  // Datos de emisor + branding del tenant para la representación impresa.
+  private brandingEmisor(tenant: Tenant): Partial<EcfPdfInput> {
+    return {
+      ...(tenant.nombreComercial !== null ? { nombreComercial: tenant.nombreComercial } : {}),
+      ...(tenant.direccion !== null ? { direccionEmisor: tenant.direccion } : {}),
+      ...(tenant.telefono !== null ? { telefonoEmisor: tenant.telefono } : {}),
+      ...(tenant.email !== null ? { emailEmisor: tenant.email } : {}),
+      ...(tenant.logoUrl !== null ? { logoUrl: tenant.logoUrl } : {}),
+      ...(tenant.colorPrimario !== null ? { colorPrimario: tenant.colorPrimario } : {}),
+      ...(tenant.colorSecundario !== null ? { colorSecundario: tenant.colorSecundario } : {}),
+    }
+  }
+
+  private fechaDDMMYYYY(d: Date): string {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}-${mm}-${d.getFullYear()}`
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import {
   downloadComprobantePdf,
@@ -38,6 +39,8 @@ export function useDashboardComprobantes(options: UseDashboardOptions = {}) {
     setDownloadingId(comprobante.id)
     try {
       await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+    } catch {
+      toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {
       setDownloadingId(null)
     }
@@ -207,6 +210,8 @@ export function useComprobantes() {
     setDownloadingId(comprobante.id)
     try {
       await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+    } catch {
+      toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {
       setDownloadingId(null)
     }

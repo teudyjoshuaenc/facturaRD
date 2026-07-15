@@ -3,27 +3,23 @@
 import React, { use, useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, getErrorMessage } from '@/lib/api'
 import {
   ChevronLeft,
   Download,
   Send,
   Pencil,
-  Trash2,
-  Check,
   CheckCircle2,
-  XCircle,
-  Clock,
-  Mail,
   AlertTriangle,
   FileText,
-  RefreshCw,
+  ArrowRight,
   Info,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/comprobantes'
+import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { Modal } from '@/components/ui/modal'
 import { toast } from 'sonner'
 
 interface PageProps {
@@ -75,6 +71,8 @@ interface Tenant {
   razonSocial: string
   nombreComercial?: string
   direccion?: string
+  telefono?: string
+  email?: string
 }
 
 function formatRnc(rncStr?: string): string {
@@ -124,41 +122,6 @@ function formatHighlightText(text: string): React.ReactNode[] | string {
   })
 }
 
-function CustomFileCheckIcon({ className, size = 16 }: { className?: string; size?: number }): JSX.Element {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <g>
-        <path
-          d="M2.66667 14.6667H12C12.3536 14.6667 12.6928 14.5262 12.9428 14.2761C13.1929 14.0261 13.3333 13.687 13.3333 13.3333V4.66667L10 1.33333H4C3.64638 1.33333 3.30724 1.47381 3.05719 1.72386C2.80714 1.97391 2.66667 2.31304 2.66667 2.66667V5.33333"
-          strokeWidth="1.33333"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M9.33333 1.33333V4C9.33333 4.35362 9.47381 4.69276 9.72386 4.94281C9.97391 5.19286 10.313 5.33333 10.6667 5.33333H13.3333"
-          strokeWidth="1.33333"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M2 10L3.33333 11.3333L6 8.66667"
-          strokeWidth="1.33333"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-    </svg>
-  )
-}
-
 function EstadoBadge({ estado }: { estado: Cotizacion['estado'] }): JSX.Element {
   switch (estado) {
     case 'APROBADA':
@@ -183,7 +146,8 @@ function EstadoBadge({ estado }: { estado: Cotizacion['estado'] }): JSX.Element 
     case 'CONVERTIDA':
       return (
         <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#1e40af] border border-[#bfdbfe] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
-          Convertida en factura
+          <FileText size={13} className="text-[#1e40af]" />
+          Facturada
         </span>
       )
     case 'VENCIDA':
@@ -213,14 +177,25 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
   const resolvedParams = use(params)
   const id = resolvedParams.id
 
+  const queryClient = useQueryClient()
   const [updatingEstado, setUpdatingEstado] = useState(false)
   const [converting, setConverting] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [confirmConvertOpen, setConfirmConvertOpen] = useState(false)
 
   // Fetch Cotizacion details
   const { data: cotizacion, isLoading: isCotizacionLoading, error: cotizacionError, refetch } = useQuery<Cotizacion>({
     queryKey: ['cotizacion-detalle', id],
     queryFn: () => api.get<Cotizacion>(`/cotizaciones/${id}`).then((res) => res.data),
     enabled: !!id,
+  })
+
+  // Factura vinculada (para el enlace "Ver factura" cuando ya fue convertida).
+  const { data: comprobante } = useQuery<{ id: string; eNCF: string | null } | null>({
+    queryKey: ['comprobante-de-cotizacion', cotizacion?.comprobanteId],
+    queryFn: () =>
+      api.get<{ id: string; eNCF: string | null }>(`/comprobantes/${cotizacion?.comprobanteId}`).then((res) => res.data),
+    enabled: !!cotizacion?.comprobanteId,
   })
 
   // Fetch Contact details (when cotizacion is loaded and has contactoId)
@@ -274,89 +249,49 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
   }, 0)
   const total = subtotal + itbis
 
-  // Dynamic Timeline Events Simulator based on real DB timestamps
-  const getTimelineEvents = () => {
-    const events = []
-    const baseDate = new Date(cotizacion.createdAt)
-    const updateDate = new Date(cotizacion.updatedAt)
-    
-    const pad = (n: number) => n.toString().padStart(2, '0')
-    const formatTime = (d: Date) => {
-      if (isNaN(d.getTime())) return '—'
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const puedeConvertir = cotizacion.estado !== 'CONVERTIDA'
+  const puedeEnviar = cotizacion.estado === 'BORRADOR'
+
+  // Marca la cotización como ENVIADA (no manda nada al cliente: sólo cambia el estado
+  // para llevar registro; el envío real es descargar el PDF y compartirlo manualmente).
+  const handleEnviar = async () => {
+    setUpdatingEstado(true)
+    try {
+      await api.patch(`/cotizaciones/${id}/estado`, { estado: 'ENVIADA' })
+      await refetch()
+      toast.success('Cotización marcada como enviada. Descarga el PDF para compartirla.')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo actualizar el estado'))
+    } finally {
+      setUpdatingEstado(false)
     }
-
-    // 1. Cotización creada (Always present)
-    events.push({
-      title: 'Cotización creada',
-      description: 'Comprobante generado y firmado',
-      date: formatTime(baseDate),
-      icon: 'file',
-      color: 'gray',
-    })
-
-    // 2. Enviada al cliente
-    if (['ENVIADA', 'APROBADA', 'CONVERTIDA'].includes(cotizacion.estado)) {
-      const sentTime = new Date(baseDate.getTime() + 5 * 60 * 1000)
-      events.unshift({
-        title: 'Enviada al cliente',
-        description: 'Comprobante generado y firmado',
-        date: formatTime(sentTime),
-        icon: 'send',
-        color: 'blue',
-      })
-    }
-
-    // 3. Cliente abrió el enlace
-    if (['ENVIADA', 'APROBADA', 'CONVERTIDA'].includes(cotizacion.estado)) {
-      const openTime = new Date(baseDate.getTime() + 15 * 60 * 1000)
-      events.unshift({
-        title: 'Cliente abrió el enlace',
-        description: 'Comprobante generado y firmado',
-        date: formatTime(openTime),
-        icon: 'mail',
-        color: 'purple',
-      })
-    }
-
-    // 4. Cliente aprobó la cotización
-    if (['APROBADA', 'CONVERTIDA'].includes(cotizacion.estado)) {
-      const approvedTime = updateDate.getTime() > baseDate.getTime() ? updateDate : new Date(baseDate.getTime() + 60 * 60 * 1000)
-      events.unshift({
-        title: 'Cliente aprobó la cotización',
-        description: 'Comprobante generado y firmado',
-        date: formatTime(approvedTime),
-        icon: 'check',
-        color: 'green',
-      })
-    }
-
-    // 5. Convertida en factura
-    if (cotizacion.estado === 'CONVERTIDA') {
-      events.unshift({
-        title: 'Cotización convertida en factura',
-        description: 'Comprobante generado y firmado',
-        date: formatTime(updateDate),
-        icon: 'check',
-        color: 'blue',
-      })
-    }
-
-    // 6. Rechazada
-    if (cotizacion.estado === 'RECHAZADA') {
-      events.unshift({
-        title: 'Cotización rechazada',
-        description: 'Comprobante rechazado por el cliente',
-        date: formatTime(updateDate),
-        icon: 'x',
-        color: 'red',
-      })
-    }
-
-    return events
   }
 
-  const timelineEvents = getTimelineEvents()
+  const handleDescargarPdf = async () => {
+    setDownloading(true)
+    try {
+      await downloadCotizacionPdf(api, cotizacion.id, cotizacion.folio)
+    } catch {
+      toast.error('No se pudo descargar el PDF de la cotización')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const handleConvertir = async () => {
+    setConverting(true)
+    try {
+      await api.post(`/cotizaciones/${id}/convertir`, { emitir: false })
+      await refetch()
+      await queryClient.invalidateQueries({ queryKey: ['comprobantes'] })
+      setConfirmConvertOpen(false)
+      toast.success('Cotización convertida en factura (borrador)')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo convertir la cotización'))
+    } finally {
+      setConverting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6 text-left w-full font-sans select-none">
@@ -390,7 +325,18 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2.5 items-center">
-          {/* Edit */}
+          {/* Descargar PDF (siempre disponible) */}
+          <Button
+            variant="secondary"
+            onClick={handleDescargarPdf}
+            disabled={downloading}
+            className="h-[40px] px-4 rounded-[8px] border border-[#d0d5dd] bg-white text-[#344054] hover:bg-neutral-50 text-[14px] font-semibold gap-2 flex items-center shadow-sm transition-colors cursor-pointer"
+          >
+            {downloading ? <Spinner size={16} /> : <Download size={16} className="text-[#475467]" />}
+            <span>Descargar PDF</span>
+          </Button>
+
+          {/* Editar (no si ya fue facturada) */}
           {cotizacion.estado !== 'CONVERTIDA' && (
             <Button
               variant="secondary"
@@ -402,13 +348,49 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
               <span>Editar</span>
             </Button>
           )}
+
+          {/* Marcar como enviada (solo desde BORRADOR) */}
+          {puedeEnviar && (
+            <Button
+              variant="secondary"
+              onClick={handleEnviar}
+              disabled={updatingEstado || converting}
+              className="h-[40px] px-4 rounded-[8px] border border-[#d0d5dd] bg-white text-[#344054] hover:bg-neutral-50 text-[14px] font-semibold gap-2 flex items-center shadow-sm transition-colors cursor-pointer"
+            >
+              {updatingEstado ? <Spinner size={16} /> : <Send size={16} className="text-[#475467]" />}
+              <span>Marcar enviada</span>
+            </Button>
+          )}
+
+          {/* Convertir en factura (abre confirmación) */}
+          {puedeConvertir && (
+            <Button
+              variant="primary"
+              onClick={() => setConfirmConvertOpen(true)}
+              disabled={converting || updatingEstado}
+              className="h-[40px] px-4 rounded-[8px] text-[14px] font-semibold gap-2 flex items-center shadow-sm cursor-pointer"
+            >
+              <FileText size={16} />
+              <span>Convertir en factura</span>
+            </Button>
+          )}
         </div>
       </div>
 
-      {cotizacion.estado === 'CONVERTIDA' && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-[10px] bg-blue-50/50 border border-[#bfdbfe] text-[#0379d5] text-[13px] font-medium leading-normal w-full">
-          <Info size={16} className="text-[#0379d5] shrink-0" />
-          <span>Esta cotización ya fue convertida en factura y está vinculada a ella.</span>
+      {cotizacion.estado === 'CONVERTIDA' && cotizacion.comprobanteId && (
+        <div className="flex items-center justify-between gap-2.5 px-4 py-3 rounded-[10px] bg-blue-50/50 border border-[#bfdbfe] text-[#0379d5] text-[13px] font-medium leading-normal w-full">
+          <div className="flex items-center gap-2.5">
+            <Info size={16} className="text-[#0379d5] shrink-0" />
+            <span>Esta cotización ya fue facturada y está vinculada a su comprobante.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push(`/facturas/${cotizacion.comprobanteId}`)}
+            className="inline-flex items-center gap-1.5 font-semibold hover:underline shrink-0 cursor-pointer"
+          >
+            Ver factura{comprobante?.eNCF ? ` ${comprobante.eNCF}` : ''}
+            <ArrowRight size={14} />
+          </button>
         </div>
       )}
 
@@ -427,23 +409,23 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
               <div className="flex flex-col gap-2.5 text-[14px] leading-[19.5px]">
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">RNC</span>
-                  <span className="text-[#344054] font-medium">{formatRnc(tenant?.rnc) || 'missing data'}</span>
+                  <span className="text-[#344054] font-medium">{formatRnc(tenant?.rnc)}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Razón social</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.razonSocial || 'missing data'}</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.razonSocial || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Dirección</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.direccion || 'missing data'}</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{tenant?.direccion || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Teléfono</span>
-                  <span className="text-[#344054] font-medium">{(tenant as any)?.telefono || 'missing data'}</span>
+                  <span className="text-[#344054] font-medium">{tenant?.telefono || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Correo</span>
-                  <span className="text-[#344054] font-medium">{(tenant as any)?.email || 'missing data'}</span>
+                  <span className="text-[#344054] font-medium">{tenant?.email || '—'}</span>
                 </div>
               </div>
             </div>
@@ -462,15 +444,15 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Dirección</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{contacto?.direccion || 'Av. Winston Churchill #45, Sto. Dgo.'}</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{contacto?.direccion || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
                   <span className="text-[#667085] font-normal">Teléfono</span>
-                  <span className="text-[#344054] font-medium">{contacto?.telefono || '809-555-0202'}</span>
+                  <span className="text-[#344054] font-medium">{contacto?.telefono || '—'}</span>
                 </div>
                 <div className="flex justify-between items-center w-full">
-                  <span className="text-[#667085] font-normal">Dirección</span>
-                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{contacto?.direccion || 'Av. Winston Churchill #45, Sto. Dgo.'}</span>
+                  <span className="text-[#667085] font-normal">Correo</span>
+                  <span className="text-[#344054] font-medium text-right max-w-[200px] truncate">{contacto?.email || '—'}</span>
                 </div>
               </div>
             </div>
@@ -478,8 +460,8 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
 
           {/* Items Table */}
           <div className="bg-white border border-[#eaecf0] rounded-[16px] p-6 flex flex-col gap-4 w-full shadow-[0_1px_3px_rgba(16,24,40,0.05)]">
-            <h3 className="text-[16px] font-semibold text-[#333] leading-[21px]">Receptor</h3>
-            
+            <h3 className="text-[16px] font-semibold text-[#333] leading-[21px]">Ítems</h3>
+
             <div className="overflow-x-auto w-full">
               <table className="w-full border-collapse">
                 <thead>
@@ -553,70 +535,76 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
 
         </div>
 
-        {/* Right Column (History / Timeline Panel) */}
+        {/* Right Column: detalles reales (sin historial inventado) */}
         <div className="w-full lg:w-[360px] lg:shrink-0 flex flex-col gap-6">
-          
-          {/* Timeline Card */}
-          <div className="bg-white border border-[#e2e8f0] rounded-[14px] p-[21px] flex flex-col gap-[10px] w-full shadow-sm select-none">
-            <span className="text-[10px] font-semibold text-[#64748b] tracking-[0.44px] uppercase leading-[16.5px] block">
-              HISTORIAL
+          <div className="bg-white border border-[#e2e8f0] rounded-[14px] p-[21px] flex flex-col gap-4 w-full shadow-sm">
+            <span className="text-[10px] font-semibold text-[#64748b] tracking-[0.44px] uppercase block">
+              Detalles
             </span>
-            
-            <div className="relative flex items-start w-full mt-1">
-              {/* Vertical line connecting events */}
-              <div className="absolute left-[15.5px] top-[16px] bottom-[16px] w-px bg-[#e4e7ec]" />
-
-              <div className="flex flex-col gap-[16px] items-start w-full">
-                {timelineEvents.map((ev, index) => {
-                  let badgeClass = 'bg-[#f1f5f9] text-[#64748b]'
-                  let iconEl = <CustomFileCheckIcon className="text-[#64748b]" />
-
-                  if (ev.color === 'green') {
-                    badgeClass = 'bg-[#ecfdf5] text-[#12b76a]'
-                    iconEl = <Check size={16} className="text-[#12b76a]" />
-                  } else if (ev.color === 'blue') {
-                    badgeClass = 'bg-[#eff6ff] text-[#2e90fa]'
-                    iconEl = <Send size={16} className="text-[#2e90fa]" />
-                  } else if (ev.color === 'purple') {
-                    badgeClass = 'bg-[#eef2ff] text-[#7f56d9]'
-                    iconEl = <Mail size={16} className="text-[#7f56d9]" />
-                  } else if (ev.color === 'red') {
-                    badgeClass = 'bg-[#fef2f2] text-[#f04438]'
-                    iconEl = <XCircle size={16} className="text-[#f04438]" />
-                  }
-
-                  return (
-                    <div key={index} className="flex gap-[10px] items-start w-full relative z-10">
-                      {/* Event Dot Icon */}
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${badgeClass}`}>
-                        {iconEl}
-                      </div>
-
-                      <div className="flex flex-col gap-px items-start flex-1 min-w-0">
-                        <span className="text-[12.5px] font-semibold text-[#333] leading-[17px] break-words w-full">
-                          {ev.title}
-                        </span>
-                        <span className="text-[12px] font-normal text-[#333] leading-[18px] break-words w-full">
-                          {ev.description}
-                        </span>
-                        <div className="flex items-center gap-[4px] mt-[1px] text-[#64748b] leading-[16.5px]">
-                          <Clock size={9} className="text-[#64748b] shrink-0" />
-                          <span className="text-[11px] font-normal font-sans text-[#64748b]">
-                            {ev.date}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+            <div className="flex flex-col gap-3 text-[13px]">
+              <DetalleFila label="Folio" value={cotizacion.folio} />
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[#667085]">Estado</span>
+                <EstadoBadge estado={cotizacion.estado} />
               </div>
+              <DetalleFila label="Creada" value={formatDisplayDate(cotizacion.createdAt)} />
+              <DetalleFila label="Última actualización" value={formatDisplayDate(cotizacion.updatedAt)} />
+              <DetalleFila
+                label="Vigente hasta"
+                value={cotizacion.fechaVigencia ? formatDisplayDate(cotizacion.fechaVigencia) : 'Sin fecha'}
+              />
+              {cotizacion.estado === 'CONVERTIDA' && cotizacion.comprobanteId && (
+                <div className="flex justify-between items-center w-full pt-1 border-t border-[#eaecf0]">
+                  <span className="text-[#667085]">Factura</span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/facturas/${cotizacion.comprobanteId}`)}
+                    className="inline-flex items-center gap-1 text-[#0379d5] font-semibold hover:underline cursor-pointer"
+                  >
+                    {comprobante?.eNCF ?? 'Ver'}
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-
         </div>
 
       </div>
 
+      {/* Confirmación de conversión */}
+      <Modal
+        open={confirmConvertOpen}
+        onClose={() => (converting ? undefined : setConfirmConvertOpen(false))}
+        title="¿Convertir esta cotización en factura?"
+        subtitle={`${cotizacion.folio} · ${formatCurrencyWithSpace(total)}`}
+        icon={<FileText size={20} />}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmConvertOpen(false)} disabled={converting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={handleConvertir} disabled={converting}>
+              {converting ? <Spinner size={16} className="text-white" /> : 'Sí, convertir'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[14px] text-[#475467] leading-relaxed">
+          Se creará una factura (comprobante en borrador) con los mismos ítems. La cotización quedará
+          marcada como <strong>Facturada</strong> y vinculada a la factura; no podrás editarla después.
+        </p>
+      </Modal>
+
+    </div>
+  )
+}
+
+function DetalleFila({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="flex justify-between items-center w-full gap-2">
+      <span className="text-[#667085] shrink-0">{label}</span>
+      <span className="text-[#344054] font-medium text-right truncate">{value}</span>
     </div>
   )
 }

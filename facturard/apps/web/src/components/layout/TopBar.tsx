@@ -1,7 +1,7 @@
 'use client'
 
 import type { JSX } from 'react'
-import { Plus, FileText, Zap, Search, Bell, Activity, ShieldCheck, ToggleRight } from 'lucide-react'
+import { Plus, Search, Activity, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useUI } from '@/lib/context/UIContext'
@@ -11,8 +11,6 @@ interface Props {
   pageSubtitle: string
   certDias?: number | null
   dgiiConectado?: boolean
-  automatizacionActivos?: number
-  notificacionesCount?: number
   onEmitir: () => void
   showEmitir: boolean
 }
@@ -22,8 +20,6 @@ export function TopBar({
   pageSubtitle,
   certDias = 12,
   dgiiConectado = true,
-  automatizacionActivos = 4,
-  notificacionesCount = 7,
   onEmitir,
   showEmitir,
 }: Props): JSX.Element {
@@ -72,27 +68,6 @@ export function TopBar({
             Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
           </span>
         )}
-
-        {/* Automatizacion chip */}
-        {!isEmitir && (
-          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/50 px-2.5 py-1 text-ui-xs font-semibold text-blue-700">
-            <ToggleRight size={13} className="text-blue-600" />
-            Automatización <span className="text-blue-600 font-bold">{automatizacionActivos} activos</span>
-          </span>
-        )}
-
-        {/* Notification Bell */}
-        <button
-          type="button"
-          className="relative p-2 text-text-secondary hover:text-text-primary hover:bg-neutral-50 rounded-lg transition-colors focus:outline-none"
-        >
-              <Bell size={18} />
-              {notificacionesCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[9px] font-bold text-white leading-none">
-                  {notificacionesCount}
-                </span>
-              )}
-            </button>
 
             {/* Emitir Factura CTA button */}
             {showEmitir && (

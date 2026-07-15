@@ -75,6 +75,10 @@ export function buildEcfPdfInput(
     ...(codigoSeguridad !== undefined ? { codigoSeguridad } : {}),
     ...(fechaHoraFirma !== undefined ? { fechaHoraFirma } : {}),
     ...(tenant.nombreComercial !== null ? { nombreComercial: tenant.nombreComercial } : {}),
+    // Datos de contacto del emisor (aparecen en el bloque emisor del PDF).
+    ...(tenant.direccion !== null ? { direccionEmisor: tenant.direccion } : {}),
+    ...(tenant.telefono !== null ? { telefonoEmisor: tenant.telefono } : {}),
+    ...(tenant.email !== null ? { emailEmisor: tenant.email } : {}),
     ...(datos.fechaVencimiento !== undefined ? { fechaVencimiento: datos.fechaVencimiento } : {}),
     ...(datos.rncComprador !== undefined ? { rncComprador: datos.rncComprador } : {}),
     ...(datos.ncfModificado !== undefined ? { eNCFReferencia: datos.ncfModificado } : {}),

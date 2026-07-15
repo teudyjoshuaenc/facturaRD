@@ -64,13 +64,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   const { token, tenant, isReady } = useAuth()
   const { setSidebarOpen } = useUI()
   const { diasParaVencer } = useCertificadoStatus()
-  const automatizacionActivos = Math.floor(Math.random() * 2);
 
   const isProd = process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SHOW_WIP_TABS !== 'true'
   const wipRoutes = [
     '/compras',
     '/reportes',
-    '/empresa',
     '/usuarios-y-roles',
     '/certificado-digital',
     '/cumplimiento',
@@ -129,8 +127,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
           pageSubtitle={pageSubtitle}
           certDias={diasParaVencer}
           dgiiConectado={true}
-          {...(automatizacionActivos > 0 ? { automatizacionActivos } : {})}
-          notificacionesCount={7}
           showEmitir={pathname !== '/nueva-factura'}
           onEmitir={() => router.push('/nueva-factura')}
         />

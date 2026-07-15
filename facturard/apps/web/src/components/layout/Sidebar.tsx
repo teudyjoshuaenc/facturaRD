@@ -20,7 +20,7 @@ const OPERACION_ITEMS = [
 
 const SISTEMA_ITEMS = [
   { href: '/reportes', label: 'Reportes', iconPath: '/assets/6f267c4ae6c73dc4966f99316120ffac8a1a08f4.svg', wip: true },
-  { href: '/empresa', label: 'Empresa', iconPath: '/assets/aea6417e5c12c502b8498862cacbc1c5f8370dc0.svg', wip: true },
+  { href: '/empresa', label: 'Empresa', iconPath: '/assets/aea6417e5c12c502b8498862cacbc1c5f8370dc0.svg' },
   { href: '/usuarios-y-roles', label: 'Usuarios y roles', iconPath: '/assets/2d9e550eb3a7ec6201239db740788d0b9c47c15c.svg', wip: true },
   { href: '/certificado-digital', label: 'Certificado Digital', iconPath: '/assets/13241a49cce1e26dd59c84c1a822c865bb4b5d48.svg', wip: true },
   { href: '/cumplimiento', label: 'Cumplimiento', iconPath: '/assets/b5e2b788c5b6fba6b49f4fe30c0ba26277cad92e.svg', wip: true },
@@ -186,47 +186,6 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                 />
               ))}
             </nav>
-          </div>
-        </div>
-
-        {/* User profile footer */}
-        <div className="border-t border-[rgba(10,10,10,0.05)] p-4 flex flex-col items-center justify-center w-full bg-neutral-50/20 shrink-0">
-          <div className={cn(
-            "flex items-center gap-[12px] rounded-[10px] w-full",
-            collapsed ? "justify-center h-[36px]" : "justify-start px-2 py-1 hover:bg-neutral-100/30 transition-colors"
-          )}>
-            {/* Avatar circular */}
-            <div className="flex h-[36px] w-[36px] flex-shrink-0 items-center justify-center rounded-full bg-[#B45309] text-white font-medium text-[13px] font-sans">
-              SM
-            </div>
-            
-            {/* User details & Chevron dropdown */}
-            {!collapsed && (
-              <>
-                <div className="flex flex-col flex-1 truncate text-left font-sans">
-                  <span className="text-[14px] font-semibold text-[#0a0a0a] leading-[21px] truncate">
-                    Sarah Mitchell
-                  </span>
-                  <span className="text-[12px] text-[#737373] leading-[18px] truncate">
-                    sarah@acme.com
-                  </span>
-                </div>
-                <div
-                  className="w-[16px] h-[16px] shrink-0 text-[#737373]"
-                  style={{
-                    maskImage: `url(/assets/c5161a09e6e09d4471b7c1397b1d7a5443877463.svg)`,
-                    WebkitMaskImage: `url(/assets/c5161a09e6e09d4471b7c1397b1d7a5443877463.svg)`,
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat',
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    backgroundColor: 'currentColor',
-                  }}
-                />
-              </>
-            )}
           </div>
         </div>
       </aside>

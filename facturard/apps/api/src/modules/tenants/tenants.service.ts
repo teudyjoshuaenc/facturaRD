@@ -3,6 +3,7 @@ import { prisma, UserRole } from '@facturard/database'
 import type { Tenant } from '@facturard/database'
 import type { CreateTenantDto } from './dto/create-tenant.dto'
 import type { BrandingDto } from './dto/branding.dto'
+import type { UpdateEmpresaDto } from './dto/update-empresa.dto'
 import { computeEmisionStatus, type EmisionStatus } from '../../common/emision-status'
 
 // El token de GHL (cifrado) nunca sale en el payload: se reemplaza por un
@@ -67,6 +68,26 @@ export class TenantsService {
         ...(dto.logoUrl !== undefined && { logoUrl: dto.logoUrl }),
         ...(dto.colorPrimario !== undefined && { colorPrimario: dto.colorPrimario }),
         ...(dto.colorSecundario !== undefined && { colorSecundario: dto.colorSecundario }),
+      },
+    })
+    const emision = await this.emisionStatusMap([tenant.id])
+    return toSafeTenant(tenant, emision.get(tenant.id)!)
+  }
+
+  /**
+   * Actualiza los datos de contacto del emisor (dirección/teléfono/correo/logo) que
+   * salen en la representación impresa. RNC y razón social NO se tocan: vienen del
+   * padrón DGII y deben coincidir con el certificado. Una cadena vacía borra el campo.
+   */
+  async updateEmpresa(tenantId: string, dto: UpdateEmpresaDto): Promise<SafeTenant> {
+    const norm = (v: string): string | null => (v.trim() === '' ? null : v.trim())
+    const tenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        ...(dto.direccion !== undefined && { direccion: norm(dto.direccion) }),
+        ...(dto.telefono !== undefined && { telefono: norm(dto.telefono) }),
+        ...(dto.email !== undefined && { email: norm(dto.email) }),
+        ...(dto.logoUrl !== undefined && { logoUrl: norm(dto.logoUrl) }),
       },
     })
     const emision = await this.emisionStatusMap([tenant.id])

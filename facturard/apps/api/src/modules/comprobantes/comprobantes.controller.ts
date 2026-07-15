@@ -79,7 +79,10 @@ export class ComprobantesController {
 
   @Get(':id/pdf')
   @Header('Content-Type', 'application/pdf')
-  @ApiOperation({ summary: 'Descarga el PDF del comprobante (solo si fue aceptado)' })
+  @ApiOperation({
+    summary:
+      'Descarga el PDF del comprobante. Aceptado → e-CF fiscal con QR; borrador/pendiente → vista previa sin timbre. Rechazado/error → 404.',
+  })
   async downloadPdf(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,

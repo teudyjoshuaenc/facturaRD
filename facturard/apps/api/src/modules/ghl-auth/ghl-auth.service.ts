@@ -87,11 +87,16 @@ export class GhlAuthService {
 
     // 4. Transacción atómica: tenant + location + secuencias (+ certificado si vino).
     const tenant = await prisma.$transaction(async (tx) => {
+      const emisorContacto = (v: string | undefined): string | null =>
+        v !== undefined && v.trim() !== '' ? v.trim() : null
       const newTenant = await tx.tenant.create({
         data: {
           rnc: dto.rnc,
           razonSocial,
           nombreComercial: nombreComercial ?? null,
+          direccion: emisorContacto(dto.direccion),
+          telefono: emisorContacto(dto.telefono),
+          email: emisorContacto(dto.email),
         },
       })
 
