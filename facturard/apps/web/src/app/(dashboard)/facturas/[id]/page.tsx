@@ -293,9 +293,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           className="bg-white border border-[#d0d5dd] h-[40px] w-[40px] rounded-[10px] flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none shrink-0 cursor-pointer"
           title="Volver a facturas"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
-            <path d="M5.33333 3.33333H14M5.33333 8H14M5.33333 12.6667H14M2 3.33333H2.00667M2 8H2.00667M2 12.6667H2.00667" stroke="#64748B" strokeWidth="1.67" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronLeft size={18} className="text-[#64748b]" />
         </button>
 
         {/* Title and Badge */}
