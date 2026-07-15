@@ -73,7 +73,7 @@ export default function ProductosPage(): JSX.Element {
   const { allProductos, crearProducto, actualizarProducto, eliminarProducto, refetch, isFetching } = useProductos(useProductosParams)
   const [openModal, setOpenModal] = useState(false)
 
-  const [selectedProducto, setSelectedProducto] = useState<any | null>(null)
+  const [selectedProductoId, setSelectedProductoId] = useState<string | null>(null)
   const [editingProducto, setEditingProducto] = useState<any | null>(null)
   const [deletingProducto, setDeletingProducto] = useState<any | null>(null)
   const [togglingProducto, setTogglingProducto] = useState<any | null>(null)
@@ -97,6 +97,67 @@ export default function ProductosPage(): JSX.Element {
       })),
     [allProductos],
   )
+
+  const selectedProducto = useMemo(() => {
+    if (!selectedProductoId) return null
+    return extendedProductos.find((p) => p.id === selectedProductoId) || null
+  }, [selectedProductoId, extendedProductos])
+
+  const handleDuplicar = async (producto: any) => {
+    try {
+      const rawCode = producto.codigo?.split(' · ')[0] || producto.codigo || ''
+      const newCodigo = rawCode ? `${rawCode}-COPY` : ''
+      await crearProducto({
+        nombre: `${producto.nombre} (copia)`,
+        tipo: producto.tipo,
+        codigo: newCodigo,
+        precio: producto.precio,
+        indicadorFacturacion: producto.indicadorFacturacion === 'EXENTO' ? 'E' : producto.indicadorFacturacion,
+        precioIncluyeItbis: producto.precioIncluyeItbis || false,
+        unidadMedida: producto.unidadMedida,
+        descripcion: producto.descripcion,
+      })
+    } catch (error) {
+      // Error is handled by hook
+    }
+  }
+
+  const handleEditSave = async (id: string, data: any) => {
+    try {
+      await actualizarProducto(id, data)
+      setEditingProducto(null)
+    } catch (error) {
+      // Error is handled by hook
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingProducto) return
+    try {
+      await eliminarProducto(deletingProducto.id)
+      if (selectedProductoId === deletingProducto.id) {
+        setSelectedProductoId(null)
+      }
+      setDeletingProducto(null)
+    } catch (error) {
+      // Error is handled by hook
+    }
+  }
+
+  const handleToggleEstado = (producto: any) => {
+    setTogglingProducto(producto)
+  }
+
+  const confirmToggleEstado = async () => {
+    if (!togglingProducto) return
+    try {
+      const nuevoEstadoActivo = togglingProducto.estado !== 'ACTIVO'
+      await actualizarProducto(togglingProducto.id, { activo: nuevoEstadoActivo })
+      setTogglingProducto(null)
+    } catch (error) {
+      // Error is handled by hook
+    }
+  }
 
   // Filter logic
   const filtered = useMemo(() => {
@@ -244,7 +305,7 @@ export default function ProductosPage(): JSX.Element {
                     return (
                       <tr
                         key={p.id}
-                        onClick={() => setSelectedProducto(p)}
+                        onClick={() => setSelectedProductoId(p.id)}
                         className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors cursor-pointer"
                       >
                         <td className={cn("px-4 py-3 flex items-center gap-3", nameColClass)}>
@@ -391,7 +452,7 @@ export default function ProductosPage(): JSX.Element {
           {selectedProducto && (
             <ProductDetailPanel
               producto={selectedProducto}
-              onClose={() => setSelectedProducto(null)}
+              onClose={() => setSelectedProductoId(null)}
               onEditar={(p) => setEditingProducto(p)}
               onDuplicar={(p) => handleDuplicar(p)}
               onEliminar={(p) => setDeletingProducto(p)}

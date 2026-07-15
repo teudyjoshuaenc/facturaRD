@@ -51,6 +51,12 @@ const tipoOptions = [
   { value: 'CONSUMIDOR_FINAL', label: 'CONSUMIDOR_FINAL' },
 ]
 
+const TIPO_LABEL: Record<string, string> = {
+  CLIENTE: 'Cliente',
+  PROVEEDOR: 'Proveedor',
+  CONSUMIDOR_FINAL: 'Consumidor Final',
+}
+
 const origenOptions = [
   { value: 'todos', label: 'Origen' },
   { value: 'MANUAL', label: 'Manual' },
@@ -120,7 +126,7 @@ export default function ContactosPage(): JSX.Element {
   // estadoFilter es el control de 3 estados de la gestión → se resuelve server-side.
   const activoParam = estadoFilter === 'todos' ? undefined : estadoFilter === 'ACTIVO'
 
-  const { contactos, total, totalPages, isLoading, isError, refetch } = useContactosDirectorio({
+  const { contactos, total, totalPages, isLoading, isError, isFetching, refetch } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
     activo: activoParam,
