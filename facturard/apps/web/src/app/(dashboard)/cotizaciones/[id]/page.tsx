@@ -15,6 +15,8 @@ import {
   FileText,
   ArrowRight,
   Info,
+  Clock,
+  XCircle
 } from 'lucide-react'
 import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { Button } from '@/components/ui/button'
@@ -126,46 +128,49 @@ function EstadoBadge({ estado }: { estado: Cotizacion['estado'] }): JSX.Element 
   switch (estado) {
     case 'APROBADA':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-[#ecfdf3] text-[#067647] border border-[#d3f9d8] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
-          <CheckCircle2 size={13} className="text-[#067647]" />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(6,118,71,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#067647] font-sans">
+          <CheckCircle2 size={14} className="text-[#067647] flex-shrink-0" />
           Aprobada
         </span>
       )
     case 'ENVIADA':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#b45309] border border-[#fde68a] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(225,113,0,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#e17100] font-sans">
+          <Clock size={14} className="text-[#e17100] flex-shrink-0" />
           Enviada
         </span>
       )
     case 'BORRADOR':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
+          <FileText size={14} className="text-[#64748b] flex-shrink-0" />
           Borrador
         </span>
       )
     case 'CONVERTIDA':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-[#eff6ff] text-[#1e40af] border border-[#bfdbfe] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
-          <FileText size={13} className="text-[#1e40af]" />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(3,121,213,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#0379d5] font-sans">
+          <CheckCircle2 size={14} className="text-[#0379d5] flex-shrink-0" />
           Facturada
         </span>
       )
     case 'VENCIDA':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 text-[12px] font-semibold px-2.5 py-1 rounded-lg">
-          <AlertTriangle size={13} />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#b42318] font-sans">
+          <AlertTriangle size={14} className="text-[#b42318] flex-shrink-0" />
           Vencida
         </span>
       )
     case 'RECHAZADA':
       return (
-        <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 text-[12px] font-semibold px-2.5 py-1 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#b42318] font-sans">
+          <XCircle size={14} className="text-[#b42318] flex-shrink-0" />
           Rechazada
         </span>
       )
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0] text-[12px] font-semibold px-2.5 py-1 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
           {estado}
         </span>
       )

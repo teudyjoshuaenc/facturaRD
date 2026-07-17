@@ -54,6 +54,7 @@ export function StepDetalle({
   const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
   const [productSearch, setProductSearch] = useState('')
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -67,13 +68,18 @@ export function StepDetalle({
   }, [])
 
   const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return []
-    const q = productSearch.toLowerCase()
     const isExemptOnly = tipoECF && ['E41', 'E43', 'E44', 'E47'].includes(tipoECF)
-    return allProductos.filter((p) => {
+    const baseList = allProductos.filter((p) => {
       if (isExemptOnly && p.indicadorFacturacion !== 'E' && p.indicadorFacturacion !== 'I4') {
         return false
       }
+      return true
+    })
+    
+    if (!productSearch.trim()) return baseList.slice(0, 5)
+    
+    const q = productSearch.toLowerCase()
+    return baseList.filter((p) => {
       return (
         p.nombre.toLowerCase().includes(q) ||
         p.codigo.toLowerCase().includes(q)
@@ -140,7 +146,7 @@ export function StepDetalle({
       <div className="flex flex-col gap-6">
         {/* Products catalog & search */}
         <div className="flex flex-col gap-4">
-          {!isQuickMode && <h3 className="text-h4 font-bold text-text-primary">Detalle de Factura</h3>}
+          {!isQuickMode && <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Detalle de Factura</h3>}
 
           <div className="flex gap-3">
             <div className="relative flex-1">
@@ -150,6 +156,7 @@ export function StepDetalle({
                 type="text"
                 placeholder={isQuickMode ? "Buscar o agregar producto... (ej: arroz, café, cerveza)" : "Buscar por nombre o NNC..."}
                 value={productSearch}
+                onFocus={() => setShowProductDropdown(true)}
                 onChange={(e) => setProductSearch(e.target.value)}
                 className={cn(
                   "h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20",
@@ -163,11 +170,13 @@ export function StepDetalle({
               )}
 
               {/* Dropdown search results (Limit to 5) */}
-              {productSearch.trim().length > 0 && (
-                <div className={cn(
-                  "absolute z-50 mt-1.5 overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 animate-in fade-in-50 duration-150",
-                  isQuickMode ? "max-h-[310px] w-full md:w-[684px]" : "max-h-[248px] w-full md:w-[742px]"
-                )}>
+              {showProductDropdown && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />
+                  <div className={cn(
+                    "absolute z-50 mt-1.5 overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 animate-in fade-in-50 duration-150",
+                    isQuickMode ? "max-h-[310px] w-full md:w-[684px]" : "max-h-[248px] w-full md:w-[742px]"
+                  )}>
                   {filteredProducts.slice(0, 5).map((p) => {
                     const hasTax = p.indicadorFacturacion === 'I1' || p.indicadorFacturacion === 'I2'
                     return (
@@ -202,7 +211,8 @@ export function StepDetalle({
                     </div>
                   )}
                 </div>
-              )}
+              </>
+            )}
             </div>
             <Button
               variant="primary"
@@ -226,9 +236,9 @@ export function StepDetalle({
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto bg-white rounded-xl border border-neutral-200/60 shadow-sm animate-in fade-in-50 duration-200">
+            <div className="overflow-auto max-h-[360px] bg-white rounded-xl border border-neutral-200/60 shadow-sm animate-in fade-in-50 duration-200">
               <table className="w-full text-left text-body-sm border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-neutral-50 z-10 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                   <tr className="text-[11px] uppercase tracking-wider text-text-secondary bg-neutral-50 border-b border-neutral-100 select-none">
                     <th className="py-3 px-4 font-semibold text-text-secondary">Producto</th>
                     <th className="py-3 px-4 font-semibold text-text-secondary">Unidad de Medida</th>

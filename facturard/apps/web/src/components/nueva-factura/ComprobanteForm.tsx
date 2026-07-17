@@ -222,6 +222,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Popover states for quick mode
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+  const clientSearchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showClientDropdown) {
+      setTimeout(() => {
+        clientSearchInputRef.current?.focus()
+      }, 50)
+    }
+  }, [showClientDropdown])
 
   const tipoECFOptions = useMemo(() => {
     return Object.entries(TIPO_ECF_LABELS).map(([key, label]) => {
@@ -435,7 +444,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         {facturacionMode === 'estandar' ? (
           <Card className={cn(
             "w-full lg:w-[952px] p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
-            currentStep === 2 ? "lg:h-[810px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
+            currentStep === 2 ? "lg:h-[850px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
           )}>
             {/* Stepper Wizard centered at top of the panel */}
             <div className="flex justify-center border-[#F5F5F5] pb-5 pt-0">
@@ -559,6 +568,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                           <div className="flex items-center gap-3 flex-1">
                             <Search size={18} className="text-[#99A1AF] flex-shrink-0" />
                             <input
+                              ref={clientSearchInputRef}
                               type="text"
                               placeholder="Buscar cliente por nombre o RNC..."
                               value={clientSearch}
@@ -783,6 +793,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             </div>
 
             <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Items Summary (List of added products) */}
+            {items.length > 0 && (
+              <>
+                <div className="flex flex-col gap-[10px] w-full text-[12px] text-[#475569] max-h-[160px] overflow-y-auto pr-1">
+                  {items.map((item, index) => {
+                    const itemSubtotal = item.cantidad * item.precioUnitarioItem
+                    return (
+                      <div key={item.key || index} className="flex items-start justify-between w-full gap-2 select-none">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-semibold text-[#334155] truncate text-[13px]" title={item.nombreItem || 'Ítem personalizado'}>
+                            {item.nombreItem || 'Ítem personalizado'}
+                          </span>
+                          <span className="text-[11px] text-[#64748B] mt-0.5">
+                            Cant: {item.cantidad} × {formatCurrency(item.precioUnitarioItem)}
+                          </span>
+                        </div>
+                        <span className="font-bold text-[#334155] shrink-0 text-right text-[13px] self-start mt-0.5">
+                          {formatCurrency(itemSubtotal)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <hr className="border-[#E2E8F0] my-0" />
+              </>
+            )}
 
             {/* Totals Summary breakdown */}
             <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] font-sans select-none">

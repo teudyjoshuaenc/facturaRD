@@ -25,7 +25,9 @@ import {
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
+import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const tipoGastoOptions = [
   { value: 'todos', label: 'Tipo de gasto' },
@@ -79,6 +81,13 @@ export default function ComprasPage(): JSX.Element {
   const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedIds(new Set())
+  }
 
   const handleRefresh = () => {
     setIsRefreshing(true)
@@ -148,30 +157,73 @@ export default function ComprasPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Refresh Button */}
+          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-2" : "w-[48px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <EditActionButton
+              onClick={toggleSelectionMode}
+              title="Activar selección"
+              className="w-11 h-11 border-[#d0d5dd]"
+            />
+          </div>
+
+          {/* RELOAD/REFRESH BUTTON - always visible */}
           <RefreshActionButton
             onClick={handleRefresh}
             isLoading={isRefreshing}
             className="w-11 h-11 border-[#d0d5dd]"
           />
 
-          {/* Export Button */}
-          <ExportActionButton
-            onClick={() => alert('Exportando compras...')}
-            title="Exportar"
-            className="h-11 border-[#d0d5dd]"
-          />
+          {/* EXPORT BUTTON - visible only in selection mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[118px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2"
+          )}>
+            <ExportActionButton
+              onClick={() => {
+                if (isSelectionMode) {
+                  const selectedList = filtered.filter(c => selectedIds.has(c.id))
+                  toast.success(`Exportando ${selectedList.length} compras seleccionadas...`)
+                } else {
+                  alert('Exportando compras...')
+                }
+              }}
+              disabled={isSelectionMode && selectedIds.size === 0}
+              title="Exportar"
+              className="h-11 w-[114px] justify-center border-[#d0d5dd]"
+            />
+          </div>
 
-          {/* Registrar Gasto Button */}
-          <button
-            onClick={() => alert('Registrar Gasto Menor (Próximamente)...')}
-            className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2.5 transition-colors"
-          >
-            <Plus size={16} className="text-white" />
-            <span className="font-sans font-semibold text-[14px] text-white">
-              Registrar Gasto
-            </span>
-          </button>
+          {/* CANCELAR BUTTON - visible only in selection mode, styled red */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[114px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2"
+          )}>
+            <button
+              onClick={toggleSelectionMode}
+              className="h-11 px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          {/* REGISTRAR GASTO BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[164px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <button
+              onClick={() => alert('Registrar Gasto Menor (Próximamente)...')}
+              className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2.5 transition-colors shrink-0 w-[160px] justify-center"
+            >
+              <Plus size={16} className="text-white" />
+              <span className="font-sans font-semibold text-[14px] text-white whitespace-nowrap">
+                Registrar Gasto
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -312,7 +364,35 @@ export default function ComprasPage(): JSX.Element {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-body-sm min-w-[1000px]">
             <thead>
-              <tr className="border-b border-[#f1f5f9] bg-neutral-50/50 text-[13px] font-semibold text-text-secondary h-10">
+              <tr className="border-b border-[#f1f5f9] bg-neutral-50/50 text-[13px] font-semibold text-text-secondary h-10 select-none">
+                <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9] bg-neutral-50/50", isSelectionMode ? "w-10" : "w-0")}>
+                  <div className={cn(
+                    "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-10 pl-4 origin-left",
+                    isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                  )}>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                      checked={paginated.length > 0 && paginated.every(c => selectedIds.has(c.id))}
+                      onChange={() => {
+                        const allSelected = paginated.every(c => selectedIds.has(c.id))
+                        if (allSelected) {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            paginated.forEach(c => next.delete(c.id))
+                            return next
+                          })
+                        } else {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            paginated.forEach(c => next.add(c.id))
+                            return next
+                          })
+                        }
+                      }}
+                    />
+                  </div>
+                </th>
                 <th className="px-4 py-2 font-semibold">NCF / Código</th>
                 <th className="px-4 py-2 font-semibold">Proveedor</th>
                 <th className="px-4 py-2 font-semibold">RNC Proveedor</th>
@@ -329,11 +409,51 @@ export default function ComprasPage(): JSX.Element {
                   ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
                   : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
 
+                const isSelected = selectedIds.has(c.id)
+
                 return (
                   <tr
                     key={c.id}
-                    className="border-b border-[#f1f5f9] last:border-0 hover:bg-neutral-50/30 transition-colors"
+                    onClick={() => {
+                      if (isSelectionMode) {
+                        setSelectedIds(prev => {
+                          const next = new Set(prev)
+                          if (next.has(c.id)) {
+                            next.delete(c.id)
+                          } else {
+                            next.add(c.id)
+                          }
+                          return next
+                        })
+                      } else {
+                        alert(`Detalle de e-CF ${c.ncf}`)
+                      }
+                    }}
+                    className={`border-b border-[#f1f5f9] last:border-0 hover:bg-neutral-50/30 transition-colors cursor-pointer ${isSelected ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : 'bg-white'}`}
                   >
+                    <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9]", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
+                      <div className={cn(
+                        "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[52px] pl-4 origin-left",
+                        isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                          checked={isSelected}
+                          onChange={() => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev)
+                              if (next.has(c.id)) {
+                                next.delete(c.id)
+                              } else {
+                                next.add(c.id)
+                              }
+                              return next
+                            })
+                          }}
+                        />
+                      </div>
+                    </td>
                     <td className="px-4 py-3.5 font-bold text-[#333] text-[13px]">
                       {c.ncf}
                     </td>

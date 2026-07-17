@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useProductos } from '@/hooks/useProductos'
-import { RefreshActionButton } from '@/components/ui/table-actions'
+import { EditActionButton, RefreshActionButton, ExportActionButton, NewActionButton } from '@/components/ui/table-actions'
 import { NuevoProductoModal } from '@/components/nueva-factura/NuevoProductoModal'
 import { formatCurrency } from '@/lib/comprobantes'
 import { Select } from '@/components/ui/select'
@@ -77,6 +77,13 @@ export default function ProductosPage(): JSX.Element {
   const [editingProducto, setEditingProducto] = useState<any | null>(null)
   const [deletingProducto, setDeletingProducto] = useState<any | null>(null)
   const [togglingProducto, setTogglingProducto] = useState<any | null>(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedIds(new Set())
+  }
 
   const [localMockOverrides, setLocalMockOverrides] = useState<Record<string, any>>({})
   const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
@@ -209,20 +216,69 @@ export default function ProductosPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-2.5" : "w-[44px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <EditActionButton
+              onClick={toggleSelectionMode}
+              title="Activar selección"
+              className="h-10 w-10 border-neutral-200"
+            />
+          </div>
+
+          {/* RELOAD/REFRESH BUTTON - always visible */}
           <RefreshActionButton
             onClick={() => refetch()}
             isLoading={isFetching}
             className="h-10 w-10 border-neutral-200"
           />
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setOpenModal(true)}
-            className="h-10 px-4 bg-brand-500 text-white font-semibold"
-          >
-            <Plus size={16} className="mr-1.5" />
-            Nuevo Producto
-          </Button>
+
+          {/* EXPORT BUTTON - visible only in selection mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[118px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
+          )}>
+            <ExportActionButton
+              onClick={() => {
+                if (isSelectionMode) {
+                  const selectedList = filtered.filter(p => selectedIds.has(p.id))
+                  toast.success(`Exportando ${selectedList.length} productos seleccionados...`)
+                } else {
+                  alert('Exportando productos...')
+                }
+              }}
+              disabled={isSelectionMode && selectedIds.size === 0}
+              title="Exportar"
+              className="h-10 w-[114px] justify-center border-neutral-200"
+            />
+          </div>
+
+          {/* CANCELAR BUTTON - visible only in selection mode, styled red */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[114px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
+          )}>
+            <button
+              onClick={toggleSelectionMode}
+              className="h-10 px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          {/* NUEVO PRODUCTO BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[174px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <NewActionButton
+              onClick={() => setOpenModal(true)}
+              label="Nuevo Producto"
+              className="h-10 w-[170px] justify-center"
+            />
+          </div>
         </div>
       </div>
 
@@ -287,7 +343,35 @@ export default function ProductosPage(): JSX.Element {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-body-sm">
                 <thead>
-                  <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary">
+                  <tr className="border-b border-neutral-200 bg-neutral-50/50 text-ui-sm font-semibold text-text-secondary h-10 select-none">
+                    <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-neutral-200 bg-neutral-50/50", isSelectionMode ? "w-10" : "w-0")}>
+                      <div className={cn(
+                        "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-10 pl-4 origin-left",
+                        isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                      )}>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                          checked={paginated.length > 0 && paginated.every(p => selectedIds.has(p.id))}
+                          onChange={() => {
+                            const allSelected = paginated.every(p => selectedIds.has(p.id))
+                            if (allSelected) {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev)
+                                paginated.forEach(p => next.delete(p.id))
+                                return next
+                              })
+                            } else {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev)
+                                paginated.forEach(p => next.add(p.id))
+                                return next
+                              })
+                            }
+                          }}
+                        />
+                      </div>
+                    </th>
                     <th className={cn("px-4 py-3 font-semibold", nameColClass)}>Nombre / Razón social</th>
                     <th className="px-4 py-3 font-semibold">Tipo</th>
                     <th className={cn("px-4 py-3 font-semibold", priceColClass)}>Precio</th>
@@ -302,13 +386,52 @@ export default function ProductosPage(): JSX.Element {
                     const isService = p.tipo === 'SERVICIO'
                     const ProductIcon = isService ? Wrench : Package
 
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => setSelectedProductoId(p.id)}
-                        className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors cursor-pointer"
-                      >
-                        <td className={cn("px-4 py-3 flex items-center gap-3", nameColClass)}>
+                      const isSelected = selectedIds.has(p.id)
+
+                      return (
+                        <tr
+                          key={p.id}
+                          onClick={() => {
+                            if (isSelectionMode) {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev)
+                                if (next.has(p.id)) {
+                                  next.delete(p.id)
+                                } else {
+                                  next.add(p.id)
+                                }
+                                return next
+                              })
+                            } else {
+                              setSelectedProductoId(p.id)
+                            }
+                          }}
+                          className={`border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors cursor-pointer ${isSelected ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : 'bg-white'}`}
+                        >
+                          <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-neutral-200", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
+                            <div className={cn(
+                              "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-12 pl-4 origin-left",
+                              isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                            )}>
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedIds(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(p.id)) {
+                                      next.delete(p.id)
+                                    } else {
+                                      next.add(p.id)
+                                    }
+                                    return next
+                                  })
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td className={cn("px-4 py-3 flex items-center gap-3", nameColClass)}>
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-text-secondary flex-shrink-0">
                             <ProductIcon size={16} className={isService ? 'text-purple-600' : 'text-blue-600'} />
                           </div>

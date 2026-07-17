@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Download, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
+import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
 import { FacturaRow } from '@/components/facturas/FacturaRow'
 import { DetailPanel } from '@/components/facturas/DetailPanel'
@@ -17,6 +17,7 @@ import { useComprobantes } from '@/hooks/useComprobantes'
 import { api, getErrorMessage } from '@/lib/api'
 import { toast } from 'sonner'
 import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
+import { cn } from '@/lib/utils'
 import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 import {
   ESTADO_LABELS,
@@ -60,6 +61,22 @@ export default function FacturasPage(): JSX.Element {
 
   const { blockingReason } = useEmissionStatus()
 
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedIds(new Set())
+  }
+
+  const handleBulkSend = () => {
+    toast.success(`Enviando ${selectedIds.size} facturas seleccionadas...`)
+  }
+
+  const handleBulkDownload = () => {
+    toast.success(`Descargando ${selectedIds.size} facturas seleccionadas...`)
+  }
+
   const [reenviarComprobante, setReenviarComprobante] = useState<Comprobante | null>(null)
   const [comprobanteToEmit, setComprobanteToEmit] = useState<Comprobante | null>(null)
   const [emittingId, setEmittingId] = useState<string | null>(null)
@@ -101,15 +118,65 @@ export default function FacturasPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-[8px]">
-          <EditActionButton onClick={() => {
-            if (!selectedId) {
-              toast.error('Seleccione un comprobante para editar')
-              return
-            }
-            router.push(`/nueva-factura?id=${selectedId}`)
-          }} />
+          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[48px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <EditActionButton
+              onClick={toggleSelectionMode}
+              title="Activar selección"
+            />
+          </div>
+
+          {/* RELOAD/REFRESH BUTTON - always visible */}
           <RefreshActionButton onClick={() => refetch()} isLoading={isFetching} />
-          <ExportActionButton onClick={() => alert('Exportar comprobantes')} title="Exportar comprobantes" />
+
+          {/* SELECTION ACTIONS CONTAINER */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center gap-[8px] overflow-hidden h-[52px] -my-1 -mx-0.5 px-0.5",
+            isSelectionMode ? "w-[497px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
+          )}>
+            <ExportActionButton
+              onClick={() => {
+                if (isSelectionMode) {
+                  const selectedList = comprobantes.filter(c => selectedIds.has(c.id))
+                  toast.success(`Exportando ${selectedList.length} facturas seleccionadas...`)
+                } else {
+                  alert('Exportar comprobantes')
+                }
+              }}
+              disabled={isSelectionMode && selectedIds.size === 0}
+              title="Exportar comprobantes"
+              className="w-[114px] justify-center"
+            />
+            <button
+              onClick={handleBulkSend}
+              disabled={selectedIds.size === 0}
+              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
+            >
+              <Send size={14} className="text-[#64748b] shrink-0" />
+              <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
+                Enviar
+              </span>
+            </button>
+            <button
+              onClick={handleBulkDownload}
+              disabled={selectedIds.size === 0}
+              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[135px] font-sans font-normal text-[14px] leading-[21px]"
+            >
+              <Download size={14} className="text-[#64748b] shrink-0" />
+              <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
+                Descargar
+              </span>
+            </button>
+            <button
+              onClick={toggleSelectionMode}
+              className="h-[44px] px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
 
@@ -147,7 +214,35 @@ export default function FacturasPage(): JSX.Element {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px]">
+                    <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px] select-none">
+                      <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#e2e8f0] bg-[#f8fafc]", isSelectionMode ? "w-10" : "w-0")}>
+                        <div className={cn(
+                          "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[40px] pl-4 origin-left",
+                          isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                        )}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                            checked={comprobantes.length > 0 && comprobantes.every(c => selectedIds.has(c.id))}
+                            onChange={() => {
+                              const allSelected = comprobantes.every(c => selectedIds.has(c.id))
+                              if (allSelected) {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  comprobantes.forEach(c => next.delete(c.id))
+                                  return next
+                                })
+                              } else {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  comprobantes.forEach(c => next.add(c.id))
+                                  return next
+                                })
+                              }
+                            }}
+                          />
+                        </div>
+                      </th>
                       <th className="px-[16px] py-[10px] w-[90px] min-w-[90px] font-normal">e-NCF</th>
                       <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">Cliente</th>
                       <th className="px-[16px] py-[10px] w-[70px] min-w-[70px] font-normal">RNC</th>
@@ -169,6 +264,19 @@ export default function FacturasPage(): JSX.Element {
                         selected={selectedId === c.id}
                         onReenviar={setReenviarComprobante}
                         onEmitir={handleEmitir}
+                        isSelectionMode={isSelectionMode}
+                        isSelectedInBulk={selectedIds.has(c.id)}
+                        onToggleSelectInBulk={() => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(c.id)) {
+                              next.delete(c.id)
+                            } else {
+                              next.add(c.id)
+                            }
+                            return next
+                          })
+                        }}
                       />
                     ))}
                   </tbody>

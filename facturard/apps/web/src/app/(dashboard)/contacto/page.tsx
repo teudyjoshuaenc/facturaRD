@@ -38,6 +38,7 @@ import { Modal } from '@/components/ui/modal'
 import { toast } from 'sonner'
 
 import {
+  EditActionButton,
   RefreshActionButton,
   ImportActionButton,
   ExportActionButton,
@@ -116,6 +117,13 @@ export default function ContactosPage(): JSX.Element {
   const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
   const [editingContacto, setEditingContacto] = useState<any | null>(null)
   const [togglingContacto, setTogglingContacto] = useState<any | null>(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedIds(new Set())
+  }
 
   const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
   const [syncError, setSyncError] = useState('')
@@ -304,28 +312,83 @@ export default function ContactosPage(): JSX.Element {
           <p className="text-body-sm text-text-secondary">{total} contactos en tu directorio</p>
         </div>
         <div className="flex items-center gap-2.5">
+          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-2.5" : "w-[44px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <EditActionButton
+              onClick={toggleSelectionMode}
+              title="Activar selección"
+              className="h-10 w-10 border-neutral-200"
+            />
+          </div>
+
+          {/* RELOAD/REFRESH BUTTON - always visible */}
           <RefreshActionButton
             onClick={() => refetch()}
             isLoading={isFetching}
             className="h-10 w-10 border-neutral-200"
           />
-          <ImportActionButton
-            onClick={handleSincronizarGhl}
-            isLoading={sincronizar.isPending}
-            label="Sincronizar con GoHighLevel"
-            title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
-            className="h-10 border-neutral-200"
-          />
-          <ExportActionButton
-            onClick={() => alert('Exportando contactos...')}
-            title="Exportar"
-            className="h-10 border-neutral-200"
-          />
-          <NewActionButton
-            onClick={() => setOpenModal(true)}
-            label="Nuevo contacto"
-            className="h-10"
-          />
+
+          {/* GHL IMPORT BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-2.5" : "w-[248px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <ImportActionButton
+              onClick={handleSincronizarGhl}
+              isLoading={sincronizar.isPending}
+              label="Sincronizar con GoHighLevel"
+              title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
+              className="h-10 w-[244px] justify-center border-neutral-200"
+            />
+          </div>
+
+          {/* EXPORT BUTTON - visible only in selection mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[118px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
+          )}>
+            <ExportActionButton
+              onClick={() => {
+                if (isSelectionMode) {
+                  const selectedList = visibles.filter(c => selectedIds.has(c.id))
+                  toast.success(`Exportando ${selectedList.length} contactos seleccionados...`)
+                } else {
+                  alert('Exportando contactos...')
+                }
+              }}
+              disabled={isSelectionMode && selectedIds.size === 0}
+              title="Exportar"
+              className="h-10 w-[114px] justify-center border-neutral-200"
+            />
+          </div>
+
+          {/* CANCELAR BUTTON - visible only in selection mode, styled red */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-right flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-[114px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
+          )}>
+            <button
+              onClick={toggleSelectionMode}
+              className="h-10 px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          {/* NUEVO CONTACTO BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[48px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[174px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <NewActionButton
+              onClick={() => setOpenModal(true)}
+              label="Nuevo contacto"
+              className="h-10 w-[170px] justify-center"
+            />
+          </div>
         </div>
       </div>
 
@@ -533,6 +596,34 @@ export default function ContactosPage(): JSX.Element {
                 <table className="w-full text-left text-body-sm table-auto border-collapse">
                   <thead>
                     <tr className="border-b border-neutral-200 bg-[#f8fafc] text-ui-sm font-semibold text-text-secondary h-10 select-none">
+                      <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-neutral-200 bg-[#f8fafc]", isSelectionMode ? "w-10" : "w-0")}>
+                        <div className={cn(
+                          "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-10 pl-4 origin-left",
+                          isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                        )}>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                            checked={visibles.length > 0 && visibles.every(c => selectedIds.has(c.id))}
+                            onChange={() => {
+                              const allSelected = visibles.every(c => selectedIds.has(c.id))
+                              if (allSelected) {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  visibles.forEach(c => next.delete(c.id))
+                                  return next
+                                })
+                              } else {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev)
+                                  visibles.forEach(c => next.add(c.id))
+                                  return next
+                                })
+                              }
+                            }}
+                          />
+                        </div>
+                      </th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[240px] min-w-[240px]">Nombre / Razón social</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[80px]">Tipo</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">Tipo fiscal</th>
@@ -591,12 +682,54 @@ export default function ContactosPage(): JSX.Element {
                       const activityDate = c.updatedAt || c.createdAt || new Date().toISOString()
                       const formattedActivity = formatDate(activityDate)
 
+                      const isSelected = selectedIds.has(c.id)
+
                       return (
                         <tr
                           key={c.id}
-                          onClick={() => setSelectedContacto(c)}
-                          className="border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors h-[72px] cursor-pointer"
+                          onClick={() => {
+                            if (isSelectionMode) {
+                              setSelectedIds(prev => {
+                                const next = new Set(prev)
+                                if (next.has(c.id)) {
+                                  next.delete(c.id)
+                                } else {
+                                  next.add(c.id)
+                                }
+                                return next
+                              })
+                            } else {
+                              setSelectedContacto(c)
+                            }
+                          }}
+                          className={cn(
+                            "border-b border-neutral-200 last:border-0 hover:bg-neutral-50/30 transition-colors h-[72px] cursor-pointer",
+                            isSelected ? "bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]" : "bg-white"
+                          )}
                         >
+                          <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-neutral-200", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
+                            <div className={cn(
+                              "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[72px] pl-4 origin-left",
+                              isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+                            )}>
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setSelectedIds(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(c.id)) {
+                                      next.delete(c.id)
+                                    } else {
+                                      next.add(c.id)
+                                    }
+                                    return next
+                                  })
+                                }}
+                              />
+                            </div>
+                          </td>
                           <td className="px-4 py-3 w-[240px] min-w-[240px]">
                             <div className="flex items-center gap-3">
                               <div className="relative">

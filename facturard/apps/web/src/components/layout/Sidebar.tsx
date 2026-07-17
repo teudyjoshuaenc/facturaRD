@@ -32,6 +32,13 @@ interface Props {
   activeRoute: string
 }
 
+function isRouteActive(activeRoute: string, itemHref: string): boolean {
+  if (itemHref === '/') {
+    return activeRoute === '/'
+  }
+  return activeRoute === itemHref || activeRoute.startsWith(itemHref + '/')
+}
+
 export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
   const { sidebarOpen, setSidebarOpen } = useUI()
   
@@ -148,7 +155,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                   href={item.href}
                   iconPath={item.iconPath}
                   label={item.label}
-                  active={activeRoute === item.href}
+                  active={isRouteActive(activeRoute, item.href)}
                   collapsed={collapsed}
                 />
               ))}
@@ -181,7 +188,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                   href={item.href}
                   iconPath={item.iconPath}
                   label={item.label}
-                  active={activeRoute === item.href}
+                  active={isRouteActive(activeRoute, item.href)}
                   collapsed={collapsed}
                 />
               ))}

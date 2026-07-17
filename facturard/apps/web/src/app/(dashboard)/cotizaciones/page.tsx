@@ -15,7 +15,8 @@ import {
   FileCheck,
   FileText,
   ArrowRight,
-  Clock
+  Clock,
+  XCircle
 } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
@@ -71,46 +72,49 @@ function EstadoBadge({ estado }: { estado: Cotizacion['estado'] }): JSX.Element 
   switch (estado) {
     case 'APROBADA':
       return (
-        <span className="inline-flex items-center gap-1 bg-[#ecfdf3] text-[#067647] border border-[#d3f9d8] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
-          <CheckCircle2 size={12} className="text-[#067647]" />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(6,118,71,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#067647] font-sans">
+          <CheckCircle2 size={14} className="text-[#067647] flex-shrink-0" />
           Aprobada
         </span>
       )
     case 'ENVIADA':
       return (
-        <span className="inline-flex items-center gap-1 bg-[#fffbeb] text-[#b45309] border border-[#fde68a] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(225,113,0,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#e17100] font-sans">
+          <Clock size={14} className="text-[#e17100] flex-shrink-0" />
           Enviada
         </span>
       )
     case 'BORRADOR':
       return (
-        <span className="inline-flex items-center gap-1 bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
+          <FileText size={14} className="text-[#64748b] flex-shrink-0" />
           Borrador
         </span>
       )
     case 'CONVERTIDA':
       return (
-        <span className="inline-flex items-center gap-1 bg-[#eff6ff] text-[#1e40af] border border-[#bfdbfe] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
-          <FileText size={11} className="text-[#1e40af]" />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(3,121,213,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#0379d5] font-sans">
+          <CheckCircle2 size={14} className="text-[#0379d5] flex-shrink-0" />
           Facturada
         </span>
       )
     case 'VENCIDA':
       return (
-        <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[11px] font-semibold px-2 py-0.5 rounded-lg">
-          <AlertTriangle size={12} />
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#b42318] font-sans">
+          <AlertTriangle size={14} className="text-[#b42318] flex-shrink-0" />
           Vencida
         </span>
       )
     case 'RECHAZADA':
       return (
-        <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[11px] font-semibold px-2 py-0.5 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#b42318] font-sans">
+          <XCircle size={14} className="text-[#b42318] flex-shrink-0" />
           Rechazada
         </span>
       )
     default:
       return (
-        <span className="inline-flex items-center gap-1 bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0] text-[11px] font-semibold px-2 py-0.5 rounded-lg">
+        <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
           {estado}
         </span>
       )
@@ -463,39 +467,7 @@ function CotizacionesPageInner(): JSX.Element {
                     </td>
                     <td className="px-4 py-3.5 text-right pr-6 align-middle" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/cotizaciones/nueva?cloneId=${c.id}`)}
-                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
-                          title="Duplicar"
-                        >
-                          <Copy size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/cotizaciones/nueva?id=${c.id}`)}
-                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
-                          title="Editar"
-                          disabled={c.estado === 'CONVERTIDA'}
-                        >
-                          <Pencil size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
-                        </button>
-                        {c.estado === 'CONVERTIDA' ? (
-                          c.comprobanteId ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/facturas/${c.comprobanteId}`)
-                              }}
-                              className="inline-flex items-center gap-1 text-[#0379d5] hover:text-[#0262ad] transition-colors focus:outline-none text-[12px] font-semibold"
-                              title="Ver factura vinculada"
-                            >
-                              Ver factura
-                              <ArrowRight size={13} />
-                            </button>
-                          ) : null
-                        ) : (
+                        {c.estado !== 'CONVERTIDA' && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -508,6 +480,23 @@ function CotizacionesPageInner(): JSX.Element {
                             <FileCheck size={14} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/cotizaciones/nueva?id=${c.id}`)}
+                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
+                          title="Editar"
+                          disabled={c.estado === 'CONVERTIDA'}
+                        >
+                          <Pencil size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/cotizaciones/nueva?cloneId=${c.id}`)}
+                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
+                          title="Duplicar"
+                        >
+                          <Copy size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>

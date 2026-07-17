@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check } from 'lucide-react'
+import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NuevoClienteModal } from './NuevoClienteModal'
 import { useContactos } from '@/hooks/useContactos'
@@ -125,9 +125,30 @@ export function StepCliente({
   onNext,
   isQuickMode,
 }: StepClienteProps): JSX.Element {
-  const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const { contactos: rawContactos, crearContacto } = useContactos()
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
+  const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const clientSearchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showClientDropdown) {
+      setTimeout(() => {
+        clientSearchInputRef.current?.focus()
+      }, 50)
+    }
+  }, [showClientDropdown])
+
+  const filteredClientes = useMemo(() => {
+    const q = clientSearch.toLowerCase().trim()
+    if (!q) return contactos.slice(0, 5)
+    return contactos.filter(
+      (c) =>
+        c.nombre.toLowerCase().includes(q) ||
+        c.rnc.toLowerCase().includes(q)
+    ).slice(0, 5)
+  }, [contactos, clientSearch])
 
   const limiteRef = useRef<HTMLInputElement>(null)
   const ncfModRef = useRef<HTMLInputElement>(null)
@@ -178,8 +199,6 @@ export function StepCliente({
     }
   }
 
-  const showSearch = searchQuery.trim().length > 0
-
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -203,65 +222,103 @@ export function StepCliente({
             )}
 
             {/* Search and Button horizontally */}
-            <div className="flex gap-[12px] h-[44px] items-center">
+            <div className="flex gap-[12px] h-[44px] items-center relative select-none">
               <div className="relative flex-1">
-                <Search size={16} className="absolute left-[16px] top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre o RNC..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-[44px] w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] pl-[40px] pr-4 text-[14px] font-normal leading-[19px] text-[#333333] placeholder:text-[#0A0A0A]/50 focus:border-[#0379D5] focus:bg-white focus:outline-none focus:ring-0 transition-colors"
-                />
-
-                {/* Search dropdown (Limit to 5) */}
-                {showSearch && (
-                  <div className="absolute z-50 mt-1.5 max-h-[337px] w-full md:w-[742px] overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
-                    {contactos.slice(0, 5).map((c: Contacto) => {
-                      const isSelected = selectedCliente?.id === c.id
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            onSelectCliente(c)
-                            setSearchQuery('')
-                          }}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[67px] border-b border-[#F3F4F6] last:border-none",
-                            isSelected ? "bg-[#F0F5FF]" : "bg-white hover:bg-[#F0F5FF]/50"
-                          )}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
-                              isSelected ? "bg-[#EFF4FF] text-[#0379D5]" : "bg-[#F3F4F6] text-[#6A7282]"
-                            )}>
-                              {c.tipo === 'EMPRESA' ? <Building2 size={16} /> : <User size={16} />}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[16px] font-semibold text-[#333333] leading-6 truncate">
-                                {c.nombre}
-                              </span>
-                              <span className="text-[13px] font-normal text-[#99A1AF] leading-[20px] mt-0.5">
-                                RNC: {c.rnc.length === 9
-                                  ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-                                  : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <Check size={18} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />
-                          )}
-                        </button>
-                      )
-                    })}
-                    {contactos.length === 0 && (
-                      <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
-                        No se encontraron clientes
-                      </div>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => setShowClientDropdown(!showClientDropdown)}
+                  className="flex w-full items-center justify-between gap-2 rounded-[10px] border border-[#E2E8F0] bg-white px-3.5 text-[14px] text-text-primary cursor-pointer hover:border-brand-500 transition-all min-w-0 h-[44px] select-none shadow-sm"
+                >
+                  <div className="flex items-center gap-2 min-w-0 font-normal">
+                    <User size={16} className="text-[#64748B] flex-shrink-0" />
+                    <span className="truncate">
+                      {selectedCliente
+                        ? `${selectedCliente.nombre} (${selectedCliente.rnc})`
+                        : 'Seleccionar cliente...'}
+                    </span>
                   </div>
+                  <ChevronDown size={16} className="text-[#64748B] flex-shrink-0" />
+                </button>
+                {showClientDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowClientDropdown(false)} />
+                    <div className="absolute left-0 mt-1.5 max-h-[400px] w-full overflow-hidden rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] z-50 flex flex-col p-0 animate-in fade-in-50 duration-150">
+                      {/* Search box sticky at the top */}
+                      <div className="px-4 border-b border-neutral-100 flex items-center justify-between sticky top-0 bg-white z-10 h-[51px] flex-shrink-0">
+                        <div className="flex items-center gap-3 flex-1">
+                          <Search size={18} className="text-[#99A1AF] flex-shrink-0" />
+                          <input
+                            ref={clientSearchInputRef}
+                            type="text"
+                            placeholder="Buscar cliente por nombre o RNC..."
+                            value={clientSearch}
+                            onChange={(e) => setClientSearch(e.target.value)}
+                            className="w-full text-[14px] focus:outline-none border-none p-0 text-[#333333] placeholder:text-[#99A1AF] bg-transparent"
+                          />
+                        </div>
+                        {clientSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setClientSearch('')}
+                            className="w-[26px] h-[26px] flex items-center justify-center rounded-[8px] bg-neutral-50 hover:bg-neutral-100 text-[#99A1AF]"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Client rows */}
+                      <div className="overflow-y-auto max-h-[349px] flex flex-col w-full py-1">
+                        {filteredClientes.length === 0 ? (
+                          <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
+                            No se encontraron clientes
+                          </div>
+                        ) : (
+                          filteredClientes.map((c: Contacto) => {
+                            const isSelected = selectedCliente?.id === c.id
+                            const isCompany = c.rnc.length === 9 || c.rnc.startsWith('1')
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  onSelectCliente(c)
+                                  setShowClientDropdown(false)
+                                  setClientSearch('')
+                                }}
+                                className={cn(
+                                  "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[67px] border-b border-[#F3F4F6] last:border-none flex-shrink-0 cursor-pointer",
+                                  isSelected ? "bg-[#F0F5FF]" : "bg-white hover:bg-[#F0F5FF]/50"
+                                )}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={cn(
+                                    "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
+                                    isSelected ? "bg-[#EFF4FF] text-[#0379D5]" : "bg-[#F3F4F6] text-[#6A7282]"
+                                  )}>
+                                    {isCompany ? <Building2 size={16} /> : <User size={16} />}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[14px] font-semibold text-[#333333] leading-5 truncate">
+                                      {c.nombre}
+                                    </span>
+                                    <span className="text-[12px] font-normal text-[#99A1AF] leading-[18px] mt-0.5">
+                                      RNC: {c.rnc.length === 9
+                                        ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+                                        : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')}
+                                    </span>
+                                  </div>
+                                </div>
+                                {isSelected && (
+                                  <Check size={18} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />
+                                )}
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
               <Button
