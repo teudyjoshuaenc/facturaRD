@@ -37,6 +37,9 @@ function isRouteActive(activeRoute: string, itemHref: string): boolean {
   if (itemHref === '/') {
     return activeRoute === '/'
   }
+  if (itemHref === '/facturas' && activeRoute === '/nueva-factura') {
+    return true
+  }
   return activeRoute === itemHref || activeRoute.startsWith(itemHref + '/')
 }
 

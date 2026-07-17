@@ -449,7 +449,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
       {/* Selector de clase de documento (Fase 2) */}
       <div className={cn(
-        "mx-auto mb-4 w-full",
+        "mx-auto mb-4 w-full text-left",
         facturacionMode === 'estandar' ? "lg:w-[1336px]" : ""
       )}>
         <div className="inline-flex rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-1 gap-1 select-none">
@@ -466,7 +466,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 onClick={() => !claseLocked && setEsFiscal(opt.val)}
                 className={cn(
                   "h-9 px-4 rounded-[9px] text-[13px] font-semibold transition-colors",
-                  active ? "bg-white text-[#0379D5] shadow-sm" : "text-[#64748B] hover:text-[#334155]",
+                  active ? "bg-[#0379D5] text-white shadow-sm" : "text-[#64748B] hover:text-[#334155]",
                   claseLocked && !active ? "opacity-40 cursor-not-allowed" : ""
                 )}
               >
@@ -787,17 +787,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 >
                   <Eye size={18} />
                 </button>
-                {esFiscal && (
-                  <button
-                    type="button"
-                    title="Guardar Borrador"
-                    onClick={() => handleSubmit(false)}
-                    disabled={submitting || isPlanExpired}
-                    className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Save size={17} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  title="Guardar Borrador"
+                  onClick={() => handleSubmit(false)}
+                  disabled={submitting || isPlanExpired}
+                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={17} />
+                </button>
               </div>
             </div>
 
@@ -1018,25 +1016,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </button>
                 )}
 
-                {/* Guardar borrador — visible en modo estándar y solo fiscal. No exige
-                    certificado: es la vía para que un usuario NO certificado cree y
-                    guarde su factura como borrador (DRAFT). Sólo "Emitir e-CF" se bloquea. */}
-                {esFiscal && facturacionMode === 'estandar' && (
-                  <button
-                    type="button"
-                    disabled={submitting || isPlanExpired || items.length === 0}
-                    onClick={() => handleSubmit(false)}
-                    className={cn(
-                      "w-full h-[44px] rounded-[10px] border border-[#0379D5] bg-white text-[#0379D5] text-[15px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none",
-                      (submitting || isPlanExpired || items.length === 0)
-                        ? "opacity-40 cursor-not-allowed"
-                        : "hover:bg-[#0379D5]/5 cursor-pointer"
-                    )}
-                  >
-                    <Save size={15} className="text-[#0379D5]" />
-                    <span>Guardar borrador</span>
-                  </button>
-                )}
+
               </div>
 
               {/* Borrador & Limpiar buttons in quick mode */}

@@ -16,7 +16,8 @@ import {
   FileText,
   ArrowRight,
   Clock,
-  XCircle
+  XCircle,
+  Mail
 } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
@@ -29,6 +30,7 @@ import { useCotizaciones } from '@/hooks/useCotizaciones'
 import type { Cotizacion } from '@/hooks/useCotizaciones'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
+import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 
 const LIMIT = 10
 
@@ -130,7 +132,9 @@ function CotizacionesPageInner(): JSX.Element {
   const [page, setPage] = useState(1)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkReenviarOpen, setIsBulkReenviarOpen] = useState(false)
   const [convertTarget, setConvertTarget] = useState<Cotizacion | null>(null)
+  const [reenviarCotizacion, setReenviarCotizacion] = useState<Cotizacion | null>(null)
   const [converting, setConverting] = useState(false)
 
   const { cotizaciones, loading, error, total, totalPages, fetchCotizaciones, deleteCotizacion } = useCotizaciones()
@@ -187,7 +191,7 @@ function CotizacionesPageInner(): JSX.Element {
   }
 
   const handleBulkSend = () => {
-    toast.success(`Enviando ${selectedIds.size} cotizaciones seleccionadas...`)
+    setIsBulkReenviarOpen(true)
   }
 
   const handleBulkDownload = () => {
@@ -491,6 +495,17 @@ function CotizacionesPageInner(): JSX.Element {
                         </button>
                         <button
                           type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setReenviarCotizacion(c)
+                          }}
+                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
+                          title="Reenviar correo"
+                        >
+                          <Mail size={14} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => router.push(`/cotizaciones/nueva?cloneId=${c.id}`)}
                           className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
                           title="Duplicar"
@@ -556,6 +571,46 @@ function CotizacionesPageInner(): JSX.Element {
           marcada como <strong>Facturada</strong> y vinculada a la factura; no podrás editarla después.
         </p>
       </Modal>
+
+      {isBulkReenviarOpen && (
+        <ReenviarModal
+          isOpen={isBulkReenviarOpen}
+          onClose={() => setIsBulkReenviarOpen(false)}
+          title="Reenviar cotizaciones"
+          defaultEmail=""
+          defaultPhone=""
+          isBulk={true}
+          onSend={async (data) => {
+            await new Promise((r) => setTimeout(r, 1000))
+            if (data.enviarAContactoIndividual) {
+              toast.success(`${selectedIds.size} cotizaciones reenviadas al correo/whatsapp de cada cliente correspondientemente`)
+            } else {
+              toast.success(`${selectedIds.size} cotizaciones reenviadas exitosamente a: ${data.para}`)
+            }
+            setIsBulkReenviarOpen(false)
+            toggleSelectionMode()
+          }}
+        />
+      )}
+
+      {reenviarCotizacion && (
+        <ReenviarModal
+          isOpen={!!reenviarCotizacion}
+          onClose={() => setReenviarCotizacion(null)}
+          title="Reenviar cotización"
+          defaultEmail={reenviarCotizacion.contacto?.email || ''}
+          defaultPhone={reenviarCotizacion.contacto?.telefono || ''}
+          isBulk={false}
+          onSend={async (data) => {
+            await new Promise((r) => setTimeout(r, 1000))
+            if (data.enviarAContactoIndividual) {
+              toast.success(`Cotización reenviada al correo/whatsapp correspondiente del cliente`)
+            } else {
+              toast.success(`Cotización reenviada exitosamente a: ${data.para}`)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

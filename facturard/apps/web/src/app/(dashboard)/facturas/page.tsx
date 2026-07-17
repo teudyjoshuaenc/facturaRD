@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react'
+import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw, Mail } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
 import { FacturaRow } from '@/components/facturas/FacturaRow'
 import { DetailPanel } from '@/components/facturas/DetailPanel'
@@ -65,10 +65,86 @@ export default function FacturasPage(): JSX.Element {
 
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkReenviarOpen, setIsBulkReenviarOpen] = useState(false)
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
     setSelectedIds(new Set())
+  }
+
+  const handleBulkExport = () => {
+    const selectedList = comprobantes.filter(c => selectedIds.has(c.id))
+    if (selectedList.length === 0) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error('Por favor permita las ventanas emergentes para exportar a PDF')
+      return
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Exportación de Facturas</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 40px; color: #333; }
+            h1 { font-size: 22px; margin-bottom: 24px; border-bottom: 2px solid #eaeaea; padding-bottom: 12px; color: #111; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #eaeaea; padding: 12px 10px; text-align: left; font-size: 13px; }
+            th { background-color: #fafafa; font-weight: 600; color: #666; border-top: 1px solid #eaeaea; }
+            .total-row { font-weight: bold; background-color: #fafafa; }
+            .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Facturas</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>e-NCF / Folio</th>
+                <th>Cliente</th>
+                <th>RNC</th>
+                <th>Fecha</th>
+                <th>ITBIS</th>
+                <th>Estado</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${selectedList.map(c => {
+                const itbisVal = Number(c.montoTotal || 0) * 18 / 118
+                const folioVal = c.eNCF || c.folioInterno || 'NV'
+                const cleanRnc = c.rnc ? (c.rnc.length === 9 ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3') : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')) : '—'
+                return "<tr>" +
+                  "<td><b>" + folioVal + "</b></td>" +
+                  "<td>" + (c.razonSocial || '—') + "</td>" +
+                  "<td>" + cleanRnc + "</td>" +
+                  "<td>" + formatDate(c.createdAt) + "</td>" +
+                  "<td>" + formatCurrency(itbisVal) + "</td>" +
+                  "<td>" + (ESTADO_LABELS[c.estado] || c.estado) + "</td>" +
+                  "<td>" + formatCurrency(c.montoTotal) + "</td>" +
+                  "</tr>"
+              }).join('')}
+              <tr class="total-row">
+                <td colspan="6" style="text-align: right;">Total General:</td>
+                <td>${formatCurrency(selectedList.reduce((sum, c) => sum + Number(c.montoTotal || 0), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="footer">
+            Generado automáticamente el ${new Date().toLocaleDateString()}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
   }
 
   const handleBulkSend = () => {
@@ -132,21 +208,18 @@ export default function FacturasPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-[8px]">
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => router.push('/nueva-factura')}
-            className="h-9 px-4 font-semibold"
-          >
-            + Crear factura
-          </Button>
-          <EditActionButton onClick={() => {
-            if (!selectedId) {
-              toast.error('Seleccione un comprobante para editar')
-              return
-            }
-            router.push(`/nueva-factura?id=${selectedId}`)
-          }} />
+          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[48px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <EditActionButton
+              onClick={toggleSelectionMode}
+              title="Activar selección"
+            />
+          </div>
+
+          {/* REFRESH/RELOAD BUTTON - always visible */}
           <RefreshActionButton onClick={() => refetch()} isLoading={isFetching} />
 
           {/* SELECTION ACTIONS CONTAINER */}
@@ -155,26 +228,19 @@ export default function FacturasPage(): JSX.Element {
             isSelectionMode ? "w-[497px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
           )}>
             <ExportActionButton
-              onClick={() => {
-                if (isSelectionMode) {
-                  const selectedList = comprobantes.filter(c => selectedIds.has(c.id))
-                  toast.success(`Exportando ${selectedList.length} facturas seleccionadas...`)
-                } else {
-                  alert('Exportar comprobantes')
-                }
-              }}
-              disabled={isSelectionMode && selectedIds.size === 0}
+              onClick={handleBulkExport}
+              disabled={selectedIds.size === 0}
               title="Exportar comprobantes"
               className="w-[114px] justify-center"
             />
             <button
-              onClick={handleBulkSend}
+              onClick={() => setIsBulkReenviarOpen(true)}
               disabled={selectedIds.size === 0}
               className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
             >
-              <Send size={14} className="text-[#64748b] shrink-0" />
+              <Mail size={14} className="text-[#64748b] shrink-0" />
               <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-                Enviar
+                Reenviar
               </span>
             </button>
             <button
@@ -357,10 +423,38 @@ export default function FacturasPage(): JSX.Element {
         <ReenviarModal
           isOpen={!!reenviarComprobante}
           onClose={() => setReenviarComprobante(null)}
+          title="Reenviar factura"
           defaultEmail={reenviarComprobante.datos?.receptor?.email || ''}
+          defaultPhone={reenviarComprobante.datos?.receptor?.telefono || ''}
+          isBulk={false}
           onSend={async (data) => {
             await new Promise((r) => setTimeout(r, 1000))
-            alert(`Comprobante reenviado exitosamente a: ${data.para}`)
+            if (data.enviarAContactoIndividual) {
+              toast.success(`Factura reenviada al correo/whatsapp correspondiente del cliente`)
+            } else {
+              toast.success(`Comprobante reenviado exitosamente a: ${data.para}`)
+            }
+          }}
+        />
+      )}
+
+      {isBulkReenviarOpen && (
+        <ReenviarModal
+          isOpen={isBulkReenviarOpen}
+          onClose={() => setIsBulkReenviarOpen(false)}
+          title="Reenviar facturas"
+          defaultEmail=""
+          defaultPhone=""
+          isBulk={true}
+          onSend={async (data) => {
+            await new Promise((r) => setTimeout(r, 1000))
+            if (data.enviarAContactoIndividual) {
+              toast.success(`${selectedIds.size} comprobantes reenviados al correo/whatsapp de cada cliente correspondientemente`)
+            } else {
+              toast.success(`${selectedIds.size} comprobantes reenviados exitosamente a: ${data.para}`)
+            }
+            setIsBulkReenviarOpen(false)
+            toggleSelectionMode()
           }}
         />
       )}

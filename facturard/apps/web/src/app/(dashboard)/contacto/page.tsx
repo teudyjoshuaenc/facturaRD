@@ -125,6 +125,86 @@ export default function ContactosPage(): JSX.Element {
     setSelectedIds(new Set())
   }
 
+  const handleBulkExport = () => {
+    const selectedList = visibles.filter(c => selectedIds.has(c.id))
+    if (selectedList.length === 0) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error('Por favor permita las ventanas emergentes para exportar a PDF')
+      return
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Exportación de Contactos</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 40px; color: #333; }
+            h1 { font-size: 22px; margin-bottom: 24px; border-bottom: 2px solid #eaeaea; padding-bottom: 12px; color: #111; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #eaeaea; padding: 12px 10px; text-align: left; font-size: 13px; }
+            th { background-color: #fafafa; font-weight: 600; color: #666; border-top: 1px solid #eaeaea; }
+            .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Contactos</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre / Razón social</th>
+                <th>Tipo</th>
+                <th>Tipo fiscal</th>
+                <th>Identificación</th>
+                <th>Origen</th>
+                <th>Estado</th>
+                <th>Última Actividad</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${selectedList.map(c => {
+                let taxTypeLabel = 'CF'
+                if (c.identificadorExtranjero) {
+                  taxTypeLabel = 'ID extranjero'
+                } else if (c.rnc) {
+                  const clean = c.rnc.replace(/\D/g, '')
+                  if (clean.length === 9) {
+                    taxTypeLabel = 'RNC'
+                  } else if (clean.length === 11) {
+                    taxTypeLabel = 'Cédula'
+                  }
+                }
+                const cleanRnc = c.rnc ? (c.rnc.length === 9 ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3') : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')) : c.identificadorExtranjero || '—'
+                const statusLabel = c.activo ? 'Activo' : 'Inactivo'
+                return "<tr>" +
+                  "<td><b>" + (c.razonSocial || '—') + "</b></td>" +
+                  "<td>" + (c.tipo || '—') + "</td>" +
+                  "<td>" + taxTypeLabel + "</td>" +
+                  "<td>" + cleanRnc + "</td>" +
+                  "<td>" + (c.origen || '—') + "</td>" +
+                  "<td>" + statusLabel + "</td>" +
+                  "<td>" + formatDate(c.updatedAt || c.createdAt || new Date().toISOString()) + "</td>" +
+                  "</tr>"
+              }).join('')}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generado automáticamente el ${new Date().toLocaleDateString()}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+  }
+
   const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
   const [syncError, setSyncError] = useState('')
   const [avisoNoConectado, setAvisoNoConectado] = useState(false)
@@ -351,15 +431,8 @@ export default function ContactosPage(): JSX.Element {
             isSelectionMode ? "w-[118px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
           )}>
             <ExportActionButton
-              onClick={() => {
-                if (isSelectionMode) {
-                  const selectedList = visibles.filter(c => selectedIds.has(c.id))
-                  toast.success(`Exportando ${selectedList.length} contactos seleccionados...`)
-                } else {
-                  alert('Exportando contactos...')
-                }
-              }}
-              disabled={isSelectionMode && selectedIds.size === 0}
+              onClick={handleBulkExport}
+              disabled={selectedIds.size === 0}
               title="Exportar"
               className="h-10 w-[114px] justify-center border-neutral-200"
             />
@@ -815,11 +888,11 @@ export default function ContactosPage(): JSX.Element {
                             <div className="flex items-center justify-end gap-3.5">
                               <button
                                 type="button"
-                                title="Emitir Factura"
+                                title="Crear factura"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   if (!c.rnc && !c.identificadorExtranjero) {
-                                    toast.error("Error: El RNC/Cédula es requerido para emitir factura. Por favor actualice los datos del contacto.")
+                                    toast.error("Error: El RNC/Cédula es requerido para crear factura. Por favor actualice los datos del contacto.")
                                     return
                                   }
                                   router.push(`/nueva-factura?clienteId=${c.id}`)

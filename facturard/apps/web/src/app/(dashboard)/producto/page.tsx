@@ -85,6 +85,75 @@ export default function ProductosPage(): JSX.Element {
     setSelectedIds(new Set())
   }
 
+  const handleBulkExport = () => {
+    const selectedList = filtered.filter(p => selectedIds.has(p.id))
+    if (selectedList.length === 0) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error('Por favor permita las ventanas emergentes para exportar a PDF')
+      return
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Exportación de Catálogo de Productos</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 40px; color: #333; }
+            h1 { font-size: 22px; margin-bottom: 24px; border-bottom: 2px solid #eaeaea; padding-bottom: 12px; color: #111; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #eaeaea; padding: 12px 10px; text-align: left; font-size: 13px; }
+            th { background-color: #fafafa; font-weight: 600; color: #666; border-top: 1px solid #eaeaea; }
+            .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Catálogo de Productos</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Precio</th>
+                <th>ITBIS</th>
+                <th>Precio Final</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${selectedList.map(p => {
+                const tipoLabel = p.tipo === 'SERVICIO' ? 'Servicio' : 'Bien'
+                const itbisLabel = ITBIS_LABELS[p.indicadorFacturacion] || '18%'
+                return "<tr>" +
+                  "<td><b>" + (p.codigo || '—') + "</b></td>" +
+                  "<td>" + (p.nombre || '—') + "</td>" +
+                  "<td>" + tipoLabel + "</td>" +
+                  "<td>" + formatCurrency(p.precio) + "</td>" +
+                  "<td>" + itbisLabel + "</td>" +
+                  "<td>" + formatCurrency(p.precioFinal) + "</td>" +
+                  "<td>" + (p.estado || '—') + "</td>" +
+                  "</tr>"
+              }).join('')}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generado automáticamente el ${new Date().toLocaleDateString()}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+  }
+
   const [localMockOverrides, setLocalMockOverrides] = useState<Record<string, any>>({})
   const [deletedMockIds, setDeletedMockIds] = useState<string[]>([])
 
@@ -241,15 +310,8 @@ export default function ProductosPage(): JSX.Element {
             isSelectionMode ? "w-[118px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-2.5"
           )}>
             <ExportActionButton
-              onClick={() => {
-                if (isSelectionMode) {
-                  const selectedList = filtered.filter(p => selectedIds.has(p.id))
-                  toast.success(`Exportando ${selectedList.length} productos seleccionados...`)
-                } else {
-                  alert('Exportando productos...')
-                }
-              }}
-              disabled={isSelectionMode && selectedIds.size === 0}
+              onClick={handleBulkExport}
+              disabled={selectedIds.size === 0}
               title="Exportar"
               className="h-10 w-[114px] justify-center border-neutral-200"
             />

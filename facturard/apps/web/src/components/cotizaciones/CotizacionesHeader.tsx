@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { JSX } from 'react'
-import { Plus, Send, Download } from 'lucide-react'
+import { Plus, Send, Download, Mail } from 'lucide-react'
 import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
 import { cn } from '@/lib/utils'
 
@@ -63,9 +63,9 @@ export function CotizacionesHeader({
             disabled={selectedCount === 0}
             className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
           >
-            <Send size={14} className="text-[#64748b] shrink-0" />
+            <Mail size={14} className="text-[#64748b] shrink-0" />
             <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-              Enviar
+              Reenviar
             </span>
           </button>
           <button

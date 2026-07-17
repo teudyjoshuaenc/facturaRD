@@ -71,24 +71,24 @@ interface ExportActionButtonProps extends ActionButtonProps {
 
 export function ExportActionButton({ onClick, disabled, className, title = 'Exportar', label = 'Exportar' }: ExportActionButtonProps): JSX.Element {
   return (
-    <Button
-      variant="secondary"
+    <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'h-[44px] w-auto px-[17px] flex items-center justify-start gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] transition-colors font-sans font-normal text-[14px] leading-[21px] shrink-0 whitespace-nowrap disabled:opacity-50 disabled:text-[#64748b] disabled:border-[#d0d5dd]',
+        'h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white font-sans font-normal text-[14px] leading-[21px]',
         className
       )}
       title={title}
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0 text-[#64748b]">
         <path d="M10 1.33333H4C3.64638 1.33333 3.30724 1.47381 3.05719 1.72386C2.80714 1.97391 2.66667 2.31304 2.66667 2.66667V13.3333C2.66667 13.687 2.80714 14.0261 3.05719 14.2761C3.30724 14.5262 3.64638 14.6667 4 14.6667H12C12.3536 14.6667 12.6928 14.5262 12.9428 14.2761C13.1929 14.0261 13.3333 13.687 13.3333 13.3333V4.66667L10 1.33333Z" stroke="currentColor" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M9.33333 1.33333V4C9.33333 4.35362 9.47381 4.69276 9.72386 4.94281C9.97391 5.19286 10.313 5.33333 10.6667 5.33333H13.3333" stroke="currentColor" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M8 8V12" stroke="currentColor" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M6 10L8 8L10 10" stroke="currentColor" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      {label && <span className="font-normal text-[14px] leading-[21px]">{label}</span>}
-    </Button>
+      {label && <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">{label}</span>}
+    </button>
   )
 }
 

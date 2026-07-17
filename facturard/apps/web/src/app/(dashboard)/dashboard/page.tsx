@@ -41,7 +41,7 @@ export default function DashboardPage(): JSX.Element {
       <div className="lg:col-span-3 flex flex-col gap-6">
         {/* Status cards row */}
         <StatusCardsRow
-          dgiiConectado={true}
+          dgiiConectado={diasParaVencer !== null}
           certDias={diasParaVencer}
           secuenciasActivas={['B01', 'B02', 'B14', 'B15']}
         />

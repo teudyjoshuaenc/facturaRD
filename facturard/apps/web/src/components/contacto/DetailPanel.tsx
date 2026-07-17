@@ -315,11 +315,11 @@ export function DetailPanel({
       {/* Footer Actions */}
       <div className="border-t border-[#e4e7ec] p-5 flex flex-col gap-2">
         <button
-          onClick={() => validateRnc("emitir factura", () => onEmitirFactura?.(contacto))}
+          onClick={() => validateRnc("crear factura", () => onEmitirFactura?.(contacto))}
           className="bg-[#0379d5] hover:bg-[#0262ad] text-white rounded-[10px] py-2.5 px-4 font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors w-full"
         >
           <Image src="/icons/emit_invoice.svg" alt="Emit" width={12} height={12} />
-          Emitir Factura
+          Crear factura
         </button>
 
         <div className="flex gap-2.5">
