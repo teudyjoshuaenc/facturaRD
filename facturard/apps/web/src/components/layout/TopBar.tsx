@@ -25,8 +25,8 @@ export function TopBar({
 }: Props): JSX.Element {
   const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
 
-  const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Emitir Factura'
-  const isEmitir = pageTitle === 'Emitir Factura'
+  const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Crear factura'
+  const isEmitir = pageTitle === 'Crear factura'
 
   return (
     <header className="hidden border-b border-border-subtle bg-white px-6 py-3.5 md:flex md:items-center md:justify-between h-[68px] shrink-0">
@@ -55,25 +55,32 @@ export function TopBar({
       <div className="flex items-center gap-3">
         {/* DGII Status chip */}
         {!isEmitir && (
-          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50/50 px-2.5 py-1 text-ui-xs font-semibold text-green-700">
-            <Activity size={13} className="text-green-600" />
-            DGII <span className="text-green-600 font-bold">Conectado</span>
-          </span>
+          dgiiConectado ? (
+            <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50/50 px-2.5 py-1 text-ui-xs font-semibold text-green-700">
+              <Activity size={13} className="text-green-600" />
+              DGII <span className="text-green-600 font-bold">Conectado</span>
+            </span>
+          ) : (
+            <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/50 px-2.5 py-1 text-ui-xs font-semibold text-red-700">
+              <Activity size={13} className="text-red-600" />
+              DGII <span className="text-red-600 font-bold">Desconectado</span>
+            </span>
+          )
         )}
 
         {/* Certificado status chip */}
-        {!isEmitir && (
+        {!isEmitir && certDias !== null && (
           <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50/50 px-2.5 py-1 text-ui-xs font-semibold text-orange-700">
             <ShieldCheck size={13} className="text-orange-600" />
             Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
           </span>
         )}
 
-            {/* Emitir Factura CTA button */}
+            {/* Crear factura CTA button */}
             {showEmitir && (
               <Button variant="primary" size="md" onClick={onEmitir} className="h-9 px-3.5 font-semibold">
                 <Plus size={16} className="mr-1" />
-                Emitir Factura
+                Crear factura
               </Button>
             )}
       </div>

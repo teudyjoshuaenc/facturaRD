@@ -37,6 +37,7 @@ export interface Cotizacion {
     nombre: string
     rnc: string
     email?: string
+    telefono?: string
   }
 }
 

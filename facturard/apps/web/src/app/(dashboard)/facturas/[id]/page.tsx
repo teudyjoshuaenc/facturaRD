@@ -727,10 +727,17 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
       <ReenviarModal
         isOpen={isReenviarOpen}
         onClose={() => setIsReenviarOpen(false)}
+        title="Reenviar factura"
         defaultEmail={comprobante.datos?.receptor?.email || ''}
+        defaultPhone={comprobante.datos?.receptor?.telefono || ''}
+        isBulk={false}
         onSend={async (data) => {
           await new Promise((r) => setTimeout(r, 1000))
-          alert(`Comprobante reenviado exitosamente a: ${data.para}`)
+          if (data.enviarAContactoIndividual) {
+            toast.success(`Factura reenviada al correo/whatsapp correspondiente del cliente`)
+          } else {
+            toast.success(`Comprobante reenviado exitosamente a: ${data.para}`)
+          }
         }}
       />
 

@@ -17,7 +17,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/cotizaciones': { title: 'Cotizaciones', subtitle: 'Presupuestos y cotizaciones de clientes' },
   '/compras': { title: 'Recepción y Compras', subtitle: 'Gastos y comprobantes recibidos de proveedores' },
   '/nueva-factura': {
-    title: 'Emitir Factura',
+    title: 'Crear factura',
     subtitle: 'Crea y emite comprobantes fiscales electrónicos',
   },
   '/nueva-factura/exito': {
@@ -126,7 +126,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
           pageTitle={meta.title}
           pageSubtitle={pageSubtitle}
           certDias={diasParaVencer}
-          dgiiConectado={true}
+          dgiiConectado={diasParaVencer !== null}
           showEmitir={pathname !== '/nueva-factura'}
           onEmitir={() => router.push('/nueva-factura')}
         />

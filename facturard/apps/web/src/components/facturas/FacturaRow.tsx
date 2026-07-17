@@ -15,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import {
   type Comprobante,
   formatCurrency,
@@ -30,6 +31,9 @@ interface Props {
   onReenviar?: (c: Comprobante) => void
   onEmitir?: (c: Comprobante) => void
   onDelete?: (c: Comprobante) => void
+  isSelectionMode?: boolean
+  isSelectedInBulk?: boolean
+  onToggleSelectInBulk?: () => void
 }
 
 function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Element {
@@ -99,6 +103,9 @@ const FacturaRow = React.memo(function FacturaRow({
   onReenviar,
   onEmitir,
   onDelete,
+  isSelectionMode = false,
+  isSelectedInBulk = false,
+  onToggleSelectInBulk,
 }: Props): JSX.Element {
   const router = useRouter()
   const esNota = c.esFiscal === false
@@ -111,11 +118,32 @@ const FacturaRow = React.memo(function FacturaRow({
       : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
     : '—'
 
+  const handleCellClick = () => {
+    if (isSelectionMode) {
+      onToggleSelectInBulk?.()
+    } else {
+      onViewDetail(c.id)
+    }
+  }
+
   return (
-    <tr className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px] ${selected ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : 'bg-white'
+    <tr className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px] ${isSelectedInBulk ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : selected ? 'bg-[rgba(3,121,213,0.02)] hover:bg-[rgba(3,121,213,0.04)]' : 'bg-white'
       }`}>
+      <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9]", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
+        <div className={cn(
+          "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[52px] pl-4 origin-left",
+          isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
+        )}>
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
+            checked={isSelectedInBulk}
+            onChange={() => onToggleSelectInBulk?.()}
+          />
+        </div>
+      </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {c.eNCF
@@ -125,7 +153,7 @@ const FacturaRow = React.memo(function FacturaRow({
             : <span className="text-[#64748b]/60 italic font-normal">Borrador</span>}
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left align-middle cursor-pointer"
       >
         <div className="w-[120px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
@@ -133,38 +161,39 @@ const FacturaRow = React.memo(function FacturaRow({
         </div>
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[70px] min-w-[70px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formattedRnc}
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(c.montoTotal)}
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[81px] min-w-[81px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(itbis)}
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[80px] min-w-[80px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatDate(c.createdAt)}
       </td>
       <td
-        onClick={() => onViewDetail(c.id)}
+        onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[106px] min-w-[106px] text-left align-middle cursor-pointer whitespace-nowrap"
       >
         {getStatusBadge(c.estado, c.cotizacionId)}
       </td>
-      <td className="px-[16px] py-[16px] w-[112px] min-w-[112px] text-left align-middle">
-        <div className="flex items-center gap-[4px] w-full">
+      <td className="px-[16px] py-[16px] w-[140px] min-w-[140px] text-right align-middle">
+        <div className="flex items-center justify-end gap-[4px] w-full">
 
+          {/* Descargar button */}
           {c.estado !== 'RECHAZADO' && c.estado !== 'ERROR' && (
             <button
               type="button"
