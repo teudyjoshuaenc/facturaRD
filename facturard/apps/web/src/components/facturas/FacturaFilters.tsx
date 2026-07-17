@@ -27,6 +27,13 @@ const estadoOptions = [
   { value: 'COTIZACION_CONVERTIDA', label: 'Cotización convertida' },
 ]
 
+const claseOptions = [
+  { value: 'todos', label: 'Clase' },
+  { value: 'fiscal', label: 'Fiscal (e-CF)' },
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'nota', label: 'Nota de venta' },
+]
+
 interface Props {
   estadoFilter: EstadoFilter
   search: string
@@ -34,6 +41,8 @@ interface Props {
   onSearchChange: (v: string) => void
   tipoFilter: string
   onTipoFilterChange: (v: string) => void
+  claseFilter: 'todos' | 'fiscal' | 'borrador' | 'nota'
+  onClaseFilterChange: (v: 'todos' | 'fiscal' | 'borrador' | 'nota') => void
   startDate: string
   onStartDateChange: (v: string) => void
   endDate: string
@@ -51,6 +60,8 @@ export function FacturaFilters({
   onSearchChange,
   tipoFilter,
   onTipoFilterChange,
+  claseFilter,
+  onClaseFilterChange,
   startDate,
   onStartDateChange,
   endDate,
@@ -80,6 +91,15 @@ export function FacturaFilters({
             className="h-full w-full rounded-[10px] border border-[#e2e8f0] bg-white pl-[38px] pr-3 text-[14px] text-[#333333] placeholder:text-[#99a1af] focus:border-[#0379d5] focus:outline-none transition-colors"
           />
         </div>
+
+        {/* Clase Dropdown */}
+        <Select
+          value={claseFilter}
+          onChange={(val) => onClaseFilterChange(val as 'todos' | 'fiscal' | 'borrador' | 'nota')}
+          options={claseOptions}
+          className="shrink-0 w-[132px]"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
+        />
 
         {/* Tipo Dropdown */}
         <Select

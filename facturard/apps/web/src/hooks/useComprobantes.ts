@@ -94,6 +94,7 @@ export function useComprobantes() {
   const initialSearch = searchParams.get('search') || ''
   const [page, setPage] = useState(1)
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
+  const [claseFilter, setClaseFilter] = useState<'todos' | 'fiscal' | 'borrador' | 'nota'>('todos')
   const [search, setSearch] = useState(initialSearch)
   const [tipoFilter, setTipoFilter] = useState<string>('todos')
   const [startDate, setStartDate] = useState<string>('')
@@ -108,6 +109,7 @@ export function useComprobantes() {
 
   // Build server-side query params
   const serverTipo = tipoFilter !== 'todos' ? tipoFilter : undefined
+  const serverClase = claseFilter !== 'todos' ? claseFilter : undefined
   const serverSearch = activeSearch || undefined
   const serverFechaDesde = startDate || undefined
   const serverFechaHasta = endDate || undefined
@@ -120,6 +122,7 @@ export function useComprobantes() {
       'comprobantes-lista',
       page,
       estadoFilter,
+      claseFilter,
       serverSearch,
       serverTipo,
       serverFechaDesde,
@@ -135,6 +138,7 @@ export function useComprobantes() {
             limit: hasClientFilter ? 100 : PAGE_SIZE,
             ...(serverSearch && { search: serverSearch }),
             ...(serverTipo && { tipoECF: serverTipo }),
+            ...(serverClase && { clase: serverClase }),
             ...(serverFechaDesde && { fechaDesde: serverFechaDesde }),
             ...(serverFechaHasta && { fechaHasta: serverFechaHasta }),
           },
@@ -232,6 +236,11 @@ export function useComprobantes() {
     setPage(1)
   }, [])
 
+  const handleClaseFilterChange = useCallback((c: 'todos' | 'fiscal' | 'borrador' | 'nota') => {
+    setClaseFilter(c)
+    setPage(1)
+  }, [])
+
   const handleStartDateChange = useCallback((d: string) => {
     setStartDate(d)
     setPage(1)
@@ -266,6 +275,8 @@ export function useComprobantes() {
     setSearch: handleSearchChange,
     tipoFilter,
     setTipoFilter: handleTipoFilterChange,
+    claseFilter,
+    setClaseFilter: handleClaseFilterChange,
     startDate,
     setStartDate: handleStartDateChange,
     endDate,

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Res, Header } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import type { Response } from 'express'
 import { ComprobantesService } from './comprobantes.service'
@@ -42,6 +42,12 @@ export class ComprobantesController {
   @ApiOperation({ summary: 'Emite un borrador: asigna e-NCF, encola y envía a la DGII. 409 si no es DRAFT.' })
   emitir(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.emitir(tenantId, id)
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Elimina (soft delete) una nota de venta interna. 409 si es un comprobante fiscal.' })
+  eliminar(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.eliminar(tenantId, id)
   }
 
   @Post(':id/nota')

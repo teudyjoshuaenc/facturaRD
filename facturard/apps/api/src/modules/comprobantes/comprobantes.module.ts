@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { ComprobantesController } from './comprobantes.controller'
 import { ComprobantesService } from './comprobantes.service'
+import { DocumentoFolioService } from './documento-folio.service'
 import { EcfEmissionProcessor } from './ecf-emission.processor'
 import { CertificadosModule } from '../certificados/certificados.module'
 import { SecuenciasModule } from '../secuencias/secuencias.module'
@@ -24,7 +25,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module'
     forwardRef(() => WebhooksModule),
   ],
   controllers: [ComprobantesController],
-  providers: [ComprobantesService, EcfEmissionProcessor],
+  providers: [ComprobantesService, DocumentoFolioService, EcfEmissionProcessor],
   exports: [ComprobantesService], // GhlReceiverController en WebhooksModule lo necesita
 })
 export class ComprobantesModule {}

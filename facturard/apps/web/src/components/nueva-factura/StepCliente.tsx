@@ -92,6 +92,8 @@ interface StepClienteProps {
   total: number
   onNext: () => void
   isQuickMode?: boolean
+  // false = Nota de venta interna: no exige campos fiscales para avanzar.
+  esFiscal?: boolean
 }
 
 export function StepCliente({
@@ -124,6 +126,7 @@ export function StepCliente({
   total,
   onNext,
   isQuickMode,
+  esFiscal = true,
 }: StepClienteProps): JSX.Element {
   const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
@@ -163,12 +166,14 @@ export function StepCliente({
   const isPaisCompradorRequired = tipoECF === 'E47'
   const isPaisCompradorValid = !isPaisCompradorRequired || paisComprador.trim() !== ''
 
-  const canProceed =
-    (skipCliente || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
-    tipoPago &&
-    isTipoIngresoValid &&
-    isFechaLimiteValid &&
-    isReferenciaValid
+  // Nota de venta (no fiscal): no exige cliente/RNC ni campos fiscales para avanzar.
+  const canProceed = !esFiscal
+    ? true
+    : (skipCliente || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
+      tipoPago &&
+      isTipoIngresoValid &&
+      isFechaLimiteValid &&
+      isReferenciaValid
 
   async function handleNuevoCliente(data: NuevoContactoData): Promise<void> {
     try {

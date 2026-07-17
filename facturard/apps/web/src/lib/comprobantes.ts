@@ -9,6 +9,7 @@ export type ComprobanteEstado =
   | 'RECHAZADO'
   | 'ERROR'
   | 'DRAFT'
+  | 'INTERNO'
 
 export interface Comprobante {
   id: string
@@ -26,6 +27,24 @@ export interface Comprobante {
   updatedAt: string
   datos?: any
   cotizacionId?: string | null
+  // Fase 2: discriminador y folio interno de Nota de venta.
+  esFiscal?: boolean
+  folioInterno?: string | null
+}
+
+// Clase de documento derivada (para badge/filtro en la lista).
+export type ClaseDocumento = 'fiscal' | 'borrador' | 'nota'
+
+export function claseDocumento(c: Pick<Comprobante, 'esFiscal' | 'estado'>): ClaseDocumento {
+  if (c.esFiscal === false) return 'nota'
+  if (c.estado === 'DRAFT') return 'borrador'
+  return 'fiscal'
+}
+
+export const CLASE_LABELS: Record<ClaseDocumento, string> = {
+  fiscal: 'Fiscal',
+  borrador: 'Borrador',
+  nota: 'Nota de venta',
 }
 
 export interface PaginatedResponse<T> {
@@ -45,6 +64,7 @@ export const ESTADO_LABELS: Record<ComprobanteEstado, string> = {
   RECHAZADO: 'Rechazado',
   ERROR: 'Error',
   DRAFT: 'Borrador',
+  INTERNO: 'No fiscal',
 }
 
 export const ESTADO_BADGE_VARIANT: Record<ComprobanteEstado, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -56,6 +76,7 @@ export const ESTADO_BADGE_VARIANT: Record<ComprobanteEstado, 'success' | 'warnin
   RECHAZADO: 'danger',
   ERROR: 'danger',
   DRAFT: 'neutral',
+  INTERNO: 'neutral',
 }
 
 export const TIPO_ECF_LABELS: Record<TipoECF, string> = {

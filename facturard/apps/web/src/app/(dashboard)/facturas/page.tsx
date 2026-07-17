@@ -40,6 +40,8 @@ export default function FacturasPage(): JSX.Element {
     setSearch,
     tipoFilter,
     setTipoFilter,
+    claseFilter,
+    setClaseFilter,
     startDate,
     setStartDate,
     endDate,
@@ -88,6 +90,18 @@ export default function FacturasPage(): JSX.Element {
     setComprobanteToEmit(c)
   }
 
+  async function handleDelete(c: Comprobante) {
+    if (!window.confirm(`¿Eliminar la nota de venta ${c.folioInterno ?? ''}? Esta acción no se puede deshacer.`)) return
+    try {
+      await api.delete(`/comprobantes/${c.id}`)
+      toast.success('Nota de venta eliminada')
+      if (selectedId === c.id) setSelectedId(null)
+      refetch()
+    } catch (err) {
+      toast.error('No se pudo eliminar', { description: getErrorMessage(err) })
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header row: count + actions */}
@@ -101,6 +115,14 @@ export default function FacturasPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-[8px]">
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => router.push('/nueva-factura')}
+            className="h-9 px-4 font-semibold"
+          >
+            + Crear factura
+          </Button>
           <EditActionButton onClick={() => {
             if (!selectedId) {
               toast.error('Seleccione un comprobante para editar')
@@ -124,6 +146,8 @@ export default function FacturasPage(): JSX.Element {
             onSearchChange={setSearch}
             tipoFilter={tipoFilter}
             onTipoFilterChange={setTipoFilter}
+            claseFilter={claseFilter}
+            onClaseFilterChange={setClaseFilter}
             startDate={startDate}
             onStartDateChange={setStartDate}
             endDate={endDate}
@@ -169,6 +193,7 @@ export default function FacturasPage(): JSX.Element {
                         selected={selectedId === c.id}
                         onReenviar={setReenviarComprobante}
                         onEmitir={handleEmitir}
+                        onDelete={handleDelete}
                       />
                     ))}
                   </tbody>

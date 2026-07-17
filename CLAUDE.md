@@ -132,6 +132,32 @@ APP_URL=http://localhost:3000
   detalle, badge CONVERTIDA→"Facturada" con enlace a la factura. Historial de detalle limpiado a eventos
   reales (factura) / eliminado el inventado (cotización). Sidebar sin bloque de usuario; header sin chip
   de automatización ni campana.
+- ✅ **Nota de venta interna (documento sin comprobante) — Fase 2 (Sprint 12).** "Emitir" ≠ "enviar a la
+  DGII": el usuario crea una factura y elige la CLASE. Migración aditiva
+  `20260716000000_add_nota_venta_interna`: `Comprobante.esFiscal Boolean @default(true)`,
+  `folioInterno String?` (unique por tenant), `eliminado Boolean @default(false)`, estado enum `INTERNO`,
+  y tabla contador `documento_folios` (mismo patrón atómico que `cotizacion_folios`).
+  - **Backend:** `POST /comprobantes` con `esFiscal:false` → rama nueva en `crear()` ANTES de toda
+    lógica de emisión: asigna `folioInterno` (`NV-000001`, `DocumentoFolioService`), estado `INTERNO`;
+    **NO consume e-NCF, NO firma, NO encola BullMQ, NO toca la DGII**, no exige certificado ni campos
+    fiscales. `actualizarDraft` ahora edita DRAFT **o** nota (`esFiscal=false`) — un e-CF emitido sigue
+    inmutable (409). `DELETE /comprobantes/:id` = soft-delete SOLO de notas (`eliminado=true`; fiscal→409).
+    `findAll` excluye `eliminado` y acepta `?clase=fiscal|borrador|nota`. `findOne` excluye eliminados.
+    `resumen` (dashboard) filtra `esFiscal:true`. **Doble defensa reportes:** 607 y 608 con `esFiscal:true`
+    explícito (las notas nunca entran a 606/607/608).
+  - **PDF:** nuevo `PdfModo='INTERNO'` (espejo de 'COTIZACION'): sin QR/timbre, título "NOTA DE VENTA",
+    folio `NV-xxxx`, leyenda "no es un e-CF". Servido por el mismo `GET /comprobantes/:id/pdf`.
+  - **Puente nota→fiscal (solo PREFILL en v1):** el botón "Facturar formalmente" abre el form fiscal
+    prellenado vía `?cloneId=` — es una **emisión NUEVA** (e-NCF/firma/DGII), NO muta la nota. Sin enlace
+    bidireccional ni columna `documentoOrigenId` todavía (pendiente si el flujo se usa).
+  - **Frontend:** "Emitir" fuera del sidebar; botón "Crear factura" en `/facturas`; toggle en el form
+    "Factura fiscal (e-CF)"/"Nota de venta (sin comprobante)" (reusa `ComprobanteForm`; en nota, un solo
+    botón "Crear nota de venta", sin cert ni campos fiscales); badge "Nota de venta" + folio `NV-` en la
+    lista; filtro "Clase"; acciones editar/eliminar en filas de nota. Fix colateral: el PATCH del hook ya
+    NO envía `emitir` (el UpdateDTO lo omite → antes 400 latente en edición de borrador).
+  - **Tests:** `nota-venta.e2e-spec.ts` (10 casos: no e-NCF/firma/cola, folio atómico, sin cert, editable,
+    soft-delete, filtro clase, fiscal inmutable PATCH+DELETE→409, regresión DMAIA, puente prefill, doble
+    defensa 607). **113 e2e + 118 ecf-engine, build 0. DMAIA fiscal intacto.**
 
 ---
 

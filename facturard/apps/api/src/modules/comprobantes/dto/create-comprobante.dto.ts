@@ -104,6 +104,15 @@ export class CreateComprobanteDto {
   @IsOptional()
   emitir?: boolean
 
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'true (default) = e-CF fiscal (mismo flujo DGII). false = "Nota de venta" interna: documento NO fiscal con numeración propia (NV-000001), sin e-NCF, sin firma, sin DGII y fuera de los reportes 606/607/608. No exige campos fiscales ni certificado.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  esFiscal?: boolean
+
   @ApiPropertyOptional({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito. Requerido para E31/E32/E33/E34/E41/E44/E45/E46' })
   @IsIn([1, 2, 3])
   @IsOptional()

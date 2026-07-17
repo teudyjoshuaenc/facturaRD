@@ -10,7 +10,8 @@ import type { TenantInfo } from '@/lib/session'
 
 const OPERACION_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', iconPath: '/assets/56c6688862abd07d5527b09c3f035232f217f5f6.svg' },
-  { href: '/nueva-factura', label: 'Emitir', iconPath: '/assets/5d63790c3ee381522361e95f58f5a882667714b0.svg' },
+  // "Emitir" se retiró del sidebar: la creación se inicia desde el botón
+  // "Crear factura" dentro de /facturas (Fase 2).
   { href: '/facturas', label: 'Facturas', iconPath: '/assets/61733f93d0c8001a74ba5b649600aae8be315442.svg' },
   { href: '/cotizaciones', label: 'Cotizaciones', iconPath: '/assets/7f182d3f3a402971ce7e1081a600cec0405d8cd5.svg' },
   { href: '/compras', label: 'Recepción y Compras', iconPath: '/assets/f6b535ce78a3cdad16b049e4047ce1d92cd8b6d1.svg', wip: true },

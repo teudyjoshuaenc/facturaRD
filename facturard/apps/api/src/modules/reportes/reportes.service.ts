@@ -100,7 +100,9 @@ export class ReportesService {
     hasta: string,
   ): Promise<ReporteResult<Reporte607Row> & { resumenConsumo: { cantidad: number; montoTotal: number } }> {
     const comps = await prisma.comprobante.findMany({
-      where: { tenantId, estado: 'ACEPTADO', tipoECF: { in: VENTAS }, createdAt: { gte: inicioDia(desde), lte: finDia(hasta) } },
+      // esFiscal:true es doble defensa: las notas de venta internas nunca son
+      // ACEPTADO, pero lo dejamos explícito para que NUNCA entren al 607.
+      where: { tenantId, esFiscal: true, estado: 'ACEPTADO', tipoECF: { in: VENTAS }, createdAt: { gte: inicioDia(desde), lte: finDia(hasta) } },
       orderBy: { createdAt: 'asc' },
     })
 
@@ -158,6 +160,7 @@ export class ReportesService {
       (await prisma.comprobante.findMany({
         where: {
           tenantId,
+          esFiscal: true,
           estado: 'ACEPTADO',
           tipoECF: 'E32',
           montoTotal: { lt: UMBRAL_CONSUMO_607 },
@@ -282,7 +285,7 @@ export class ReportesService {
   // caso normal es "en cero".
   async reporte608(tenantId: string, desde: string, hasta: string): Promise<ReporteResult<Reporte608Row>> {
     const notas = await prisma.comprobante.findMany({
-      where: { tenantId, tipoECF: { in: ['E33', 'E34'] }, comprobanteReferenciaId: { not: null } },
+      where: { tenantId, esFiscal: true, tipoECF: { in: ['E33', 'E34'] }, comprobanteReferenciaId: { not: null } },
       select: { comprobanteReferenciaId: true, datos: true },
     })
     const anuladosIds = notas
@@ -292,7 +295,7 @@ export class ReportesService {
     let rows: Reporte608Row[] = []
     if (anuladosIds.length > 0) {
       const comps = await prisma.comprobante.findMany({
-        where: { tenantId, id: { in: anuladosIds }, createdAt: { gte: inicioDia(desde), lte: finDia(hasta) } },
+        where: { tenantId, esFiscal: true, id: { in: anuladosIds }, createdAt: { gte: inicioDia(desde), lte: finDia(hasta) } },
         orderBy: { createdAt: 'asc' },
       })
       rows = comps.map((c) => {

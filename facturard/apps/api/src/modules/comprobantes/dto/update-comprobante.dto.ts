@@ -7,5 +7,5 @@ import { CreateComprobanteDto } from './create-comprobante.dto'
  * emisión directa. `emitir` no aplica aquí (se emite vía POST /:id/emitir).
  */
 export class UpdateComprobanteDto extends PartialType(
-  OmitType(CreateComprobanteDto, ['emitir'] as const),
+  OmitType(CreateComprobanteDto, ['emitir', 'esFiscal'] as const),
 ) {}

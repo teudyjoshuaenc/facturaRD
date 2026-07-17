@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsDateString, IsNumber, IsString, Min, Max } from 'class-validator'
+import { IsOptional, IsEnum, IsDateString, IsNumber, IsString, IsIn, Min, Max } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { ComprobanteEstado, TipoECF } from '@facturard/database'
@@ -8,6 +8,14 @@ export class ListComprobantesDto {
   @IsEnum(ComprobanteEstado)
   @IsOptional()
   estado?: ComprobanteEstado
+
+  @ApiPropertyOptional({
+    enum: ['fiscal', 'borrador', 'nota'],
+    description: 'Clase de documento: fiscal (e-CF emitido/en proceso), borrador (DRAFT fiscal), nota (Nota de venta interna).',
+  })
+  @IsIn(['fiscal', 'borrador', 'nota'])
+  @IsOptional()
+  clase?: 'fiscal' | 'borrador' | 'nota'
 
   @ApiPropertyOptional({ enum: TipoECF })
   @IsEnum(TipoECF)
