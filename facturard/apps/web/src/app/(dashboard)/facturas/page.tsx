@@ -284,6 +284,19 @@ export default function FacturasPage(): JSX.Element {
                         onReenviar={setReenviarComprobante}
                         onEmitir={handleEmitir}
                         onDelete={handleDelete}
+                        isSelectionMode={isSelectionMode}
+                        isSelectedInBulk={selectedIds.has(c.id)}
+                        onToggleSelectInBulk={() => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(c.id)) {
+                              next.delete(c.id)
+                            } else {
+                              next.add(c.id)
+                            }
+                            return next
+                          })
+                        }}
                       />
                     ))}
                   </tbody>

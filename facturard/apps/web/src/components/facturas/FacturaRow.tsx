@@ -31,6 +31,9 @@ interface Props {
   onReenviar?: (c: Comprobante) => void
   onEmitir?: (c: Comprobante) => void
   onDelete?: (c: Comprobante) => void
+  isSelectionMode?: boolean
+  isSelectedInBulk?: boolean
+  onToggleSelectInBulk?: () => void
 }
 
 function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Element {
@@ -100,6 +103,9 @@ const FacturaRow = React.memo(function FacturaRow({
   onReenviar,
   onEmitir,
   onDelete,
+  isSelectionMode = false,
+  isSelectedInBulk = false,
+  onToggleSelectInBulk,
 }: Props): JSX.Element {
   const router = useRouter()
   const esNota = c.esFiscal === false

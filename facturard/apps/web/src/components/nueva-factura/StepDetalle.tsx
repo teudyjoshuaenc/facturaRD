@@ -72,7 +72,7 @@ export function StepDetalle({
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase().trim()
     const isExemptOnly = tipoECF && ['E41', 'E43', 'E44', 'E47'].includes(tipoECF)
-    const baseList = allProductos.filter((p) => {
+    return allProductos.filter((p) => {
       if (isExemptOnly && p.indicadorFacturacion !== 'E' && p.indicadorFacturacion !== 'I4') {
         return false
       }
@@ -153,7 +153,6 @@ export function StepDetalle({
                 type="text"
                 placeholder={isQuickMode ? "Buscar o agregar producto... (ej: arroz, café, cerveza)" : "Buscar por nombre o NNC..."}
                 value={productSearch}
-                onFocus={() => setShowProductDropdown(true)}
                 onChange={(e) => setProductSearch(e.target.value)}
                 onFocus={() => setProductFocused(true)}
                 className={cn(
@@ -213,9 +212,8 @@ export function StepDetalle({
                     </div>
                   )}
                 </div>
-              </>
-            )}
-          </div>
+              )}
+            </div>
           <Button
             variant="primary"
             size="md"

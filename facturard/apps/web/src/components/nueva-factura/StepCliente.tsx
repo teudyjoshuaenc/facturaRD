@@ -128,7 +128,7 @@ export function StepCliente({
   isQuickMode,
   esFiscal = true,
 }: StepClienteProps): JSX.Element {
-  const { contactos: rawContactos, crearContacto } = useContactos()
+  const { contactos: rawContactos, crearContacto, searchQuery, setSearchQuery } = useContactos()
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
   const [clienteFocused, setClienteFocused] = useState(false)
@@ -276,8 +276,8 @@ export function StepCliente({
                       <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
                         {searchQuery.trim().length > 0 ? 'No se encontraron clientes' : 'No tienes clientes activos todavía'}
                       </div>
-                    </div>
-                  </>
+                    )}
+                  </div>
                 )}
             </div>
             <Button
