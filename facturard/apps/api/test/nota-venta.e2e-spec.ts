@@ -64,6 +64,52 @@ describe('Notas de venta internas (esFiscal=false) — e2e', () => {
     expect(ctx.queueAdd).not.toHaveBeenCalled()
   })
 
+  it('nota de venta SOLO con ítems (sin NINGÚN campo fiscal) → 201, tipoECF se default-ea', async () => {
+    ctx.queueAdd.mockClear()
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantSinCert))
+      .send({
+        esFiscal: false,
+        fechaEmision: '16-07-2026',
+        // sin tipoECF, sin tipoPago, sin tipoIngresos, sin fechaVencimiento, sin terminoPago, sin rnc
+        items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'Producto', indicadorBienoServicio: 1, cantidad: 1, precioUnitarioItem: 1000 }],
+      })
+      .expect(201)
+    expect(res.body.estado).toBe('INTERNO')
+    expect(res.body.esFiscal).toBe(false)
+    expect(res.body.tipoECF).toBe('E32') // default informativo
+    expect(res.body.folioInterno).toMatch(/^NV-\d{6}$/)
+    expect(ctx.queueAdd).not.toHaveBeenCalled()
+  })
+
+  it('nota de venta con fechaVencimiento/terminoPago → se guardan (opcionales)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantSinCert))
+      .send({
+        esFiscal: false,
+        tipoPago: 2,
+        fechaEmision: '16-07-2026',
+        fechaVencimiento: '30-07-2026',
+        terminoPago: 'Neto 15',
+        items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'Producto', indicadorBienoServicio: 1, cantidad: 1, precioUnitarioItem: 1000 }],
+      })
+      .expect(201)
+    expect(res.body.estado).toBe('INTERNO')
+    expect((res.body.datos as { fechaVencimiento?: string; terminoPago?: string }).fechaVencimiento).toBe('30-07-2026')
+    expect((res.body.datos as { terminoPago?: string }).terminoPago).toBe('Neto 15')
+  })
+
+  it('regresión fiscal: un e-CF fiscal SIN tipoECF → 400 (tipoECF sigue obligatorio para fiscal)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA))
+      .send({
+        emitir: false, // fiscal (esFiscal por default true)
+        fechaEmision: '16-07-2026',
+        items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'X', indicadorBienoServicio: 2, cantidad: 1, precioUnitarioItem: 1000 }],
+      })
+      .expect(400)
+  })
+
   it('la numeración interna es atómica y correlativa (NV-000001, NV-000002...)', async () => {
     const t = await createTenant()
     const a = await request(app.getHttpServer()).post('/api/v1/comprobantes').set(auth(t)).send(notaBody).expect(201)

@@ -213,7 +213,9 @@ export class ComprobantesService {
           eNCF: null,
           esFiscal: false,
           folioInterno,
-          tipoECF: dto.tipoECF, // informativo; una nota de venta no va a la DGII
+          // tipoECF es informativo en una nota (no va a la DGII). Si no vino, se
+          // default-ea a E32 solo para satisfacer la columna NOT NULL del schema.
+          tipoECF: dto.tipoECF ?? 'E32',
           estado: 'INTERNO',
           montoTotal: totales.montoTotal,
           rnc: dto.rncComprador ?? '',

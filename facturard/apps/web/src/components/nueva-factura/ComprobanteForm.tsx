@@ -289,6 +289,19 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     checkBlockingStatus()
   }, [])
 
+  // Default inteligente de la CLASE: si el tenant NO puede emitir (sin certificado
+  // o vencido), preselecciona "Nota de venta" — lo único que puede usar. Se aplica
+  // una sola vez y solo al CREAR (no al editar/clonar, donde la clase la fija el doc).
+  const autoClaseApplied = useRef(false)
+  useEffect(() => {
+    if (autoClaseApplied.current) return
+    if (draftId || cloneId) return
+    if (hasCertIssue) {
+      setEsFiscal(false)
+      autoClaseApplied.current = true
+    }
+  }, [hasCertIssue, draftId, cloneId])
+
 
 
   const filteredClientes = useMemo(() => {
@@ -766,7 +779,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               <div className="flex items-center gap-[8px]">
                 <FileText size={20} className="text-[#333333]" />
                 <span className="font-['Open_Sans'] font-semibold leading-[24px] text-[#333333] text-[16px]">
-                  Resumen e-CF
+                  {esFiscal ? 'Resumen e-CF' : 'Resumen'}
                 </span>
               </div>
               <div className="flex items-center gap-[12px]">
@@ -808,11 +821,11 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 </span>
               </div>
 
-              {/* e-CF Document Type */}
+              {/* Tipo de documento */}
               <div className="flex items-center gap-[8px] text-[#64748B] text-[13px] font-sans w-full min-w-0">
                 <FileText size={16} className="text-[#64748B] flex-shrink-0" />
-                <span className="leading-[19.5px] truncate" title={TIPO_ECF_LABELS[tipoECF]}>
-                  {TIPO_ECF_LABELS[tipoECF]}
+                <span className="leading-[19.5px] truncate" title={esFiscal ? TIPO_ECF_LABELS[tipoECF] : 'Nota de venta'}>
+                  {esFiscal ? TIPO_ECF_LABELS[tipoECF] : 'Nota de venta (documento interno)'}
                 </span>
               </div>
             </div>
@@ -1042,7 +1055,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             {/* Footer e-CF label */}
             <div className="flex justify-center items-center px-[38px] w-full select-none font-sans mt-1">
               <span className="text-[#64748B] text-[12px] text-center leading-[16.5px] whitespace-nowrap">
-                e-NCF • Comprobante Fiscal Electrónico
+                {esFiscal ? 'e-NCF • Comprobante Fiscal Electrónico' : 'NV • Documento interno (no fiscal)'}
               </span>
             </div>
           </Card>

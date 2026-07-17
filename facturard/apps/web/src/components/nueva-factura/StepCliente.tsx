@@ -347,48 +347,52 @@ export function StepCliente({
         {/* Identificación del Documento */}
         <div className="flex flex-col gap-4 w-[904px]">
           <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
-            Identificación del Documento
+            {esFiscal ? 'Identificación del Documento' : 'Condiciones de pago (opcional)'}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 text-left select-none w-full">
             
-            {/* Tipo e-CF */}
-            <div className="flex flex-col gap-[8px] items-start w-full">
-              <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo e-CF</label>
-              <Select
-                value={tipoECF}
-                onChange={(val) => onTipoECFChange(val as TipoECF)}
-                options={TIPOS_ECF}
-                placeholder="Seleccionar"
-                triggerClassName="h-[54.5px] border-[1.25px] border-[#F5F5F5] bg-white text-[13px] text-[#64748B]"
-              />
-            </div>
+            {/* Tipo e-CF — solo documentos fiscales (una nota de venta no es un e-CF) */}
+            {esFiscal && (
+              <div className="flex flex-col gap-[8px] items-start w-full">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo e-CF</label>
+                <Select
+                  value={tipoECF}
+                  onChange={(val) => onTipoECFChange(val as TipoECF)}
+                  options={TIPOS_ECF}
+                  placeholder="Seleccionar"
+                  triggerClassName="h-[54.5px] border-[1.25px] border-[#F5F5F5] bg-white text-[13px] text-[#64748B]"
+                />
+              </div>
+            )}
 
-            {/* Tipo de Ingreso */}
-            <div className="flex flex-col gap-[8px] items-start w-full">
-              <div className="flex justify-between items-center w-full select-none">
-                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Ingreso</label>
-                {isTipoIngresoRequired && !tipoIngreso && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+            {/* Tipo de Ingreso — campo fiscal DGII: oculto en modo nota de venta */}
+            {esFiscal && (
+              <div className="flex flex-col gap-[8px] items-start w-full">
+                <div className="flex justify-between items-center w-full select-none">
+                  <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Ingreso</label>
+                  {isTipoIngresoRequired && !tipoIngreso && (
+                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  )}
+                </div>
+                {isTipoIngresoRequired ? (
+                  <Select
+                    value={tipoIngreso}
+                    onChange={onTipoIngresoChange}
+                    options={tipoIngresoOptions}
+                    placeholder="Seleccionar"
+                    triggerClassName={cn(
+                      "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                      !tipoIngreso ? "border-danger-500" : "border-[#F5F5F5]"
+                    )}
+                  />
+                ) : (
+                  <div className="w-full h-[54.5px] bg-[#F8FAFC] border-[1.25px] border-[#F5F5F5] rounded-[10px] flex items-center px-[16px]">
+                    <span className="text-[13px] text-[#64748B]/60 italic">No aplica para este tipo e-CF</span>
+                  </div>
                 )}
               </div>
-              {isTipoIngresoRequired ? (
-                <Select
-                  value={tipoIngreso}
-                  onChange={onTipoIngresoChange}
-                  options={tipoIngresoOptions}
-                  placeholder="Seleccionar"
-                  triggerClassName={cn(
-                    "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
-                    !tipoIngreso ? "border-danger-500" : "border-[#F5F5F5]"
-                  )}
-                />
-              ) : (
-                <div className="w-full h-[54.5px] bg-[#F8FAFC] border-[1.25px] border-[#F5F5F5] rounded-[10px] flex items-center px-[16px]">
-                  <span className="text-[13px] text-[#64748B]/60 italic">No aplica para este tipo e-CF</span>
-                </div>
-              )}
-            </div>
+            )}
 
 
 
@@ -419,9 +423,9 @@ export function StepCliente({
                   "text-[12px] font-semibold uppercase font-sans transition-colors",
                   tipoPago === 'CREDITO' ? "text-[#333333]" : "text-[#333333]/50"
                 )}>
-                  Fecha Límite {tipoPago === 'CREDITO' && '*'}
+                  Fecha Límite {esFiscal && tipoPago === 'CREDITO' && '*'}
                 </label>
-                {tipoPago === 'CREDITO' && !fechaLimite && (
+                {esFiscal && tipoPago === 'CREDITO' && !fechaLimite && (
                   <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
                 )}
               </div>
@@ -474,8 +478,8 @@ export function StepCliente({
           </div>
         </div>
 
-        {/* Información de Referencia */}
-        {isReferenciaRequired && (
+        {/* Información de Referencia — solo fiscal (E33/E34); no aplica a notas */}
+        {esFiscal && isReferenciaRequired && (
           <div className="flex flex-col gap-4 w-[904px]">
             <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
               Información de Referencia

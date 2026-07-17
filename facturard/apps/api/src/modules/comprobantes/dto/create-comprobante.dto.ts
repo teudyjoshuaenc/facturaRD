@@ -91,7 +91,10 @@ export class CreateItemDto {
 }
 
 export class CreateComprobanteDto {
-  @ApiProperty({ enum: TipoECF, example: 'E31' })
+  // tipoECF es obligatorio SOLO para documentos fiscales (esFiscal !== false). Una
+  // Nota de venta interna no es un e-CF: puede omitirlo (el servidor lo default-ea).
+  @ApiPropertyOptional({ enum: TipoECF, example: 'E31', description: 'Obligatorio para e-CF fiscal; opcional para Nota de venta (esFiscal=false).' })
+  @ValidateIf((o: CreateComprobanteDto) => o.esFiscal !== false)
   @IsEnum(TipoECF)
   tipoECF!: TipoECF
 
