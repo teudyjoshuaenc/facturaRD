@@ -35,6 +35,8 @@ export interface ComprobanteFormData {
   indicadorNotaCredito?: 1 | 2
   items: ItemRow[]
   emitirConComprobante?: boolean
+  // false = "Nota de venta" interna (no fiscal). Ausente/true = e-CF fiscal.
+  esFiscal?: boolean
 }
 
 function toDDMMYYYY(iso: string): string {
@@ -60,10 +62,13 @@ export function useNuevaFactura() {
       if (data.condicionPago === 'CREDITO') backendTipoPago = 2
       else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
 
+      // Nota de venta interna: se manda esFiscal=false y NO emitir (no aplica).
+      const esNota = data.esFiscal === false
+
       const res = await api.post<{ id: string; eNCF: string; montoTotal: number }>('/comprobantes', {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
-        emitir: data.emitirConComprobante,
+        ...(esNota ? { esFiscal: false } : { emitir: data.emitirConComprobante }),
         ...(tiposConTipoIngresos.includes(data.tipoECF) && data.tipoIngresos && { tipoIngresos: data.tipoIngresos }),
         ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
@@ -110,10 +115,11 @@ export function useNuevaFactura() {
       if (data.condicionPago === 'CREDITO') backendTipoPago = 2
       else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
 
+      // El PATCH edita el documento; NO lleva `emitir` (el UpdateDTO lo omite y la
+      // emisión real se hace aparte vía POST /:id/emitir).
       const res = await api.patch<{ id: string; eNCF: string; montoTotal: number }>(`/comprobantes/${id}`, {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
-        emitir: data.emitirConComprobante,
         ...(tiposConTipoIngresos.includes(data.tipoECF) && data.tipoIngresos && { tipoIngresos: data.tipoIngresos }),
         ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),

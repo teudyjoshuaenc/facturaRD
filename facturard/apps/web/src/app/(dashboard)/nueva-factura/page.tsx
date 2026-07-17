@@ -16,11 +16,16 @@ function NuevaFacturaContent(): JSX.Element {
   const { createComprobante, updateComprobante } = useNuevaFactura()
 
   async function handleSubmit(data: ComprobanteFormData): Promise<void> {
+    const esNota = data.esFiscal === false
+
     if (draftId) {
-      // 1. Update the draft with the corrected values first
+      // 1. Update the draft/nota with the corrected values first
       await updateComprobante(draftId, data)
-      
-      if (data.emitirConComprobante === false) {
+
+      if (esNota) {
+        toast.success('Nota de venta actualizada exitosamente')
+        router.push('/facturas')
+      } else if (data.emitirConComprobante === false) {
         toast.success('Borrador actualizado exitosamente')
         router.push('/facturas')
       } else {
@@ -35,8 +40,13 @@ function NuevaFacturaContent(): JSX.Element {
     } else {
       // Create new comprobante
       const res = await createComprobante(data)
-      if (data.emitirConComprobante === false) {
-        toast.success('Factura creada exitosamente como borrador/factura interna', {
+      if (esNota) {
+        toast.success('Nota de venta creada exitosamente', {
+          description: 'Documento interno (no fiscal).',
+        })
+        router.push('/facturas')
+      } else if (data.emitirConComprobante === false) {
+        toast.success('Factura creada exitosamente como borrador', {
           description: `Código asignado: ${res.eNCF || 'DRAFT'}`,
         })
         router.push('/facturas')

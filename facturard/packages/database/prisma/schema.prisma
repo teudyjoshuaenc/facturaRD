@@ -50,6 +50,9 @@ enum ComprobanteEstado {
   ACEPTADO_CONDICIONAL
   RECHAZADO
   ERROR
+  // Documento interno "Nota de venta" (esFiscal=false): NO es un e-CF. Estado
+  // terminal — nunca entra al ciclo DGII (sin e-NCF, sin firma, sin envío).
+  INTERNO
 }
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -171,6 +174,16 @@ model CotizacionFolio {
   @@map("cotizacion_folios")
 }
 
+// Contador atómico de folios de Notas de venta internas (NV-000001) por tenant.
+// Mismo patrón que CotizacionFolio: independiente de las secuencias e-NCF.
+model DocumentoFolio {
+  tenantId    String   @id
+  ultimoFolio Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@map("documento_folios")
+}
+
 model Contacto {
   id                      String   @id @default(uuid())
   tenantId                String
@@ -277,6 +290,17 @@ model Comprobante {
   // El e-NCF se asigna atómicamente sólo al emitir. NULLs son distintos en el
   // índice único de Postgres, así que múltiples borradores conviven sin colisión.
   eNCF         String?
+  // Discriminador fiscal. true (default) = e-CF fiscal → mismo ciclo DGII de
+  // siempre (DMAIA intacto). false = "Nota de venta" interna: sin e-NCF, sin
+  // firma, sin DGII, sin reportes 606/607/608. NULLs/default mantienen todas
+  // las filas existentes como fiscales.
+  esFiscal     Boolean           @default(true)
+  // Número interno de la Nota de venta (NV-000001). Sólo para esFiscal=false;
+  // null en fiscales (que usan eNCF). Nunca es un e-NCF ni va a la DGII.
+  folioInterno String?
+  // Soft delete: sólo las Notas de venta (esFiscal=false) son eliminables. Un
+  // e-CF fiscal emitido es inmutable y nunca se marca aquí.
+  eliminado    Boolean           @default(false)
   tipoECF      TipoECF
   estado       ComprobanteEstado @default(PENDIENTE)
   xmlFirmado   String?
@@ -299,8 +323,10 @@ model Comprobante {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, eNCF])
+  @@unique([tenantId, folioInterno])
   @@index([tenantId, estado])
   @@index([tenantId, createdAt])
+  @@index([tenantId, esFiscal])
   @@map("comprobantes")
 }
 

@@ -67,6 +67,27 @@ export class CreateItemDto {
   @Min(0)
   @IsOptional()
   descuentoPorcentaje?: number
+
+  @ApiPropertyOptional({ example: 100, description: 'Descuento en monto absoluto (RD$) de la línea' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  descuento?: number
+
+  @ApiPropertyOptional({ example: 27, description: 'ITBIS retenido de la línea (RD$) — típicamente E41' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  itbisRetenido?: number
+
+  @ApiPropertyOptional({ example: 100, description: 'ISR retenido de la línea (RD$) — típicamente E47' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  isrRetenido?: number
 }
 
 export class CreateComprobanteDto {
@@ -82,6 +103,15 @@ export class CreateComprobanteDto {
   @IsBoolean()
   @IsOptional()
   emitir?: boolean
+
+  @ApiPropertyOptional({
+    default: true,
+    description:
+      'true (default) = e-CF fiscal (mismo flujo DGII). false = "Nota de venta" interna: documento NO fiscal con numeración propia (NV-000001), sin e-NCF, sin firma, sin DGII y fuera de los reportes 606/607/608. No exige campos fiscales ni certificado.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  esFiscal?: boolean
 
   @ApiPropertyOptional({ enum: [1, 2, 3], description: '1=Contado, 2=Crédito, 3=Gratuito. Requerido para E31/E32/E33/E34/E41/E44/E45/E46' })
   @IsIn([1, 2, 3])
@@ -123,6 +153,11 @@ export class CreateComprobanteDto {
   @IsString()
   @IsOptional()
   paisComprador?: string
+
+  @ApiPropertyOptional({ description: 'Término/condición de pago libre (ej. "Neto 30 días"). Informativo, se guarda en el documento.' })
+  @IsString()
+  @IsOptional()
+  terminoPago?: string
 
   @ApiPropertyOptional()
   @IsString()

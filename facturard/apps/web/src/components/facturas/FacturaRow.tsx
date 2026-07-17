@@ -12,6 +12,7 @@ import {
   Pencil,
   Mail,
   Copy,
+  Trash2,
 } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
@@ -29,9 +30,7 @@ interface Props {
   selected?: boolean
   onReenviar?: (c: Comprobante) => void
   onEmitir?: (c: Comprobante) => void
-  isSelectionMode?: boolean
-  isSelectedInBulk?: boolean
-  onToggleSelectInBulk?: () => void
+  onDelete?: (c: Comprobante) => void
 }
 
 function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Element {
@@ -75,6 +74,14 @@ function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Eleme
       </span>
     )
   }
+  if (estado === 'INTERNO') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.12)] px-[10px] py-[5px] text-[12px] font-semibold text-[#475569] font-sans">
+        <FileText size={14} className="text-[#475569] flex-shrink-0" />
+        Nota de venta
+      </span>
+    )
+  }
   // En proceso / Pendiente
   return (
     <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#f1f5f9] px-[10px] py-[5px] text-[12px] font-normal text-[#64748b] font-sans">
@@ -92,11 +99,10 @@ const FacturaRow = React.memo(function FacturaRow({
   selected = false,
   onReenviar,
   onEmitir,
-  isSelectionMode = false,
-  isSelectedInBulk = false,
-  onToggleSelectInBulk,
+  onDelete,
 }: Props): JSX.Element {
   const router = useRouter()
+  const esNota = c.esFiscal === false
   const itbis = Number(c.montoTotal) * 18 / 118
 
   // Format RNC nicely: e.g. 130-87456-2
@@ -134,7 +140,11 @@ const FacturaRow = React.memo(function FacturaRow({
         onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
-        {c.eNCF || <span className="text-[#64748b]/60 italic font-normal">Borrador</span>}
+        {c.eNCF
+          ? c.eNCF
+          : c.esFiscal === false
+            ? <span className="text-[#475569] font-semibold">{c.folioInterno || 'NV'}</span>
+            : <span className="text-[#64748b]/60 italic font-normal">Borrador</span>}
       </td>
       <td
         onClick={handleCellClick}
@@ -198,8 +208,52 @@ const FacturaRow = React.memo(function FacturaRow({
             </button>
           )}
 
-          {/* Reenviar button (only if not draft/rejected/error) */}
-          {c.estado !== 'DRAFT' && c.estado !== 'RECHAZADO' && c.estado !== 'ERROR' && (
+          {esNota ? (
+            <>
+              {/* Editar nota de venta */}
+              <button
+                type="button"
+                title="Editar nota de venta"
+                onClick={() => router.push(`/nueva-factura?id=${c.id}`)}
+                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
+              >
+                <Pencil size={14} />
+              </button>
+
+              {/* Eliminar nota de venta (soft delete) */}
+              <button
+                type="button"
+                title="Eliminar nota de venta"
+                onClick={() => onDelete && onDelete(c)}
+                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#b42318] hover:bg-red-50 transition-colors focus:outline-none flex-shrink-0"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          ) : c.estado === 'DRAFT' || c.estado === 'RECHAZADO' || c.estado === 'ERROR' ? (
+            <>
+              {/* Edit button */}
+              <button
+                type="button"
+                title="Editar borrador"
+                onClick={() => router.push(`/nueva-factura?id=${c.id}`)}
+                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
+              >
+                <Pencil size={14} />
+              </button>
+
+              {/* Emit button (Plane icon) */}
+              <button
+                type="button"
+                title="Emitir comprobante"
+                onClick={() => onEmitir && onEmitir(c)}
+                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#0379d5] hover:bg-blue-50 transition-colors focus:outline-none flex-shrink-0"
+              >
+                <Send size={14} />
+              </button>
+            </>
+          ) : (
+            /* Reenviar button (Mail icon) */
             <button
               type="button"
               title="Reenviar correo"
@@ -210,34 +264,10 @@ const FacturaRow = React.memo(function FacturaRow({
             </button>
           )}
 
-          {/* Emitir button (only if draft/rejected/error) */}
-          {(c.estado === 'DRAFT' || c.estado === 'RECHAZADO' || c.estado === 'ERROR') && (
-            <button
-              type="button"
-              title="Emitir comprobante"
-              onClick={() => onEmitir && onEmitir(c)}
-              className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#0379d5] hover:bg-blue-50 transition-colors focus:outline-none flex-shrink-0"
-            >
-              <Send size={14} />
-            </button>
-          )}
-
-          {/* Editar button (only if draft/rejected/error) */}
-          {(c.estado === 'DRAFT' || c.estado === 'RECHAZADO' || c.estado === 'ERROR') && (
-            <button
-              type="button"
-              title="Editar borrador"
-              onClick={() => router.push(`/nueva-factura?id=${c.id}`)}
-              className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
-            >
-              <Pencil size={14} />
-            </button>
-          )}
-
-          {/* Duplicar/Clonar button (always) */}
+          {/* Clonar / Facturar formalmente (prefill del form fiscal vía cloneId) */}
           <button
             type="button"
-            title="Clonar comprobante"
+            title={esNota ? 'Facturar formalmente (crear e-CF)' : 'Clonar comprobante'}
             onClick={() => router.push(`/nueva-factura?cloneId=${c.id}`)}
             className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
           >

@@ -16,6 +16,7 @@ import type { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
 import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
 import { SecuenciasService } from '../secuencias/secuencias.service'
+import { DocumentoFolioService } from './documento-folio.service'
 
 // fechaDesde/fechaHasta son fechas calendario en hora de RD (UTC-4 fijo, sin DST).
 // Se anclan explícitamente a ese offset — usar setHours() dependería de la zona
@@ -104,12 +105,15 @@ function calcularTotales(items: CreateItemDto[]): {
 } {
   const r2 = (n: number) => Math.round(n * 100) / 100
 
-  let gI1 = 0, gI2 = 0, gI3 = 0, exento = 0, itbis = 0
+  let gI1 = 0, gI2 = 0, gI3 = 0, exento = 0, itbis = 0, retITBIS = 0, retISR = 0
 
   for (const item of items) {
     const bruto = r2(item.cantidad * (item.precioUnitarioItem ?? 0))
-    const desc = r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100))
-    const monto = r2(bruto - desc)
+    // Descuento por porcentaje (cotizaciones) y/o monto absoluto (form estándar);
+    // ausentes → 0, sin efecto. La base gravada nunca baja de 0.
+    const descPct = r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100))
+    const descAbs = item.descuento ?? 0
+    const monto = r2(Math.max(0, bruto - descPct - descAbs))
 
     switch (item.indicadorFacturacion) {
       case 'I1': gI1 += monto; itbis += r2(monto * 0.18); break
@@ -117,11 +121,15 @@ function calcularTotales(items: CreateItemDto[]): {
       case 'I3': gI3 += monto; break
       default:   exento += monto; break  // I4, E
     }
+
+    // Retenciones de la línea (E41/E47); ausentes → 0, no alteran el total.
+    retITBIS += item.itbisRetenido ?? 0
+    retISR += item.isrRetenido ?? 0
   }
 
   const montoGravadoTotal = r2(gI1 + gI2 + gI3)
   const totalITBIS = r2(itbis)
-  const montoTotal = r2(montoGravadoTotal + exento + totalITBIS)
+  const montoTotal = r2(Math.max(0, montoGravadoTotal + exento + totalITBIS - retITBIS - retISR))
 
   return { montoGravadoI1: r2(gI1), montoGravadoI2: r2(gI2), montoGravadoI3: r2(gI3), montoExento: r2(exento), totalITBIS, montoTotal }
 }
@@ -131,6 +139,7 @@ export class ComprobantesService {
   constructor(
       @InjectQueue('ecf-emission') private readonly ecfQueue: Queue<EcfJobData>,
       private readonly secuenciasService: SecuenciasService,
+      private readonly documentoFolioService: DocumentoFolioService,
   ) {}
 
   /**
@@ -191,6 +200,29 @@ export class ComprobantesService {
     // calcular totales y persistir, para que el documento sea inmutable.
     const dto = await this.resolverDto(tenantId, dtoOriginal)
     const totales = calcularTotales(dto.items)
+
+    // esFiscal=false → "Nota de venta" interna: documento NO fiscal. NO consume
+    // e-NCF, NO firma, NO encola, NO toca la DGII y queda fuera de 606/607/608.
+    // Numeración interna propia (NV-000001). No exige certificado ni campos
+    // fiscales. Esta rama corre ANTES que cualquier lógica de emisión.
+    if (dto.esFiscal === false) {
+      const folioInterno = await this.documentoFolioService.siguienteFolio(tenantId)
+      return prisma.comprobante.create({
+        data: {
+          tenantId,
+          eNCF: null,
+          esFiscal: false,
+          folioInterno,
+          tipoECF: dto.tipoECF, // informativo; una nota de venta no va a la DGII
+          estado: 'INTERNO',
+          montoTotal: totales.montoTotal,
+          rnc: dto.rncComprador ?? '',
+          razonSocial: dto.razonSocialComprador ?? '',
+          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
+          datos: JSON.parse(JSON.stringify(dto)) as object,
+        },
+      })
+    }
 
     // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
     if (dto.emitir === false) {
@@ -313,14 +345,21 @@ export class ComprobantesService {
       indicadorFacturacion: item.indicadorFacturacion ?? mapTratamientoITBIS(producto.tratamientoITBIS),
       indicadorBienoServicio: item.indicadorBienoServicio ?? (producto.tipo === 'SERVICIO' ? 2 : 1),
       ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
+      ...(item.descuento !== undefined && { descuento: item.descuento }),
+      ...(item.itbisRetenido !== undefined && { itbisRetenido: item.itbisRetenido }),
+      ...(item.isrRetenido !== undefined && { isrRetenido: item.isrRetenido }),
       ...(unidadMedida !== undefined && { unidadMedida }),
     }
   }
 
   /**
-   * Edita un comprobante en estado DRAFT (borrador). Recalcula totales si se
-   * envían nuevos `items`. Rechaza (409) cualquier comprobante que ya no sea
-   * borrador — un e-CF emitido es inmutable.
+   * Edita un comprobante EDITABLE. Recalcula totales si se envían nuevos `items`.
+   * Son editables:
+   *  - un borrador fiscal (DRAFT), y
+   *  - una Nota de venta interna (esFiscal=false, estado INTERNO) — no tiene
+   *    consecuencia fiscal, así que se puede corregir después de creada.
+   * Un e-CF fiscal ya EMITIDO es inmutable → 409. La edición nunca cambia la
+   * naturaleza (esFiscal) ni el folio/e-NCF del documento.
    */
   async actualizarDraft(
       tenantId: string,
@@ -328,8 +367,12 @@ export class ComprobantesService {
       dto: UpdateComprobanteDto,
   ): Promise<Comprobante> {
     const comprobante = await this.findOne(tenantId, id)
-    if (comprobante.estado !== 'DRAFT') {
-      throw new ConflictException('Sólo se pueden editar comprobantes en estado DRAFT')
+    const esNotaVenta = !comprobante.esFiscal && comprobante.estado === 'INTERNO'
+    const esBorrador = comprobante.estado === 'DRAFT'
+    if (!esBorrador && !esNotaVenta) {
+      throw new ConflictException(
+          'Sólo se pueden editar borradores (DRAFT) o notas de venta internas. Un e-CF emitido es inmutable.',
+      )
     }
 
     const datosActuales = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
@@ -348,6 +391,22 @@ export class ComprobantesService {
         datos: JSON.parse(JSON.stringify(datos)) as object,
       },
     })
+  }
+
+  /**
+   * Soft-delete de una Nota de venta interna (esFiscal=false). Un e-CF fiscal
+   * NUNCA se elimina (inmutable) → 409. El registro se marca `eliminado=true` y
+   * deja de aparecer en listados/detalle/PDF, pero se conserva en la DB.
+   */
+  async eliminar(tenantId: string, id: string): Promise<{ id: string; eliminado: true }> {
+    const comprobante = await this.findOne(tenantId, id)
+    if (comprobante.esFiscal) {
+      throw new ConflictException(
+          'No se puede eliminar un comprobante fiscal. Sólo las notas de venta internas son eliminables.',
+      )
+    }
+    await prisma.comprobante.update({ where: { id }, data: { eliminado: true } })
+    return { id, eliminado: true }
   }
 
   /**
@@ -468,8 +527,20 @@ export class ComprobantesService {
     const limit = Math.min(query.limit ?? 20, 100)
     const skip = (page - 1) * limit
 
+    // Clase de documento (filtro de la lista):
+    //  fiscal   → e-CF fiscal en cualquier estado salvo borrador
+    //  borrador → borrador fiscal (DRAFT)
+    //  nota     → Nota de venta interna (esFiscal=false)
+    const claseWhere: Prisma.ComprobanteWhereInput =
+        query.clase === 'nota' ? { esFiscal: false }
+      : query.clase === 'borrador' ? { esFiscal: true, estado: 'DRAFT' }
+      : query.clase === 'fiscal' ? { esFiscal: true, estado: { not: 'DRAFT' } }
+      : {}
+
     const where: Prisma.ComprobanteWhereInput = {
       tenantId,
+      eliminado: false, // las notas de venta soft-deleted no se listan
+      ...claseWhere,
       ...(query.estado !== undefined && { estado: query.estado }),
       ...(query.tipoECF !== undefined && { tipoECF: query.tipoECF }),
       ...rangoFechas(query.fechaDesde, query.fechaHasta),
@@ -492,7 +563,7 @@ export class ComprobantesService {
   }
 
   async findOne(tenantId: string, id: string): Promise<Comprobante> {
-    const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId } })
+    const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId, eliminado: false } })
     if (!comprobante) throw new NotFoundException(`Comprobante ${id} no encontrado`)
     return comprobante
   }
@@ -518,7 +589,10 @@ export class ComprobantesService {
       throw new NotFoundException('El comprobante no tiene datos suficientes para generar el PDF')
     }
 
-    const esFiscal = comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
+    // Una Nota de venta interna (esFiscal=false) es un documento NO fiscal: sale
+    // en modo INTERNO (sin QR/timbre, título "NOTA DE VENTA", folio NV-xxxx).
+    const esNotaVenta = !comprobante.esFiscal
+    const aceptadoFiscal = comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
 
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     const datos = comprobante.datos as unknown as CreateComprobanteDto
@@ -527,19 +601,25 @@ export class ComprobantesService {
         tenant,
         comprobante.eNCF ?? '',
         resolveDgiiEnv(),
-        esFiscal ? (comprobante.xmlFirmado ?? undefined) : undefined,
+        aceptadoFiscal ? (comprobante.xmlFirmado ?? undefined) : undefined,
     )
-    // Sólo el aceptado se representa como e-CF fiscal (con QR/timbre). Cualquier otro
-    // estado emitible (DRAFT/PENDIENTE/EN_COLA/ENVIANDO) es una vista previa.
-    const pdfInput: EcfPdfInput = esFiscal ? base : { ...base, modo: 'BORRADOR' }
+    // Sólo el aceptado fiscal se representa como e-CF (con QR/timbre). La nota de
+    // venta interna → modo INTERNO. Cualquier otro estado fiscal emitible
+    // (DRAFT/PENDIENTE/EN_COLA/ENVIANDO) es una vista previa (BORRADOR).
+    const pdfInput: EcfPdfInput =
+        esNotaVenta ? { ...base, modo: 'INTERNO', folio: comprobante.folioInterno ?? '' }
+      : aceptadoFiscal ? base
+      : { ...base, modo: 'BORRADOR' }
 
     const tmpPath = join(tmpdir(), `ecf-${id}-${Date.now()}.pdf`)
     try {
       await generarRepresentacionImpresa(pdfInput, tmpPath)
       const buffer = await readFile(tmpPath)
-      const filename = comprobante.eNCF
-        ? `${comprobante.eNCF}${esFiscal ? '' : '-borrador'}.pdf`
-        : `borrador-${id.slice(0, 8)}.pdf`
+      const filename = esNotaVenta
+        ? `${comprobante.folioInterno ?? `nota-venta-${id.slice(0, 8)}`}.pdf`
+        : comprobante.eNCF
+          ? `${comprobante.eNCF}${aceptadoFiscal ? '' : '-borrador'}.pdf`
+          : `borrador-${id.slice(0, 8)}.pdf`
       return { buffer, filename }
     } finally {
       await unlink(tmpPath).catch(() => undefined)
@@ -547,8 +627,12 @@ export class ComprobantesService {
   }
 
   async resumen(tenantId: string, query: ResumenComprobantesDto): Promise<ResumenComprobantes> {
+    // El dashboard mide facturación FISCAL: las notas de venta internas
+    // (esFiscal=false) y los eliminados no cuentan en estas métricas.
     const where: Prisma.ComprobanteWhereInput = {
       tenantId,
+      esFiscal: true,
+      eliminado: false,
       ...rangoFechas(query.fechaDesde, query.fechaHasta),
     }
 

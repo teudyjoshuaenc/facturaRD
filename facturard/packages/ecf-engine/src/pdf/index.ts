@@ -19,8 +19,10 @@ export type DgiiAmbiente = 'certecf' | 'ecf';
  * - 'ECF'        → e-CF fiscal con QR/timbre DGII (comportamiento por defecto).
  * - 'BORRADOR'   → borrador aún no emitido: sin QR, badge "sin valor fiscal".
  * - 'COTIZACION' → cotización (no fiscal): sin QR, título "COTIZACIÓN", folio COT-xxxx.
+ * - 'INTERNO'    → Nota de venta interna (no fiscal): sin QR, título "NOTA DE VENTA",
+ *                  folio NV-xxxx, leyenda de documento sin valor fiscal.
  */
-export type PdfModo = 'ECF' | 'BORRADOR' | 'COTIZACION';
+export type PdfModo = 'ECF' | 'BORRADOR' | 'COTIZACION' | 'INTERNO';
 
 export interface EcfPdfInput {
   // Emisor
@@ -33,7 +35,7 @@ export interface EcfPdfInput {
 
   /** Tipo de documento a representar. Default 'ECF'. */
   modo?: PdfModo;
-  /** Folio interno de la cotización (COT-xxxx). Solo se usa con modo 'COTIZACION'. */
+  /** Folio interno (COT-xxxx en cotización, NV-xxxx en nota de venta). Se usa con modo 'COTIZACION'/'INTERNO'. */
   folio?: string;
 
   // Identificación
@@ -227,6 +229,7 @@ export async function generarRepresentacionImpresa(
   // bottom triggering pdfkit auto-pagination inside the page-loop.
   const tituloDoc =
     modo === 'COTIZACION' ? `Cotización ${ecf.folio ?? ''}`.trim()
+    : modo === 'INTERNO' ? `Nota de venta ${ecf.folio ?? ''}`.trim()
     : modo === 'BORRADOR' ? `Borrador ${ecf.eNCF ?? ''}`.trim()
     : `e-CF ${ecf.eNCF}`;
 
@@ -315,6 +318,7 @@ export async function generarRepresentacionImpresa(
     // documento "e-CF" (no lo es); en fiscal se usa la etiqueta oficial del tipo.
     const tipo =
       modo === 'COTIZACION' ? 'COTIZACIÓN'
+      : modo === 'INTERNO' ? 'NOTA DE VENTA'
       : modo === 'BORRADOR' ? `${tipoLabel(ecf.tipoECF)} (Borrador)`
       : tipoLabel(ecf.tipoECF);
     const tipoCode = ecf.tipoECF.replace(/^[Ee]/, '');
@@ -337,10 +341,11 @@ export async function generarRepresentacionImpresa(
     doc.text(tipo, RIGHT_X, tipoTopY, { width: RIGHT_W, align: 'right' });
     let rY = tipoTopY + tipoH + 5;
 
-    if (modo === 'COTIZACION') {
-      // Cotización: folio interno en vez de e-NCF; sin vencimiento de secuencia.
+    if (modo === 'COTIZACION' || modo === 'INTERNO') {
+      // Documento interno: folio propio en vez de e-NCF; sin vencimiento de secuencia.
+      const etiquetaFolio = modo === 'INTERNO' ? 'Nota de venta No.' : 'Cotización No.';
       doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
-         .text(`Cotización No.: ${ecf.folio ?? '—'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+         .text(`${etiquetaFolio}: ${ecf.folio ?? '—'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
       rY += 13;
     } else {
       doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
@@ -356,7 +361,7 @@ export async function generarRepresentacionImpresa(
 
     // Badge de advertencia para documentos NO fiscales.
     if (modo !== 'ECF') {
-      const badge = modo === 'COTIZACION' ? 'DOCUMENTO NO FISCAL' : 'BORRADOR · SIN VALOR FISCAL';
+      const badge = (modo === 'COTIZACION' || modo === 'INTERNO') ? 'DOCUMENTO NO FISCAL' : 'BORRADOR · SIN VALOR FISCAL';
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#B45309')
          .text(badge, RIGHT_X, rY + 1, { width: RIGHT_W, align: 'right' });
       rY += 13;
@@ -506,9 +511,11 @@ export async function generarRepresentacionImpresa(
     const footerText =
       modo === 'COTIZACION'
         ? 'COTIZACIÓN — Este documento NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
-        : modo === 'BORRADOR'
-          ? 'BORRADOR — Vista previa sin validez fiscal. Este documento no ha sido emitido ni aceptado por la DGII.'
-          : 'Representación impresa de Comprobante Fiscal Electrónico (e-CF) — Conserve este documento';
+        : modo === 'INTERNO'
+          ? 'NOTA DE VENTA — Documento interno. NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
+          : modo === 'BORRADOR'
+            ? 'BORRADOR — Vista previa sin validez fiscal. Este documento no ha sido emitido ni aceptado por la DGII.'
+            : 'Representación impresa de Comprobante Fiscal Electrónico (e-CF) — Conserve este documento';
 
     doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
        .text(footerText, margin, footerY + 5, { align: 'center', width: contentW });

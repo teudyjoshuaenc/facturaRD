@@ -41,6 +41,8 @@ export default function FacturasPage(): JSX.Element {
     setSearch,
     tipoFilter,
     setTipoFilter,
+    claseFilter,
+    setClaseFilter,
     startDate,
     setStartDate,
     endDate,
@@ -105,6 +107,18 @@ export default function FacturasPage(): JSX.Element {
     setComprobanteToEmit(c)
   }
 
+  async function handleDelete(c: Comprobante) {
+    if (!window.confirm(`¿Eliminar la nota de venta ${c.folioInterno ?? ''}? Esta acción no se puede deshacer.`)) return
+    try {
+      await api.delete(`/comprobantes/${c.id}`)
+      toast.success('Nota de venta eliminada')
+      if (selectedId === c.id) setSelectedId(null)
+      refetch()
+    } catch (err) {
+      toast.error('No se pudo eliminar', { description: getErrorMessage(err) })
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header row: count + actions */}
@@ -118,18 +132,21 @@ export default function FacturasPage(): JSX.Element {
           </p>
         </div>
         <div className="flex items-center gap-[8px]">
-          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
-          <div className={cn(
-            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
-            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[48px] opacity-100 translate-x-0 scale-100"
-          )}>
-            <EditActionButton
-              onClick={toggleSelectionMode}
-              title="Activar selección"
-            />
-          </div>
-
-          {/* RELOAD/REFRESH BUTTON - always visible */}
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => router.push('/nueva-factura')}
+            className="h-9 px-4 font-semibold"
+          >
+            + Crear factura
+          </Button>
+          <EditActionButton onClick={() => {
+            if (!selectedId) {
+              toast.error('Seleccione un comprobante para editar')
+              return
+            }
+            router.push(`/nueva-factura?id=${selectedId}`)
+          }} />
           <RefreshActionButton onClick={() => refetch()} isLoading={isFetching} />
 
           {/* SELECTION ACTIONS CONTAINER */}
@@ -191,6 +208,8 @@ export default function FacturasPage(): JSX.Element {
             onSearchChange={setSearch}
             tipoFilter={tipoFilter}
             onTipoFilterChange={setTipoFilter}
+            claseFilter={claseFilter}
+            onClaseFilterChange={setClaseFilter}
             startDate={startDate}
             onStartDateChange={setStartDate}
             endDate={endDate}
@@ -264,19 +283,7 @@ export default function FacturasPage(): JSX.Element {
                         selected={selectedId === c.id}
                         onReenviar={setReenviarComprobante}
                         onEmitir={handleEmitir}
-                        isSelectionMode={isSelectionMode}
-                        isSelectedInBulk={selectedIds.has(c.id)}
-                        onToggleSelectInBulk={() => {
-                          setSelectedIds(prev => {
-                            const next = new Set(prev)
-                            if (next.has(c.id)) {
-                              next.delete(c.id)
-                            } else {
-                              next.add(c.id)
-                            }
-                            return next
-                          })
-                        }}
+                        onDelete={handleDelete}
                       />
                     ))}
                   </tbody>
@@ -317,9 +324,8 @@ export default function FacturasPage(): JSX.Element {
 
         {/* Right Side: Animated DetailPanel */}
         <div
-          className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
-            selectedId ? 'w-[360px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
-          }`}
+          className={`transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${selectedId ? 'w-[360px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+            }`}
         >
           <DetailPanel
             open={!!selectedId}

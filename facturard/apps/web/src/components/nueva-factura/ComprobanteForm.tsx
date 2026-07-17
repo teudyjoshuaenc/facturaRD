@@ -116,6 +116,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const [items, setItems] = useState<ItemRow[]>([])
   const [notas, setNotas] = useState('')
   const [emitirConComprobante, setEmitirConComprobante] = useState(true)
+  // Clase de documento: true = e-CF fiscal (flujo DGII); false = Nota de venta
+  // interna (no fiscal, sin e-NCF/firma/DGII, sin exigir campos fiscales ni cert).
+  const [esFiscal, setEsFiscal] = useState(true)
   const [identificadorExtranjero, setIdentificadorExtranjero] = useState('')
   const [paisComprador, setPaisComprador] = useState('')
 
@@ -146,7 +149,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       api.get(`/comprobantes/${targetId}`)
         .then((res) => {
           const c = res.data
-          if (draftId && c.estado !== 'DRAFT' && c.estado !== 'RECHAZADO' && c.estado !== 'ERROR') {
+          // Editables: borrador fiscal (DRAFT/RECHAZADO/ERROR) o Nota de venta
+          // interna (INTERNO). Un e-CF emitido/aceptado no se edita aquí.
+          if (draftId && c.estado !== 'DRAFT' && c.estado !== 'RECHAZADO' && c.estado !== 'ERROR' && c.estado !== 'INTERNO') {
             toast.error('Este comprobante ya fue emitido y aceptado o está en proceso.')
             router.push('/facturas')
             return
@@ -155,6 +160,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           if (draftId) {
             setOriginalEstado(c.estado)
           }
+          // Al clonar (cloneId) siempre se crea una factura FISCAL nueva; al editar
+          // (draftId) se respeta la clase del documento cargado.
+          setEsFiscal(cloneId ? true : c.esFiscal !== false)
           setTipoECF(c.tipoECF)
 
           // Map backend payment condition to local tipoPago
@@ -367,6 +375,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         ...(indicadorNotaCredito && { indicadorNotaCredito: Number(indicadorNotaCredito) as 1 | 2 }),
         items: filteredItems,
         emitirConComprobante: emitConCF,
+        esFiscal,
       })
     } catch (err) {
       const msg = getErrorMessage(err)
@@ -412,11 +421,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const isPaisCompradorRequired = tipoECF === 'E47'
   const isPaisCompradorValid = !isPaisCompradorRequired || paisComprador.trim() !== ''
 
-  const isClienteStepValid =
-    (!emitirConComprobante || tipoECF === 'E43' || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
-    (!emitirConComprobante || isTipoIngresoValid) &&
-    isFechaLimiteValid &&
-    isReferenciaValid
+  // Una Nota de venta interna (esFiscal=false) no exige campos fiscales: basta
+  // con líneas válidas (cliente y campos fiscales son opcionales).
+  const isClienteStepValid = !esFiscal
+    ? true
+    : (!emitirConComprobante || tipoECF === 'E43' || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
+      (!emitirConComprobante || isTipoIngresoValid) &&
+      isFechaLimiteValid &&
+      isReferenciaValid
   const isDetalleStepValid = items.length > 0 && items.every(
     (i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0,
   )
@@ -431,8 +443,45 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     )
   }
 
+  const claseLocked = Boolean(draftId) // al editar no se cambia la clase del documento
+
   return (
     <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
+      {/* Selector de clase de documento (Fase 2) */}
+      <div className={cn(
+        "mx-auto mb-4 w-full",
+        facturacionMode === 'estandar' ? "lg:w-[1336px]" : ""
+      )}>
+        <div className="inline-flex rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-1 gap-1 select-none">
+          {([
+            { val: true, label: 'Factura fiscal (e-CF)' },
+            { val: false, label: 'Nota de venta (sin comprobante)' },
+          ] as const).map((opt) => {
+            const active = esFiscal === opt.val
+            return (
+              <button
+                key={String(opt.val)}
+                type="button"
+                disabled={claseLocked && !active}
+                onClick={() => !claseLocked && setEsFiscal(opt.val)}
+                className={cn(
+                  "h-9 px-4 rounded-[9px] text-[13px] font-semibold transition-colors",
+                  active ? "bg-white text-[#0379D5] shadow-sm" : "text-[#64748B] hover:text-[#334155]",
+                  claseLocked && !active ? "opacity-40 cursor-not-allowed" : ""
+                )}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+        {!esFiscal && (
+          <p className="mt-2 text-[12px] text-[#64748B] leading-snug">
+            Documento interno con numeración propia (NV-000001). No se envía a la DGII, no consume e-NCF ni exige certificado ni campos fiscales.
+          </p>
+        )}
+      </div>
+
       {/* Main 2-column layout */}
       <div className={cn(
         "w-full",
@@ -489,6 +538,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onPaisCompradorChange={setPaisComprador}
                   total={total}
                   onNext={() => goToStep(2)}
+                  esFiscal={esFiscal}
                 />
               )}
 
@@ -737,15 +787,17 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 >
                   <Eye size={18} />
                 </button>
-                <button
-                  type="button"
-                  title="Guardar Borrador"
-                  onClick={() => handleSubmit(false)}
-                  disabled={submitting || isPlanExpired}
-                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save size={17} />
-                </button>
+                {esFiscal && (
+                  <button
+                    type="button"
+                    title="Guardar Borrador"
+                    onClick={() => handleSubmit(false)}
+                    disabled={submitting || isPlanExpired}
+                    className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save size={17} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -893,12 +945,36 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               )}
 
               <div className="flex flex-col gap-[8px] w-full">
-                {isE32OverLimit && (!selectedCliente || !selectedCliente.rnc.trim()) && (
+                {/* Nota de venta interna: un solo botón, sin certificado ni campos fiscales */}
+                {!esFiscal && (
+                  <button
+                    type="button"
+                    disabled={submitting || isPlanExpired || !isDetalleStepValid}
+                    onClick={() => handleSubmit(false)}
+                    className={cn(
+                      "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                      (submitting || isPlanExpired || !isDetalleStepValid)
+                        ? "opacity-20 cursor-not-allowed"
+                        : "hover:bg-[#0379D5]/90 cursor-pointer"
+                    )}
+                  >
+                    {submitting ? (
+                      <Spinner size={18} className="text-white" />
+                    ) : (
+                      <>
+                        <FilePlus size={15} className="text-white" />
+                        <span>{draftId ? 'Guardar cambios' : 'Crear nota de venta'}</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {esFiscal && isE32OverLimit && (!selectedCliente || !selectedCliente.rnc.trim()) && (
                   <p className="text-[11px] font-semibold text-danger-600 text-left leading-normal animate-in fade-in-50 mb-1 font-sans">
                     Para facturas de consumo (E32) de RD$250,000 o más, es obligatorio identificar al comprador con su RNC o cédula.
                   </p>
                 )}
-                {blockingReason && (
+                {esFiscal && blockingReason && (
                   <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[12px] text-red-700 font-semibold leading-normal text-left font-sans flex items-start gap-2 select-none mb-1">
                     <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
                     <div className="min-w-0">
@@ -918,43 +994,67 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     </div>
                   </div>
                 )}
-                {/* Emitir e-CF Button */}
-                <button
-                  type="button"
-                  disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason}
-                  onClick={() => handleSubmit(true)}
-                  className={cn(
-                    "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
-                    ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason)
-                      ? "opacity-20 cursor-not-allowed"
-                      : "hover:bg-[#0379D5]/90 cursor-pointer"
-                  )}
-                >
-                  {submitting ? (
-                    <Spinner size={18} className="text-white" />
-                  ) : (
-                    <>
-                      <Send size={15} className="text-white" />
-                      <span>Emitir e-CF</span>
-                    </>
-                  )}
-                </button>
+                {/* Emitir e-CF Button (solo fiscal) */}
+                {esFiscal && (
+                  <button
+                    type="button"
+                    disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason}
+                    onClick={() => handleSubmit(true)}
+                    className={cn(
+                      "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                      ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason)
+                        ? "opacity-20 cursor-not-allowed"
+                        : "hover:bg-[#0379D5]/90 cursor-pointer"
+                    )}
+                  >
+                    {submitting ? (
+                      <Spinner size={18} className="text-white" />
+                    ) : (
+                      <>
+                        <Send size={15} className="text-white" />
+                        <span>Emitir e-CF</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Guardar borrador — visible en modo estándar y solo fiscal. No exige
+                    certificado: es la vía para que un usuario NO certificado cree y
+                    guarde su factura como borrador (DRAFT). Sólo "Emitir e-CF" se bloquea. */}
+                {esFiscal && facturacionMode === 'estandar' && (
+                  <button
+                    type="button"
+                    disabled={submitting || isPlanExpired || items.length === 0}
+                    onClick={() => handleSubmit(false)}
+                    className={cn(
+                      "w-full h-[44px] rounded-[10px] border border-[#0379D5] bg-white text-[#0379D5] text-[15px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none",
+                      (submitting || isPlanExpired || items.length === 0)
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:bg-[#0379D5]/5 cursor-pointer"
+                    )}
+                  >
+                    <Save size={15} className="text-[#0379D5]" />
+                    <span>Guardar borrador</span>
+                  </button>
+                )}
               </div>
 
               {/* Borrador & Limpiar buttons in quick mode */}
               {facturacionMode === 'rapido' && (
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    type="button"
-                    onClick={() => handleSubmit(false)}
-                    disabled={submitting || isPlanExpired}
-                    className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <FileText size={15} className="text-text-secondary" />
-                    Borrador
-                  </Button>
+                <div className={cn("grid gap-2 mt-1", esFiscal ? "grid-cols-2" : "grid-cols-1")}>
+                  {esFiscal && (
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      type="button"
+                      onClick={() => handleSubmit(false)}
+                      disabled={submitting || isPlanExpired}
+                      className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileText size={15} className="text-text-secondary" />
+                      Borrador
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     size="md"
