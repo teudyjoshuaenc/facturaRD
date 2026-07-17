@@ -67,6 +67,27 @@ export class CreateItemDto {
   @Min(0)
   @IsOptional()
   descuentoPorcentaje?: number
+
+  @ApiPropertyOptional({ example: 100, description: 'Descuento en monto absoluto (RD$) de la línea' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  descuento?: number
+
+  @ApiPropertyOptional({ example: 27, description: 'ITBIS retenido de la línea (RD$) — típicamente E41' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  itbisRetenido?: number
+
+  @ApiPropertyOptional({ example: 100, description: 'ISR retenido de la línea (RD$) — típicamente E47' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  isrRetenido?: number
 }
 
 export class CreateComprobanteDto {
@@ -123,6 +144,11 @@ export class CreateComprobanteDto {
   @IsString()
   @IsOptional()
   paisComprador?: string
+
+  @ApiPropertyOptional({ description: 'Término/condición de pago libre (ej. "Neto 30 días"). Informativo, se guarda en el documento.' })
+  @IsString()
+  @IsOptional()
+  terminoPago?: string
 
   @ApiPropertyOptional()
   @IsString()

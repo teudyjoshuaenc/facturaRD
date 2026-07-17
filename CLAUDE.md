@@ -200,6 +200,25 @@ van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos po
   - Verificado: E31/E32/E33/E34 generan XML que **valida contra los XSD nuevos** (ecf-engine 114 tests);
     `0` y `1` pasan la validación y `2` es rechazado por el XSD (`maxInclusive 1`).
 
+### 🐞 BUG PENDIENTE — Formulario E34 manda `indicadorNotaCredito` con el valor VIEJO (1|2)
+- **Consecuencia directa del FIX 1 (regla de 30 días):** el backend se corrigió a `0|1`
+  (`@IsIn([0, 1])` en `create-comprobante.dto.ts`; semántica 0=≤30 días / 1=>30 días), pero el
+  **formulario de nueva factura quedó con el valor viejo `1|2`** (semántica anterior "Anulación/
+  Corrección"). En `apps/web/src/components/nueva-factura/StepCliente.tsx` el `indicadorNotaOptions`
+  sigue siendo `[{value:'1'…},{value:'2'…}]` y `ComprobanteForm.tsx` envía
+  `indicadorNotaCredito: Number(indicadorNotaCredito) as 1 | 2`.
+- **Síntoma:** crear/guardar/emitir un **E34 desde el formulario** con "Indicador Nota de Crédito = 2"
+  → **HTTP 400** (`indicadorNotaCredito must be one of the following values: 0, 1`). Con `1` pasa la
+  validación pero la semántica es incorrecta (el servidor **debería calcularlo por fecha**, no tomarlo
+  del formulario).
+- **Causa raíz:** el campo quedó como entrada manual en la UI cuando el FIX 1 ya lo volvió
+  **derivado en el servidor** (`crearNota` calcula 0/1 por `diasCalendarioEntre` e ignora lo que envíe
+  el caller). El path correcto de nota de crédito es `POST /comprobantes/:id/nota` (que sí calcula bien);
+  el formulario de emisión directa de E34 quedó desalineado.
+- **NO arreglado aún (anotado a pedido).** Arreglo esperado cuando se retome: quitar el input manual de
+  `IndicadorNotaCredito` del formulario E34 (o mapearlo a `0|1`) y dejar que el backend lo derive por
+  fecha. No es uno de los 3 bugs de la Fase 1.
+
 ### Comportamiento actual de REINTENTO tras rechazo (investigado, sin modificar — FIX 5)
 - El **e-NCF se asigna al crear/emitir** (`SecuenciasService.siguienteENCF`, atómico) y se persiste
   antes de que corra el worker.

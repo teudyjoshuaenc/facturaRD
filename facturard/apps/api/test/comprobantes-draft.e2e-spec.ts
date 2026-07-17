@@ -53,6 +53,39 @@ describe('Comprobantes — draft + emisión (e2e)', () => {
     expect(ctx.queueAdd).not.toHaveBeenCalled()
   })
 
+  // ── BUG 2: el frontend envía terminoPago + descuento/itbisRetenido/isrRetenido ──
+  // por línea. Antes el DTO no los declaraba y forbidNonWhitelisted respondía 400.
+  it('crea un borrador con terminoPago + descuento/retenciones por línea → 201', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes')
+      .set(auth(tenantA))
+      .send({
+        tipoECF: 'E31',
+        tipoPago: 1,
+        emitir: false,
+        fechaEmision: '16-07-2026',
+        rncComprador: '131880681',
+        razonSocialComprador: 'CLIENTE TEST SRL',
+        terminoPago: 'Neto 30 días',
+        items: [
+          { numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem: 'Servicio', indicadorBienoServicio: 2, cantidad: 1, precioUnitarioItem: 1000, descuento: 100, itbisRetenido: 27 },
+        ],
+      })
+      .expect(201)
+
+    expect(res.body.estado).toBe('DRAFT')
+    // base 900 (1000-100) + ITBIS 162 - ITBIS retenido 27 = 1035
+    expect(Number(res.body.montoTotal)).toBe(1035)
+    // terminoPago se persiste en datos (round-trip del form).
+    expect((res.body.datos as { terminoPago?: string }).terminoPago).toBe('Neto 30 días')
+  })
+
+  it('regresión: un borrador SIN campos extra mantiene el montoTotal (DMAIA intacto)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA)).send(draftBody).expect(201)
+    expect(Number(res.body.montoTotal)).toBe(1180) // 1000 + 18% ITBIS, sin cambios
+  })
+
   it('el filtro ?estado=DRAFT devuelve los borradores', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/comprobantes?estado=DRAFT')

@@ -104,12 +104,15 @@ function calcularTotales(items: CreateItemDto[]): {
 } {
   const r2 = (n: number) => Math.round(n * 100) / 100
 
-  let gI1 = 0, gI2 = 0, gI3 = 0, exento = 0, itbis = 0
+  let gI1 = 0, gI2 = 0, gI3 = 0, exento = 0, itbis = 0, retITBIS = 0, retISR = 0
 
   for (const item of items) {
     const bruto = r2(item.cantidad * (item.precioUnitarioItem ?? 0))
-    const desc = r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100))
-    const monto = r2(bruto - desc)
+    // Descuento por porcentaje (cotizaciones) y/o monto absoluto (form estándar);
+    // ausentes → 0, sin efecto. La base gravada nunca baja de 0.
+    const descPct = r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100))
+    const descAbs = item.descuento ?? 0
+    const monto = r2(Math.max(0, bruto - descPct - descAbs))
 
     switch (item.indicadorFacturacion) {
       case 'I1': gI1 += monto; itbis += r2(monto * 0.18); break
@@ -117,11 +120,15 @@ function calcularTotales(items: CreateItemDto[]): {
       case 'I3': gI3 += monto; break
       default:   exento += monto; break  // I4, E
     }
+
+    // Retenciones de la línea (E41/E47); ausentes → 0, no alteran el total.
+    retITBIS += item.itbisRetenido ?? 0
+    retISR += item.isrRetenido ?? 0
   }
 
   const montoGravadoTotal = r2(gI1 + gI2 + gI3)
   const totalITBIS = r2(itbis)
-  const montoTotal = r2(montoGravadoTotal + exento + totalITBIS)
+  const montoTotal = r2(Math.max(0, montoGravadoTotal + exento + totalITBIS - retITBIS - retISR))
 
   return { montoGravadoI1: r2(gI1), montoGravadoI2: r2(gI2), montoGravadoI3: r2(gI3), montoExento: r2(exento), totalITBIS, montoTotal }
 }
@@ -313,6 +320,9 @@ export class ComprobantesService {
       indicadorFacturacion: item.indicadorFacturacion ?? mapTratamientoITBIS(producto.tratamientoITBIS),
       indicadorBienoServicio: item.indicadorBienoServicio ?? (producto.tipo === 'SERVICIO' ? 2 : 1),
       ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
+      ...(item.descuento !== undefined && { descuento: item.descuento }),
+      ...(item.itbisRetenido !== undefined && { itbisRetenido: item.itbisRetenido }),
+      ...(item.isrRetenido !== undefined && { isrRetenido: item.isrRetenido }),
       ...(unidadMedida !== undefined && { unidadMedida }),
     }
   }

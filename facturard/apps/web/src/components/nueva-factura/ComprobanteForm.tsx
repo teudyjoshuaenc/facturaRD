@@ -902,6 +902,26 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     </>
                   )}
                 </button>
+
+                {/* Guardar borrador — visible en modo estándar. No exige certificado ni
+                    campos fiscales: es la vía para que un usuario NO certificado cree y
+                    guarde su factura como borrador (DRAFT). Sólo "Emitir e-CF" se bloquea. */}
+                {facturacionMode === 'estandar' && (
+                  <button
+                    type="button"
+                    disabled={submitting || isPlanExpired || items.length === 0}
+                    onClick={() => handleSubmit(false)}
+                    className={cn(
+                      "w-full h-[44px] rounded-[10px] border border-[#0379D5] bg-white text-[#0379D5] text-[15px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none",
+                      (submitting || isPlanExpired || items.length === 0)
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:bg-[#0379D5]/5 cursor-pointer"
+                    )}
+                  >
+                    <Save size={15} className="text-[#0379D5]" />
+                    <span>Guardar borrador</span>
+                  </button>
+                )}
               </div>
 
               {/* Borrador & Limpiar buttons in quick mode */}

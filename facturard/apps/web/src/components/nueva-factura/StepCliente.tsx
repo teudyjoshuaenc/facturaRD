@@ -128,6 +128,7 @@ export function StepCliente({
   const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
+  const [clienteFocused, setClienteFocused] = useState(false)
 
   const limiteRef = useRef<HTMLInputElement>(null)
   const ncfModRef = useRef<HTMLInputElement>(null)
@@ -178,7 +179,10 @@ export function StepCliente({
     }
   }
 
-  const showSearch = searchQuery.trim().length > 0
+  // El dropdown se abre al ENFOCAR el campo (no exige teclear). Con texto, la lista
+  // ya viene filtrada por el hook; sin texto, mostramos un tope de clientes activos.
+  const showSearch = clienteFocused
+  const clientesVisibles = contactos.slice(0, 15)
 
   return (
     <>
@@ -205,19 +209,25 @@ export function StepCliente({
             {/* Search and Button horizontally */}
             <div className="flex gap-[12px] h-[44px] items-center">
               <div className="relative flex-1">
-                <Search size={16} className="absolute left-[16px] top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                <Search size={16} className="absolute left-[16px] top-1/2 -translate-y-1/2 text-[#94A3B8] z-50" />
                 <input
                   type="text"
                   placeholder="Buscar por nombre o RNC..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-[44px] w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] pl-[40px] pr-4 text-[14px] font-normal leading-[19px] text-[#333333] placeholder:text-[#0A0A0A]/50 focus:border-[#0379D5] focus:bg-white focus:outline-none focus:ring-0 transition-colors"
+                  onFocus={() => setClienteFocused(true)}
+                  className="relative z-50 h-[44px] w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] pl-[40px] pr-4 text-[14px] font-normal leading-[19px] text-[#333333] placeholder:text-[#0A0A0A]/50 focus:border-[#0379D5] focus:bg-white focus:outline-none focus:ring-0 transition-colors"
                 />
 
-                {/* Search dropdown (Limit to 5) */}
+                {/* Backdrop para cerrar al hacer click fuera */}
+                {showSearch && (
+                  <div className="fixed inset-0 z-40" onClick={() => setClienteFocused(false)} />
+                )}
+
+                {/* Dropdown: se abre al enfocar; tope de clientes activos, filtra al teclear */}
                 {showSearch && (
                   <div className="absolute z-50 mt-1.5 max-h-[337px] w-full md:w-[742px] overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
-                    {contactos.slice(0, 5).map((c: Contacto) => {
+                    {clientesVisibles.map((c: Contacto) => {
                       const isSelected = selectedCliente?.id === c.id
                       return (
                         <button
@@ -226,6 +236,7 @@ export function StepCliente({
                           onClick={() => {
                             onSelectCliente(c)
                             setSearchQuery('')
+                            setClienteFocused(false)
                           }}
                           className={cn(
                             "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[67px] border-b border-[#F3F4F6] last:border-none",
@@ -256,9 +267,9 @@ export function StepCliente({
                         </button>
                       )
                     })}
-                    {contactos.length === 0 && (
+                    {clientesVisibles.length === 0 && (
                       <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
-                        No se encontraron clientes
+                        {searchQuery.trim().length > 0 ? 'No se encontraron clientes' : 'No tienes clientes activos todavía'}
                       </div>
                     )}
                   </div>

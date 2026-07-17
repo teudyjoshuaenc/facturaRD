@@ -54,6 +54,7 @@ export function StepDetalle({
   const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
   const [productSearch, setProductSearch] = useState('')
+  const [productFocused, setProductFocused] = useState(false)
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -66,14 +67,16 @@ export function StepDetalle({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Lista para el dropdown: sin texto muestra todos los productos activos permitidos
+  // por el tipo e-CF; con texto filtra por nombre/código. El tope se aplica al render.
   const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return []
-    const q = productSearch.toLowerCase()
+    const q = productSearch.toLowerCase().trim()
     const isExemptOnly = tipoECF && ['E41', 'E43', 'E44', 'E47'].includes(tipoECF)
     return allProductos.filter((p) => {
       if (isExemptOnly && p.indicadorFacturacion !== 'E' && p.indicadorFacturacion !== 'I4') {
         return false
       }
+      if (!q) return true
       return (
         p.nombre.toLowerCase().includes(q) ||
         p.codigo.toLowerCase().includes(q)
@@ -144,15 +147,16 @@ export function StepDetalle({
 
           <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary" />
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary z-50" />
               <input
                 id="producto-search-input"
                 type="text"
                 placeholder={isQuickMode ? "Buscar o agregar producto... (ej: arroz, café, cerveza)" : "Buscar por nombre o NNC..."}
                 value={productSearch}
                 onChange={(e) => setProductSearch(e.target.value)}
+                onFocus={() => setProductFocused(true)}
                 className={cn(
-                  "h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20",
+                  "relative z-50 h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 text-body-sm text-text-primary placeholder:text-text-tertiary focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20",
                   isQuickMode ? "pr-12" : "pr-4"
                 )}
               />
@@ -162,13 +166,18 @@ export function StepDetalle({
                 </div>
               )}
 
-              {/* Dropdown search results (Limit to 5) */}
-              {productSearch.trim().length > 0 && (
+              {/* Backdrop para cerrar al hacer click fuera */}
+              {productFocused && (
+                <div className="fixed inset-0 z-40" onClick={() => setProductFocused(false)} />
+              )}
+
+              {/* Dropdown: se abre al enfocar; tope de productos activos, filtra al teclear */}
+              {productFocused && (
                 <div className={cn(
                   "absolute z-50 mt-1.5 overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 animate-in fade-in-50 duration-150",
                   isQuickMode ? "max-h-[310px] w-full md:w-[684px]" : "max-h-[248px] w-full md:w-[742px]"
                 )}>
-                  {filteredProducts.slice(0, 5).map((p) => {
+                  {filteredProducts.slice(0, 15).map((p) => {
                     const hasTax = p.indicadorFacturacion === 'I1' || p.indicadorFacturacion === 'I2'
                     return (
                       <button
@@ -177,6 +186,7 @@ export function StepDetalle({
                         onClick={() => {
                           addFromProduct(p)
                           setProductSearch('')
+                          setProductFocused(false)
                         }}
                         className="flex w-full h-[62px] items-center justify-between px-4 py-2.5 text-left border-b border-neutral-50 last:border-none bg-white hover:bg-[#F0F5FF] transition-colors focus:bg-[#F0F5FF] focus:outline-none"
                       >
@@ -198,7 +208,7 @@ export function StepDetalle({
                   })}
                   {filteredProducts.length === 0 && (
                     <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
-                      No se encontraron productos
+                      {productSearch.trim().length > 0 ? 'No se encontraron productos' : 'No tienes productos activos todavía'}
                     </div>
                   )}
                 </div>
