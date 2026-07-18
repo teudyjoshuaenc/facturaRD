@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw, Mail } from 'lucide-react'
+import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw, Mail, Plus } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
 import { FacturaRow } from '@/components/facturas/FacturaRow'
 import { DetailPanel } from '@/components/facturas/DetailPanel'
@@ -258,6 +258,22 @@ export default function FacturasPage(): JSX.Element {
               className="h-[44px] px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
             >
               Cancelar
+            </button>
+          </div>
+
+          {/* CREAR FACTURA BUTTON - visible only in normal mode, slides/collapses left-to-right (origin-left) */}
+          <div className={cn(
+            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[144px] opacity-100 translate-x-0 scale-100"
+          )}>
+            <button
+              onClick={() => router.push('/nueva-factura')}
+              className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2 transition-all focus:outline-none shrink-0 w-[140px] justify-center"
+            >
+              <Plus size={16} className="text-white shrink-0" />
+              <span className="font-semibold text-[14px] text-white whitespace-nowrap">
+                Crear factura
+              </span>
             </button>
           </div>
         </div>

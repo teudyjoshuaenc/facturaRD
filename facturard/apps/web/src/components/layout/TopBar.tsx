@@ -11,8 +11,6 @@ interface Props {
   pageSubtitle: string
   certDias?: number | null
   dgiiConectado?: boolean
-  onEmitir: () => void
-  showEmitir: boolean
 }
 
 export function TopBar({
@@ -20,8 +18,6 @@ export function TopBar({
   pageSubtitle,
   certDias = 12,
   dgiiConectado = true,
-  onEmitir,
-  showEmitir,
 }: Props): JSX.Element {
   const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
 
@@ -75,14 +71,6 @@ export function TopBar({
             Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
           </span>
         )}
-
-            {/* Crear factura CTA button */}
-            {showEmitir && (
-              <Button variant="primary" size="md" onClick={onEmitir} className="h-9 px-3.5 font-semibold">
-                <Plus size={16} className="mr-1" />
-                Crear factura
-              </Button>
-            )}
       </div>
     </header>
   )

@@ -127,8 +127,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
           pageSubtitle={pageSubtitle}
           certDias={diasParaVencer}
           dgiiConectado={diasParaVencer !== null}
-          showEmitir={pathname !== '/nueva-factura'}
-          onEmitir={() => router.push('/nueva-factura')}
         />
         <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8 flex justify-center items-start">
           <div className="w-full max-w-[1400px] lg:min-h-[1012px] lg:h-auto flex flex-col text-left mx-auto">
