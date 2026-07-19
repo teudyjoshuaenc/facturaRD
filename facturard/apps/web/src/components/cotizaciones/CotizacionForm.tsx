@@ -807,7 +807,7 @@ export function CotizacionForm(): JSX.Element {
         </div>
 
         {/* Right Column (Fixed Resumen) */}
-        <div className="w-[360px] shrink-0 sticky top-0 h-fit">
+        <div className="w-[310px] [@media(min-width:1201px)]:w-[360px] shrink-0 sticky top-0 h-fit transition-all duration-300">
           <Card className="flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-[21px] gap-[16px] relative text-left">
             {/* Header */}
             <div className="flex items-center justify-between w-full select-none">

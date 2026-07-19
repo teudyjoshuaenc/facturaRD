@@ -313,7 +313,7 @@ export default function FacturasPage(): JSX.Element {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse table-fixed">
+                <table className="w-full min-w-[1080px] text-left border-collapse table-fixed">
                   <thead>
                     <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px] select-none">
                       <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#e2e8f0] bg-[#f8fafc]", isSelectionMode ? "w-10" : "w-0")}>
@@ -344,14 +344,14 @@ export default function FacturasPage(): JSX.Element {
                           />
                         </div>
                       </th>
-                      <th className="px-[16px] py-[10px] w-[90px] min-w-[90px] font-normal">e-NCF</th>
-                      <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">Cliente</th>
-                      <th className="px-[16px] py-[10px] w-[70px] min-w-[70px] font-normal">RNC</th>
-                      <th className="px-[16px] py-[10px] w-[85px] min-w-[85px] font-normal">Total</th>
-                      <th className="px-[16px] py-[10px] w-[81px] min-w-[81px] font-normal">ITBIS</th>
-                      <th className="px-[16px] py-[10px] w-[80px] min-w-[80px] font-normal">Fecha</th>
-                      <th className="px-[16px] py-[10px] w-[106px] min-w-[106px] font-normal">Estado DGII</th>
-                      <th className="px-[16px] py-[10px] w-[112px] min-w-[112px] font-normal">Acciones</th>
+                      <th className="px-[16px] py-[10px] w-[110px] min-w-[110px] font-normal">e-NCF</th>
+                      <th className="px-[16px] py-[10px] w-[160px] min-w-[160px] font-normal">Cliente</th>
+                      <th className="px-[16px] py-[10px] w-[110px] min-w-[110px] font-normal">RNC</th>
+                      <th className="px-[16px] py-[10px] w-[130px] min-w-[130px] font-normal">Total</th>
+                      <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">ITBIS</th>
+                      <th className="px-[16px] py-[10px] w-[95px] min-w-[95px] font-normal">Fecha</th>
+                      <th className="px-[8px] py-[10px] w-[195px] min-w-[195px] font-normal">Estado DGII</th>
+                      <th className="px-[8px] py-[10px] w-[145px] min-w-[145px] font-normal">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>

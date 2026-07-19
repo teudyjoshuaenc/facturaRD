@@ -192,9 +192,8 @@ export function StepCliente({
   return (
     <>
       <div className="flex flex-col gap-6">
-        {/* Seleccionar cliente */}
         {!skipCliente && (
-          <div className="flex flex-col gap-4 w-[904px]">
+          <div className="flex flex-col gap-4 w-full max-w-[904px]">
             <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Seleccionar Cliente</h3>
 
             {isE32OverLimit && !selectedCliente && (
@@ -345,7 +344,7 @@ export function StepCliente({
         )}
 
         {/* Identificación del Documento */}
-        <div className="flex flex-col gap-4 w-[904px]">
+        <div className="flex flex-col gap-4 w-full max-w-[904px]">
           <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
             {esFiscal ? 'Identificación del Documento' : 'Condiciones de pago (opcional)'}
           </p>
@@ -480,7 +479,7 @@ export function StepCliente({
 
         {/* Información de Referencia — solo fiscal (E33/E34); no aplica a notas */}
         {esFiscal && isReferenciaRequired && (
-          <div className="flex flex-col gap-4 w-[904px]">
+          <div className="flex flex-col gap-4 w-full max-w-[904px]">
             <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
               Información de Referencia
             </p>
@@ -594,7 +593,7 @@ export function StepCliente({
 
       {/* Next button (full-width) */}
       {!isQuickMode && (
-        <div className="flex justify-center w-[904px] h-[48px] mt-2">
+        <div className="flex justify-center w-full max-w-[904px] h-[48px] mt-2">
           <Button
             type="button"
             variant="primary"

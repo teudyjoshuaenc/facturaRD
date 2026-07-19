@@ -144,7 +144,7 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[90px] min-w-[90px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[110px] min-w-[110px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {c.eNCF
           ? c.eNCF
@@ -154,43 +154,43 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left align-middle cursor-pointer"
+        className="px-[16px] py-[16px] w-[160px] min-w-[160px] text-left align-middle cursor-pointer"
       >
-        <div className="w-[120px] truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
+        <div className="w-full truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
           {c.razonSocial}
         </div>
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[70px] min-w-[70px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[110px] min-w-[110px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formattedRnc}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[85px] min-w-[85px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[130px] min-w-[130px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(c.montoTotal)}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[81px] min-w-[81px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(itbis)}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[80px] min-w-[80px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatDate(c.createdAt)}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[106px] min-w-[106px] text-left align-middle cursor-pointer whitespace-nowrap"
+        className="px-[8px] py-[16px] w-[195px] min-w-[195px] text-left align-middle cursor-pointer whitespace-nowrap"
       >
         {getStatusBadge(c.estado, c.cotizacionId)}
       </td>
-      <td className="px-[16px] py-[16px] w-[140px] min-w-[140px] text-right align-middle">
+      <td className="px-[8px] py-[16px] w-[145px] min-w-[145px] text-right align-middle">
         <div className="flex items-center justify-end gap-[4px] w-full">
 
           {/* Descargar button */}

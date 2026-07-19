@@ -404,7 +404,7 @@ export function StepDetalle({
 
       {/* Navigation */}
       {!isQuickMode && (
-        <div className="flex items-center gap-[24px] w-[904px] h-[48px] select-none">
+        <div className="flex items-center gap-[24px] w-full max-w-[904px] h-[48px] select-none">
           <Button
             variant="secondary"
             size="lg"

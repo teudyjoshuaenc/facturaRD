@@ -75,10 +75,11 @@ export function FacturaFilters({
   const endDateRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="flex flex-col gap-0 bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
-      <div className="flex items-center gap-[12px] w-full">
+    <div className="flex flex-col gap-[12px] bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
+      {/* Row 1: Buscador, Clase, Tipo */}
+      <div className="flex flex-wrap items-center gap-[12px] w-full">
         {/* Search Input */}
-        <div className="relative flex-[1_0_0] min-w-0 h-[44px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[240px] h-[44px]">
           <Search
             className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[#99a1af] pointer-events-none"
             size={16}
@@ -88,7 +89,7 @@ export function FacturaFilters({
             placeholder="Buscar por cliente, RNC o e-NCF..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-full w-full rounded-[10px] border border-[#e2e8f0] bg-white pl-[38px] pr-3 text-[14px] text-[#333333] placeholder:text-[#99a1af] focus:border-[#0379d5] focus:outline-none transition-colors"
+            className="h-full w-full rounded-[10px] border border-[#e2e8f0] bg-white pl-[38px] pr-3 text-[14px] text-[#333333] placeholder:text-[#99a1af] focus:border-[#0379d5] focus:outline-none transition-colors shadow-sm"
           />
         </div>
 
@@ -97,7 +98,7 @@ export function FacturaFilters({
           value={claseFilter}
           onChange={(val) => onClaseFilterChange(val as 'todos' | 'fiscal' | 'borrador' | 'nota')}
           options={claseOptions}
-          className="shrink-0 w-[132px]"
+          className="w-full sm:flex-1 sm:min-w-[132px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />
 
@@ -106,92 +107,95 @@ export function FacturaFilters({
           value={tipoFilter}
           onChange={onTipoFilterChange}
           options={tipoOptions}
-          className="shrink-0 w-[126px]"
+          className="w-full sm:flex-1 sm:min-w-[126px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />
+      </div>
 
+      {/* Row 2: Estado, Desde, Hasta, Rango Precios */}
+      <div className="flex flex-wrap items-center gap-[12px] w-full">
         {/* Estado Dropdown */}
         <Select
           value={estadoFilter}
           onChange={(val) => onEstadoChange(val as EstadoFilter)}
           options={estadoOptions}
-          className="shrink-0 w-[126px]"
+          className="w-full sm:flex-1 sm:min-w-[126px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />
 
-        {/* Date Range Group */}
-        <div className="relative flex flex-[1_0_0] min-w-0 h-[44px] items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[13px]">
-          {/* Visual Display */}
-          <div className="flex items-center gap-[10px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none whitespace-nowrap">
+        {/* Desde Group */}
+        <div
+          onClick={() => {
+            try {
+              startDateRef.current?.showPicker()
+            } catch (e) {
+              startDateRef.current?.focus()
+            }
+          }}
+          className="relative w-full sm:flex-1 sm:min-w-[130px] h-[44px] flex items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[10px] cursor-pointer"
+        >
+          <div className="flex items-center justify-center gap-[8px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none whitespace-nowrap">
             <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
             <span className={startDate ? "text-[#333333]" : "text-[#99a1af]"}>
-              {startDate ? formatDate(startDate) : 'dd/mm/aaaa'}
-            </span>
-            <span className="text-[#99a1af] font-normal text-[16px]">–</span>
-            <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
-              {endDate ? formatDate(endDate) : 'dd/mm/aaaa'}
+              {startDate ? formatDate(startDate) : 'Desde'}
             </span>
           </div>
+          <input
+            ref={startDateRef}
+            type="date"
+            value={startDate}
+            onChange={(e) => onStartDateChange(e.target.value)}
+            className="absolute -z-10 opacity-0 invisible w-0 h-0"
+          />
+        </div>
 
-          {/* Invisible inputs on top */}
-          <div className="absolute inset-0 flex">
-            <div
-              onClick={() => {
-                try {
-                  startDateRef.current?.showPicker()
-                } catch (e) {
-                  startDateRef.current?.focus()
-                }
-              }}
-              className="w-1/2 h-full cursor-pointer"
-            />
-            <div
-              onClick={() => {
-                try {
-                  endDateRef.current?.showPicker()
-                } catch (e) {
-                  endDateRef.current?.focus()
-                }
-              }}
-              className="w-1/2 h-full cursor-pointer"
-            />
-            <input
-              ref={startDateRef}
-              type="date"
-              value={startDate}
-              onChange={(e) => onStartDateChange(e.target.value)}
-              className="absolute -z-10 opacity-0 invisible w-0 h-0"
-            />
-            <input
-              ref={endDateRef}
-              type="date"
-              value={endDate}
-              onChange={(e) => onEndDateChange(e.target.value)}
-              className="absolute -z-10 opacity-0 invisible w-0 h-0"
-            />
+        {/* Hasta Group */}
+        <div
+          onClick={() => {
+            try {
+              endDateRef.current?.showPicker()
+            } catch (e) {
+              endDateRef.current?.focus()
+            }
+          }}
+          className="relative w-full sm:flex-1 sm:min-w-[130px] h-[44px] flex items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[10px] cursor-pointer"
+        >
+          <div className="flex items-center justify-center gap-[8px] w-full text-[12px] font-sans font-normal text-[#99a1af] select-none pointer-events-none whitespace-nowrap">
+            <Calendar size={14} className="text-[#99a1af] flex-shrink-0" />
+            <span className={endDate ? "text-[#333333]" : "text-[#99a1af]"}>
+              {endDate ? formatDate(endDate) : 'Hasta'}
+            </span>
           </div>
+          <input
+            ref={endDateRef}
+            type="date"
+            value={endDate}
+            onChange={(e) => onEndDateChange(e.target.value)}
+            className="absolute -z-10 opacity-0 invisible w-0 h-0"
+          />
         </div>
 
         {/* Price Range Input Group */}
-        <div className="flex flex-[1_0_0] min-w-0 h-[44px] items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[13px]">
-          <div className="flex-[1_0_0] min-w-0 flex items-center gap-[4px] text-[13px] text-[#99a1af] font-normal whitespace-nowrap">
-            <span className="select-none">RD$</span>
-            <input
-              type="number"
-              placeholder="Máx"
-              value={maxAmount}
-              onChange={(e) => onMaxAmountChange(e.target.value)}
-              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af]"
-            />
-          </div>
-          <div className="flex-[1_0_0] min-w-0 flex items-center gap-[4px] text-[#99a1af]">
-            <span className="text-[16px] leading-[24px] select-none">–</span>
+        <div className="flex w-full sm:flex-1 sm:min-w-[180px] h-[44px] items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[10px] gap-1">
+          <div className="flex-1 min-w-0 flex items-center gap-[2px] text-[13px] text-[#99a1af]">
+            <span className="select-none font-normal">$</span>
             <input
               type="number"
               placeholder="Mín"
               value={minAmount}
               onChange={(e) => onMinAmountChange(e.target.value)}
-              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af]"
+              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af] min-w-0"
+            />
+          </div>
+          <span className="text-[#99a1af] select-none text-[14px] leading-none px-0.5">–</span>
+          <div className="flex-1 min-w-0 flex items-center gap-[2px] text-[13px] text-[#99a1af]">
+            <span className="select-none font-normal">$</span>
+            <input
+              type="number"
+              placeholder="Máx"
+              value={maxAmount}
+              onChange={(e) => onMaxAmountChange(e.target.value)}
+              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af] min-w-0"
             />
           </div>
         </div>

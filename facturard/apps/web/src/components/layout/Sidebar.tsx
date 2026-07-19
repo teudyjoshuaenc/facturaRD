@@ -49,14 +49,24 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
   // Collapse preference state persisted in localStorage
   const [collapsed, setCollapsed] = useState(false)
 
-  // Initialize collapse preference on mount
+  // Initialize collapse preference and handle window resizing dynamically
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sidebar_collapsed')
-      if (saved !== null) {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => {
+      if (window.innerWidth < 1201) {
+        setCollapsed(true)
+      } else {
+        const saved = localStorage.getItem('sidebar_collapsed')
         setCollapsed(saved === 'true')
       }
     }
+
+    // Run initially
+    handleResize()
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const toggleCollapsed = () => {
@@ -144,7 +154,10 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
         </div>
 
         {/* Scrollable Navigation Area */}
-        <div className="flex flex-col gap-4 overflow-y-auto flex-1 select-none px-[16px] py-[16px]">
+        <div className={cn(
+          "flex flex-col gap-4 flex-1 select-none px-[16px] py-[16px]",
+          collapsed ? "overflow-visible" : "overflow-y-auto"
+        )}>
           {/* Navigation group: OPERACION */}
           <div className="flex flex-col gap-2 w-full">
             {!collapsed && (

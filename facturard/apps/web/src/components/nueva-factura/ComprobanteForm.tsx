@@ -463,7 +463,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       {/* Selector de clase de documento (Fase 2) */}
       <div className={cn(
         "mx-auto mb-4 w-full text-left",
-        facturacionMode === 'estandar' ? "lg:w-[1336px]" : ""
+        facturacionMode === 'estandar' ? "lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0" : ""
       )}>
         <div className="inline-flex rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-1 gap-1 select-none">
           {([
@@ -499,13 +499,13 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       <div className={cn(
         "w-full",
         facturacionMode === 'estandar'
-          ? "flex flex-col lg:flex-row gap-[24px] lg:w-[1336px] lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
+          ? "flex flex-col lg:flex-row gap-[24px] lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0 lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
           : "grid grid-cols-1 gap-6 lg:grid-cols-3 h-full overflow-hidden"
       )}>
         {/* Left Column */}
         {facturacionMode === 'estandar' ? (
           <Card className={cn(
-            "w-full lg:w-[952px] p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
+            "w-full lg:flex-1 lg:max-w-[952px] lg:min-w-0 p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
             currentStep === 2 ? "lg:h-[850px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
           )}>
             {/* Stepper Wizard centered at top of the panel */}
@@ -601,7 +601,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         {/* Right Column */}
         <div className={cn(
           "h-full flex flex-col overflow-hidden",
-          facturacionMode === 'estandar' ? "w-full lg:w-[360px]" : "lg:col-span-1"
+          facturacionMode === 'estandar' ? "w-full lg:w-[360px] max-[1200px]:lg:w-[310px] shrink-0" : "lg:col-span-1"
         )}>
           {/* Rápido Mode Selectors (Client, Type, Date) above the card */}
           {facturacionMode === 'rapido' && (
@@ -781,7 +781,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           <Card className={cn(
             "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300 gap-[16px] items-stretch p-[21px] relative",
             facturacionMode === 'estandar'
-              ? "w-[360px] shadow-sm h-auto lg:self-start"
+              ? "w-full shadow-sm h-auto lg:self-start"
               : "flex-1 shadow-sm overflow-y-auto h-full"
           )}>
             {/* Header */}
