@@ -1,14 +1,16 @@
 'use client'
 
-import type { JSX } from 'react'
+import { useMemo, type JSX } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FileText, TrendingUp, TrendingDown, Scale, ChevronRight, AlertCircle, AlertTriangle } from 'lucide-react'
 import { MetricCard } from '@/components/dashboard/MetricCard'
 import { FacturasTable } from '@/components/dashboard/FacturasTable'
+import { IngresosGastosChart } from '@/components/dashboard/IngresosGastosChart'
+import { GastosDonut } from '@/components/dashboard/GastosDonut'
 import { Button } from '@/components/ui/button'
 import { useDashboardComprobantes, useMonthMetrics, useCumplimiento } from '@/hooks/useComprobantes'
-import { useFinanzasResumen } from '@/hooks/useFinanzas'
+import { useFinanzasResumen, useFinanzasFlujo, useTransacciones, CATEGORIA_LABELS } from '@/hooks/useFinanzas'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
 
@@ -16,6 +18,7 @@ const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
+const MESES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 function monthRange(): { fechaDesde: string; fechaHasta: string; label: string } {
   const now = new Date()
@@ -42,6 +45,45 @@ export default function DashboardPage(): JSX.Element {
   const resumen = useFinanzasResumen({ desde: fechaDesde, hasta: fechaHasta })
   const flujo = resumen.data?.devengado
   const flujoLoading = resumen.isLoading
+
+  // Gráfico 1: ingresos vs gastos de los últimos 6 meses.
+  const ejes6 = useMemo(() => {
+    const now = new Date()
+    const arr: { periodo: string; label: string }[] = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      arr.push({
+        periodo: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: MESES_SHORT[d.getMonth()] ?? '',
+      })
+    }
+    return arr
+  }, [])
+  const desde6 = `${ejes6[0]?.periodo ?? fechaDesde.slice(0, 7)}-01`
+  const flujo6 = useFinanzasFlujo({ desde: desde6, hasta: fechaHasta, agrupacion: 'mes', vista: 'devengado' })
+  const ingresosGastos = useMemo(() => {
+    const byPeriodo = new Map((flujo6.data?.serie ?? []).map((s) => [s.periodo, s]))
+    return ejes6.map((e) => ({
+      label: e.label,
+      ingresos: byPeriodo.get(e.periodo)?.ingresos ?? 0,
+      egresos: byPeriodo.get(e.periodo)?.egresos ?? 0,
+    }))
+  }, [flujo6.data, ejes6])
+
+  // Gráfico 2: en qué gastas este mes (compras + gastos manuales), donut por categoría.
+  const gastosMes = useTransacciones({ desde: fechaDesde, hasta: fechaHasta, vista: 'devengado', tipo: 'EGRESO', limit: 5000 })
+  const gastosPorCat = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of gastosMes.data?.data ?? []) {
+      // Las notas de crédito reducen ingreso, no son un gasto → fuera del donut
+      // (así el total cuadra con el KPI "Gastos").
+      if (t.origen === 'NOTA_CREDITO') continue
+      const label =
+        t.origen === 'MOVIMIENTO' ? (t.categoria ? CATEGORIA_LABELS[t.categoria] : 'Otros') : t.origen === 'COMPRA' ? 'Compras' : 'Otros'
+      map.set(label, (map.get(label) ?? 0) + Math.abs(t.monto))
+    }
+    return [...map.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+  }, [gastosMes.data])
 
   const { cumplimiento, isLoading: complianceLoading } = useCumplimiento()
 
@@ -106,6 +148,12 @@ export default function DashboardPage(): JSX.Element {
             icon={FileText}
             subtitle={label}
           />
+        </div>
+
+        {/* Gráficas hero */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <IngresosGastosChart data={ingresosGastos} isLoading={flujo6.isLoading} />
+          <GastosDonut data={gastosPorCat} isLoading={gastosMes.isLoading} periodo={label} />
         </div>
 
         {/* Facturas recientes */}

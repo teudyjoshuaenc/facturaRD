@@ -2,6 +2,15 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Dashboard · Gráficas] — 2026-07-20 — Dos gráficas hero
+
+Entre las métricas y la lista de facturas, dos gráficas relevantes con datos reales:
+- **Ingresos vs Gastos — últimos 6 meses** (`IngresosGastosChart`, barras): tendencia de caja mensual
+  vía `/finanzas/flujo`, con totales in/out.
+- **En qué gastas** (`GastosDonut`, donut SVG por categoría del mes): agrupa compras + gastos manuales
+  desde `/finanzas/transacciones` (egresos); el total del donut cuadra con el KPI "Gastos" (las notas de
+  crédito se excluyen por no ser gasto). Sin librería de gráficos (SVG/CSS a mano). Grid `xl:grid-cols-2`.
+
 ## [Dashboard] — 2026-07-20 — Enfocado en datos reales de uso
 
 Se recortó el relleno y se centró en lo que de verdad usas.
