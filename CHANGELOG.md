@@ -2,6 +2,30 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Sprint 13 · Frontend] — 2026-07-20 — Tablero de Finanzas (flujo de caja)
+
+Tab `/finanzas` que consume el backend del Sprint 13. Sigue el patrón de diseño de los otros tabs
+(reutiliza los primitivos existentes; ningún componente nuevo de librería). NO fiscal.
+
+### Added
+- **Ruta `src/app/(dashboard)/finanzas/page.tsx`** — header con toggle **Devengado/Cobrado**
+  (`ToggleGroup`) + selector mes/año (`Select`, estilo `reportes`); KPIs (ingresos, egresos, balance,
+  capital acumulado); gráfico de flujo del año; movimientos manuales (tabla + alta/edición/baja) con
+  filtro por tipo; aside con capital inicial (editable) y desglose por categoría.
+- **Hooks `src/hooks/useFinanzas.ts`** — `useFinanzasResumen/Flujo/Categorias`, `useMovimientos`,
+  `useCapital` + mutaciones (`useCrearMovimiento/Actualizar/Eliminar`, `useSetCapital`). Query keys
+  `['finanzas-*', …]`; invalidación por predicado; tipos espejo del backend; toasts con `sonner`.
+- **Componentes `src/components/finanzas/`** — `FinanzasMetrics` (KPI row estilo `CotizacionesMetrics`),
+  `FlujoChart` (**gráfico de barras SVG/CSS a mano** — no hay librería de charts en el repo; ingresos
+  vs egresos por mes, responsive con `overflow-x-auto`), `CategoriasBreakdown`, `CapitalCard` (+ modal),
+  `MovimientosTable`, `MovimientoModal`. Reutilizan `Card/Button/Badge/Select/Input/Modal/ToggleGroup/
+  Spinner` y `formatCurrency/formatDate`.
+- **Navegación** — entrada "Finanzas" en `OPERACION_ITEMS` (`Sidebar`, icono `public/assets/finanzas.svg`
+  con la técnica de máscara existente) + `PAGE_META['/finanzas']` en el layout.
+- **Responsive** — mismos breakpoints que los demás tabs (`sm:grid-cols-2 lg:grid-cols-4` KPIs,
+  `lg:grid-cols-3` cuerpo, headers `flex-wrap`, tablas/gráfico en `overflow-x-auto`); correcto a 1200px.
+  Build de producción `next build` en verde.
+
 ## [Test harness] — 2026-07-20 — Endurecimiento del harness e2e (anti-flakiness)
 
 Deuda técnica del harness pagada antes de que la suite crezca. Sin cambios de producción.

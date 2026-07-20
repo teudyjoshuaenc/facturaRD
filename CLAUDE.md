@@ -419,6 +419,12 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
                    "Vista previa" con datos reales. PATCH /tenants/empresa
 /cotizaciones/[id] → detalle: Descargar PDF, Marcar enviada, Convertir en factura (con confirmación),
                    badge "Facturada" + enlace a la factura; sin historial inventado
+/finanzas        → tablero de flujo de caja (Sprint 13). Toggle Devengado/Cobrado + selector mes/año;
+                   KPIs (ingresos/egresos/balance/capital acumulado), gráfico de flujo del año (barras
+                   CSS, ingresos vs egresos por mes), desglose por categoría, capital inicial (editable)
+                   y CRUD de movimientos manuales (modal). Hooks en useFinanzas.ts contra /finanzas/*;
+                   reutiliza Card/Select/ToggleGroup/Modal/Input/Button. Sin librería de gráficos (SVG/CSS
+                   a mano). NO fiscal: sólo lee/registra caja, no toca emisión ni reportes
 /nueva-factura   → formulario emitir comprobante (E31/E32). Sin certificado: *Emitir e-CF* queda
                    deshabilitado con enlace a Configuración → Certificación fiscal; *Guardar
                    borrador* sigue habilitado (DRAFT)

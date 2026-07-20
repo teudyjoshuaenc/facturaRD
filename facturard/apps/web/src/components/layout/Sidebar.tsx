@@ -14,6 +14,7 @@ const OPERACION_ITEMS = [
   // "Crear factura" dentro de /facturas (Fase 2).
   { href: '/facturas', label: 'Facturas', iconPath: '/assets/61733f93d0c8001a74ba5b649600aae8be315442.svg' },
   { href: '/cotizaciones', label: 'Cotizaciones', iconPath: '/assets/7f182d3f3a402971ce7e1081a600cec0405d8cd5.svg' },
+  { href: '/finanzas', label: 'Finanzas', iconPath: '/assets/finanzas.svg' },
   { href: '/compras', label: 'Recepción y Compras', iconPath: '/assets/f6b535ce78a3cdad16b049e4047ce1d92cd8b6d1.svg', wip: true },
   { href: '/contacto', label: 'Contactos', iconPath: '/assets/0e61680031b0c0958286e2e9ae9f0bc98aed933d.svg' },
   { href: '/producto', label: 'Productos', iconPath: '/assets/0b59873e2e7ffc5e3ea365aa91ffdcad2beda49d.svg' },
