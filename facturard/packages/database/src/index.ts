@@ -7,6 +7,9 @@ export {
   UserRole,
   TipoECF,
   ComprobanteEstado,
+  MovimientoTipo,
+  MovimientoCategoria,
+  PagoTipo,
 } from '@prisma/client'
 
 // Model types
@@ -25,6 +28,9 @@ export type {
   Cotizacion,
   CotizacionItem,
   CompraRecibida,
+  MovimientoFinanciero,
+  Pago,
+  CapitalInicial,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

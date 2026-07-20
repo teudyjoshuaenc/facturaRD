@@ -158,6 +158,30 @@ APP_URL=http://localhost:3000
   - **Tests:** `nota-venta.e2e-spec.ts` (10 casos: no e-NCF/firma/cola, folio atómico, sin cert, editable,
     soft-delete, filtro clase, fiscal inmutable PATCH+DELETE→409, regresión DMAIA, puente prefill, doble
     defensa 607). **113 e2e + 118 ecf-engine, build 0. DMAIA fiscal intacto.**
+- ✅ **Finanzas — flujo de caja (ingresos/egresos) — Sprint 13.** Módulo **NO fiscal**, 100% de LECTURA
+  sobre lo fiscal + tablas propias. **Aislamiento total: NO consume e-NCF, NO firma, NO encola, NO toca
+  el estado DGII, NO altera secuencias ni los reportes 606/607/608.** Migración aditiva
+  `20260720161637_add_finanzas` (sólo tablas/enums nuevos; cero `ALTER` de columnas fiscales).
+  - **Modelos:** `MovimientoFinanciero` (manuales: INGRESO/EGRESO × categoría NOMINA|ALQUILER|SERVICIOS|
+    PRESTAMO|APORTE_CAPITAL|IMPUESTOS|OTROS), `Pago` (COBRO sobre factura / PAGO sobre compra — sólo
+    referencia contable, pagos parciales, `onDelete SET NULL`), `CapitalInicial` (uno por tenant). Todos
+    Decimal(18,2), `moneda` default DOP (no se mezclan monedas).
+  - **Endpoints** (`/api/v1/finanzas`, JWT + tenant-scoped): `movimientos` CRUD; `pagos`
+    (`POST`/`GET`/`DELETE :id`) + `GET /saldo?comprobanteId|compraId` (saldo pendiente = monto − abonos,
+    **rechaza sobrepago 400**, no cobra DRAFT); `GET|PUT /capital` (upsert); `GET /resumen` (dos vistas
+    **devengado** y **cobrado** + capital acumulado); `GET /flujo?agrupacion=mes|semana&vista=…` (serie);
+    `GET /categorias` (desglose de manuales).
+  - **Devengado vs cobrado:** fuente unificada por CONSULTA de las 4 fuentes (facturas, compras, pagos,
+    movimientos) — sin tabla duplicada. **Ingreso fiscal NETO** = facturas (+ nota débito E33) − notas de
+    crédito **E34**. Estados devengados: ACEPTADO/ACEPTADO_CONDICIONAL + en vuelo (PENDIENTE/EN_COLA/
+    ENVIANDO); RECHAZADO/ERROR/DRAFT no suman. Notas de venta internas suman pero **distinguibles**
+    (`ingresosNotaVenta`). Movimientos manuales cuentan en ambas vistas. Capital acumulado ignora `desde`
+    (acumulado hasta `hasta`); los totales del rango sí respetan `desde/hasta`.
+  - **Tests:** `finanzas.e2e-spec.ts` (17 casos por área: CRUD/isolation/validaciones, cobro NO cambia
+    estado DGII [assert explícito], pagos parciales, sobrepago, DRAFT no cobrable, devengado≠cobrado con
+    capital acumulado distinto, netting E34, nota de venta distinguible, serie por bucket, categorías,
+    **aislamiento fiscal: reporte 607 idéntico antes/después**). **133 e2e + 118 ecf-engine, build 0.
+    DMAIA fiscal intacto.**
 
 ---
 

@@ -18,6 +18,7 @@ import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module'
 import { ComprasModule } from './modules/compras/compras.module'
 import { ReportesModule } from './modules/reportes/reportes.module'
 import { CumplimientoModule } from './modules/cumplimiento/cumplimiento.module'
+import { FinanzasModule } from './modules/finanzas/finanzas.module'
 import appConfig from './config/app.config'
 import databaseConfig from './config/database.config'
 import redisConfig from './config/redis.config'
@@ -60,6 +61,7 @@ import jwtConfig from './config/jwt.config'
     ComprasModule,
     ReportesModule,
     CumplimientoModule,
+    FinanzasModule,
   ],
 })
 export class AppModule {}

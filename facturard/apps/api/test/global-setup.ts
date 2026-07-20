@@ -16,7 +16,7 @@ export default async function globalSetup(): Promise<void> {
 
   const prisma = new PrismaClient()
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "audit_logs","comprobantes","comprobantes_recibidos","certificados","secuencias","api_keys","webhooks","ghl_locations","users","tenants" RESTART IDENTITY CASCADE;`,
+    `TRUNCATE TABLE "pagos","movimientos_financieros","capital_inicial","audit_logs","comprobantes","comprobantes_recibidos","certificados","secuencias","api_keys","webhooks","ghl_locations","users","tenants" RESTART IDENTITY CASCADE;`,
   )
   await prisma.$disconnect()
 }

@@ -2,6 +2,50 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Sprint 13] — 2026-07-20 — Módulo Finanzas (flujo de caja: ingresos/egresos)
+
+Nuevo módulo NO fiscal para el tablero de flujo financiero. **Aislamiento fiscal total:**
+100% de lectura sobre lo fiscal + tablas propias. NO consume e-NCF, NO firma, NO encola, NO toca
+el estado DGII de las facturas, NO altera secuencias ni los reportes 606/607/608. El path de
+emisión de DMAIA queda intacto.
+
+### Added
+- **Migración aditiva `20260720161637_add_finanzas`** — sólo `CREATE TYPE`/`CREATE TABLE`/índices/FK
+  sobre tablas nuevas; cero `ALTER` de columnas sobre tablas fiscales. Nuevos enums `MovimientoTipo`,
+  `MovimientoCategoria`, `PagoTipo` y modelos:
+  - `MovimientoFinanciero` (movimientos manuales: nómina, alquiler, aporte de capital, impuestos…);
+    `tipo` INGRESO/EGRESO, `categoria`, `monto` Decimal(18,2), `moneda` (default DOP), `fecha`,
+    `descripcion`, `metodoPago`. Índice `(tenantId, fecha)`.
+  - `Pago` (cobros de facturas / pagos de compras). `tipo` COBRO/PAGO, `comprobanteId?`/`compraId?`
+    (referencias virtuales, `onDelete SET NULL`), `monto`. **Registrar un Pago NO modifica el
+    comprobante/compra** — es sólo una referencia contable. Soporta pagos parciales.
+  - `CapitalInicial` (uno por tenant, `@@unique(tenantId)`) — saldo de partida.
+- **Módulo `finanzas`** (`apps/api/src/modules/finanzas/`), todos los endpoints JWT + tenant-scoped
+  bajo `/api/v1/finanzas`:
+  - Movimientos: `POST|GET /movimientos`, `GET|PATCH|DELETE /movimientos/:id`.
+  - Pagos: `POST /pagos`, `GET /pagos`, `DELETE /pagos/:id`, `GET /saldo?comprobanteId|compraId`
+    (saldo pendiente = monto − abonos; **rechaza sobrepago** con 400; no se cobra un DRAFT).
+  - Capital: `GET|PUT /capital` (upsert).
+  - Tablero: `GET /resumen` (totales en dos vistas **devengado** y **cobrado**, con capital acumulado),
+    `GET /flujo?agrupacion=mes|semana&vista=devengado|cobrado` (serie temporal), `GET /categorias`
+    (desglose de movimientos manuales).
+- **Lógica devengado vs cobrado.** Fuente unificada por CONSULTA de las 4 fuentes (facturas fiscales,
+  compras, pagos, movimientos manuales) — sin tabla duplicada.
+  - **Ingreso fiscal NETO:** facturas positivas (E31/E32/E44-47 + notas débito E33) **menos** notas de
+    crédito **E34**. Estados que cuentan como devengado: `ACEPTADO`, `ACEPTADO_CONDICIONAL`, y en vuelo
+    (`PENDIENTE`/`EN_COLA`/`ENVIANDO`); RECHAZADO/ERROR/DRAFT NO suman.
+  - **Notas de venta internas** (`esFiscal=false`, `INTERNO`) suman como ingreso pero **distinguibles**
+    (`ingresosNotaVenta` aparte de `ingresosFiscal`).
+  - Movimientos manuales cuentan en **ambas** vistas (caja inmediata). Sólo DOP (el campo `moneda`
+    existe pero no se mezclan monedas en los totales). Capital acumulado = capital inicial + flujo neto
+    **acumulado** hasta `hasta` (ignora `desde`).
+- **Tests** — `apps/api/test/finanzas.e2e-spec.ts` (**17 casos** por área): movimientos CRUD +
+  tenant isolation + validaciones; cobro NO cambia el estado DGII (assert explícito), pagos parciales,
+  sobrepago 400, DRAFT no cobrable, pago sobre compra + isolation; devengado vs cobrado difieren con
+  capital acumulado distinto, netting E34, nota de venta distinguible, capital upsert; serie temporal
+  por bucket; desglose por categoría; **aislamiento fiscal** (reporte 607 idéntico antes/después).
+  **133 e2e + 118 ecf-engine, build 0.** DMAIA fiscal intacto.
+
 ## [Ajustes UI] — 2026-07-15 — Datos del emisor, Empresa, cotizaciones y PDFs
 
 Lote de ajustes de frontend (y backend de soporte). Sin cambios en el path de emisión de DMAIA.
