@@ -328,4 +328,60 @@ describe('Finanzas (e2e)', () => {
       expect(comp.eNCF).toBe(f.eNCF)
     })
   })
+
+  // ─── FEED UNIFICADO DE TRANSACCIONES ─────────────────────────────────────
+  describe('Transacciones (feed unificado)', () => {
+    const RANGO = 'desde=2026-08-01&hasta=2026-08-31'
+
+    it('devengado: combina factura (+), compra (−) y movimiento; ordena desc; filtra y pagina', async () => {
+      const t = await createTenant()
+      await mkComprobante(t, { tipoECF: 'E31', montoTotal: 1000, createdAt: new Date('2026-08-05T10:00:00-04:00') })
+      await prisma.compraRecibida.create({
+        data: { tenantId: t.tenant.id, tipo: 'E41', subtotal: 500, itbis: 90, total: 590,
+          razonSocialProveedor: 'PROV SRL', ncf: 'E410000000001', fechaComprobante: new Date('2026-08-10T10:00:00-04:00') },
+      })
+      await request(srv()).post('/api/v1/finanzas/movimientos').set(auth(t))
+        .send({ tipo: 'EGRESO', categoria: 'NOMINA', monto: 300, fecha: '2026-08-15' }).expect(201)
+
+      const all = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}`).set(auth(t)).expect(200)).body
+      expect(all.total).toBe(3)
+      // Orden desc por fecha: movimiento (15) → compra (10) → factura (05).
+      expect(all.data.map((x: { origen: string }) => x.origen)).toEqual(['MOVIMIENTO', 'COMPRA', 'FACTURA'])
+      const factura = all.data.find((x: { origen: string }) => x.origen === 'FACTURA')
+      const compra = all.data.find((x: { origen: string }) => x.origen === 'COMPRA')
+      expect(factura.monto).toBe(1000) // entrada +
+      expect(factura.tipo).toBe('INGRESO')
+      expect(compra.monto).toBe(-590) // salida −
+      expect(compra.tipo).toBe('EGRESO')
+
+      // Filtro por tipo
+      const ingresos = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}&tipo=INGRESO`).set(auth(t)).expect(200)).body
+      expect(ingresos.total).toBe(1)
+      expect(ingresos.data[0].origen).toBe('FACTURA')
+      // Filtro por origen
+      const soloCompras = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}&origen=COMPRA`).set(auth(t)).expect(200)).body
+      expect(soloCompras.total).toBe(1)
+      // Paginación
+      const pag = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}&limit=2&page=1`).set(auth(t)).expect(200)).body
+      expect(pag.data).toHaveLength(2)
+      expect(pag.totalPages).toBe(2)
+    })
+
+    it('nota de crédito E34 aparece como salida (monto negativo)', async () => {
+      const t = await createTenant()
+      await mkComprobante(t, { tipoECF: 'E34', montoTotal: 200, createdAt: new Date('2026-08-06T10:00:00-04:00') })
+      const r = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}`).set(auth(t)).expect(200)).body
+      const nc = r.data.find((x: { origen: string }) => x.origen === 'NOTA_CREDITO')
+      expect(nc.monto).toBe(-200)
+      expect(nc.tipo).toBe('EGRESO')
+    })
+
+    it('tenant isolation: sólo ve sus transacciones', async () => {
+      const a = await createTenant()
+      const b = await createTenant()
+      await mkComprobante(a, { tipoECF: 'E31', montoTotal: 777, createdAt: new Date('2026-08-07T10:00:00-04:00') })
+      const rb = (await request(srv()).get(`/api/v1/finanzas/transacciones?${RANGO}`).set(auth(b)).expect(200)).body
+      expect(rb.total).toBe(0)
+    })
+  })
 })

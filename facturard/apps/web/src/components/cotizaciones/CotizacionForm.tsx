@@ -494,7 +494,7 @@ export function CotizacionForm(): JSX.Element {
                 </div>
                 {/* Correo */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-semibold text-[#344054]">Correo *</label>
+                  <label className="text-[11px] font-semibold text-[#344054]">Correo</label>
                   <input
                     type="email"
                     placeholder="cliente@correo.com"

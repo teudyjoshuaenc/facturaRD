@@ -10,6 +10,7 @@ import { SetCapitalDto } from './dto/set-capital.dto'
 import { RangoDto } from './dto/rango.dto'
 import { FlujoDto } from './dto/flujo.dto'
 import { SaldoDto } from './dto/saldo.dto'
+import { ListTransaccionesDto } from './dto/list-transacciones.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
@@ -106,5 +107,11 @@ export class FinanzasController {
   @ApiOperation({ summary: 'Desglose de movimientos manuales por categoría' })
   categorias(@CurrentTenant() tenantId: string, @Query() query: RangoDto) {
     return this.service.categorias(tenantId, query)
+  }
+
+  @Get('transacciones')
+  @ApiOperation({ summary: 'Feed unificado (facturas/compras/notas/movimientos) filtrable — base del historial y export' })
+  transacciones(@CurrentTenant() tenantId: string, @Query() query: ListTransaccionesDto) {
+    return this.service.transacciones(tenantId, query)
   }
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, type JSX } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useMemo, useState, type JSX } from 'react'
+import { Plus, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
@@ -10,18 +10,23 @@ import { FinanzasMetrics } from '@/components/finanzas/FinanzasMetrics'
 import { FlujoChart } from '@/components/finanzas/FlujoChart'
 import { CategoriasBreakdown } from '@/components/finanzas/CategoriasBreakdown'
 import { CapitalCard } from '@/components/finanzas/CapitalCard'
-import { MovimientosTable } from '@/components/finanzas/MovimientosTable'
+import { TransaccionesTable } from '@/components/finanzas/TransaccionesTable'
 import { MovimientoModal } from '@/components/finanzas/MovimientoModal'
+import { descargarTransaccionesCsv } from '@/lib/finanzas-export'
 import {
   useFinanzasResumen,
   useFinanzasFlujo,
   useFinanzasCategorias,
   useMovimientos,
+  useTransacciones,
   useEliminarMovimiento,
+  fetchTransaccionesExport,
   type Vista,
   type MovimientoFinanciero,
-  type MovimientoTipo,
+  type Transaccion,
+  type TransaccionOrigen,
 } from '@/hooks/useFinanzas'
+import { toast } from 'sonner'
 
 const monthOptions = [
   { value: '01', label: 'Enero' },
@@ -43,9 +48,17 @@ const yearOptions = [
   { value: '2027', label: '2027' },
 ]
 const tipoOptions = [
-  { value: '', label: 'Todos los tipos' },
+  { value: '', label: 'Todo' },
   { value: 'INGRESO', label: 'Ingresos' },
   { value: 'EGRESO', label: 'Egresos' },
+]
+const origenOptions = [
+  { value: '', label: 'Todos los orígenes' },
+  { value: 'FACTURA', label: 'Facturas' },
+  { value: 'COMPRA', label: 'Compras' },
+  { value: 'NOTA_VENTA', label: 'Notas de venta' },
+  { value: 'NOTA_CREDITO', label: 'Notas de crédito' },
+  { value: 'MOVIMIENTO', label: 'Manuales' },
 ]
 
 export default function FinanzasPage(): JSX.Element {
@@ -54,9 +67,12 @@ export default function FinanzasPage(): JSX.Element {
   const [year, setYear] = useState(String(now.getFullYear()))
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'))
   const [tipoFiltro, setTipoFiltro] = useState('')
+  const [origenFiltro, setOrigenFiltro] = useState('')
+  const [txPage, setTxPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<MovimientoFinanciero | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<MovimientoFinanciero | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const { monthDesde, monthHasta, yearDesde, yearHasta } = useMemo(() => {
     const lastDay = new Date(Number(year), Number(month), 0).getDate()
@@ -68,33 +84,84 @@ export default function FinanzasPage(): JSX.Element {
     }
   }, [year, month])
 
+  // Reinicia la página del feed cuando cambian período, vista o filtros.
+  useEffect(() => setTxPage(1), [month, year, vista, tipoFiltro, origenFiltro])
+
   const resumen = useFinanzasResumen({ desde: monthDesde, hasta: monthHasta })
   const flujo = useFinanzasFlujo({ desde: yearDesde, hasta: yearHasta, agrupacion: 'mes', vista })
   const categorias = useFinanzasCategorias({ desde: monthDesde, hasta: monthHasta })
-  const movimientos = useMovimientos({
+  const movimientos = useMovimientos({ desde: monthDesde, hasta: monthHasta, limit: 100 })
+  const transacciones = useTransacciones({
     desde: monthDesde,
     hasta: monthHasta,
-    ...(tipoFiltro ? { tipo: tipoFiltro as MovimientoTipo } : {}),
-    limit: 100,
+    vista,
+    page: txPage,
+    limit: 15,
+    ...(tipoFiltro ? { tipo: tipoFiltro as 'INGRESO' | 'EGRESO' } : {}),
+    ...(origenFiltro ? { origen: origenFiltro as TransaccionOrigen } : {}),
   })
   const eliminar = useEliminarMovimiento()
 
   const v = resumen.data?.[vista]
   const vistaLabel = vista === 'devengado' ? 'Devengado' : 'Cobrado'
   const periodoLabel = `${monthOptions.find((m) => m.value === month)?.label} ${year}`
+  const feed = transacciones.data
+
+  // Resuelve el MovimientoFinanciero completo de una fila manual (para editar sin
+  // perder metodoPago); si no está en la consulta, lo reconstruye de la fila.
+  function toMovimiento(t: Transaccion): MovimientoFinanciero | null {
+    if (!t.movimientoId) return null
+    const full = movimientos.data?.data.find((m) => m.id === t.movimientoId)
+    if (full) return full
+    return {
+      id: t.movimientoId,
+      tenantId: '',
+      tipo: t.monto >= 0 ? 'INGRESO' : 'EGRESO',
+      categoria: t.categoria ?? 'OTROS',
+      monto: Math.abs(t.monto),
+      moneda: 'DOP',
+      fecha: t.fecha,
+      descripcion: t.descripcion,
+      metodoPago: null,
+      createdAt: t.fecha,
+      updatedAt: t.fecha,
+    }
+  }
 
   function nuevoMovimiento(): void {
     setEditTarget(null)
     setModalOpen(true)
   }
-  function editarMovimiento(m: MovimientoFinanciero): void {
-    setEditTarget(m)
+  function editarTransaccion(t: Transaccion): void {
+    setEditTarget(toMovimiento(t))
     setModalOpen(true)
   }
   async function confirmarEliminar(): Promise<void> {
     if (!deleteTarget) return
     await eliminar.mutateAsync(deleteTarget.id)
     setDeleteTarget(null)
+  }
+  async function exportar(): Promise<void> {
+    setExporting(true)
+    try {
+      const rows = await fetchTransaccionesExport({
+        desde: monthDesde,
+        hasta: monthHasta,
+        vista,
+        ...(tipoFiltro ? { tipo: tipoFiltro as 'INGRESO' | 'EGRESO' } : {}),
+        ...(origenFiltro ? { origen: origenFiltro as TransaccionOrigen } : {}),
+      })
+      if (rows.length === 0) {
+        toast.info('No hay transacciones para exportar en este período')
+        return
+      }
+      descargarTransaccionesCsv(rows, `finanzas-${year}-${month}.csv`)
+      toast.success(`${rows.length} transacciones exportadas`)
+    } catch {
+      toast.error('No se pudo exportar')
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -103,9 +170,7 @@ export default function FinanzasPage(): JSX.Element {
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-100 pb-5">
         <div className="flex flex-col gap-1">
           <h2 className="text-h4 font-bold text-text-primary">Finanzas</h2>
-          <p className="text-body-sm text-text-secondary">
-            Flujo de caja del negocio: ingresos, egresos y capital.
-          </p>
+          <p className="text-body-sm text-text-secondary">Flujo de caja del negocio: ingresos, egresos y capital.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="w-[210px]">
@@ -147,34 +212,81 @@ export default function FinanzasPage(): JSX.Element {
       {/* Flujo (año completo) */}
       <FlujoChart serie={flujo.data?.serie ?? []} isLoading={flujo.isLoading} vistaLabel={vistaLabel} />
 
-      {/* Movimientos + aside */}
+      {/* Transacciones + aside */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col text-left">
-              <h3 className="text-body-base font-bold text-text-primary">Movimientos manuales</h3>
-              <p className="text-ui-xs text-text-secondary font-medium">{periodoLabel}</p>
+              <h3 className="text-body-base font-bold text-text-primary">Transacciones</h3>
+              <p className="text-ui-xs text-text-secondary font-medium">
+                {periodoLabel} · {vistaLabel}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Select
                 value={tipoFiltro}
                 onChange={setTipoFiltro}
                 options={tipoOptions}
-                className="w-40"
+                className="w-28"
                 triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
               />
+              <Select
+                value={origenFiltro}
+                onChange={setOrigenFiltro}
+                options={origenOptions}
+                className="w-44"
+                triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+              />
+              <Button
+                variant="secondary"
+                onClick={exportar}
+                disabled={exporting}
+                className="h-10 shrink-0"
+                title="Exportar a Excel (CSV)"
+              >
+                <Download size={16} />
+                {exporting ? 'Exportando…' : 'Exportar'}
+              </Button>
               <Button variant="primary" onClick={nuevoMovimiento} className="h-10 shrink-0">
                 <Plus size={16} />
                 Registrar
               </Button>
             </div>
           </div>
-          <MovimientosTable
-            movimientos={movimientos.data?.data ?? []}
-            isLoading={movimientos.isLoading}
-            onEdit={editarMovimiento}
-            onDelete={setDeleteTarget}
+
+          <TransaccionesTable
+            transacciones={feed?.data ?? []}
+            isLoading={transacciones.isLoading}
+            onEdit={editarTransaccion}
+            onDelete={(t) => setDeleteTarget(toMovimiento(t))}
           />
+
+          {/* Paginación */}
+          {feed && feed.totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <span className="text-ui-xs text-text-secondary">
+                {feed.total} transacciones · página {feed.page} de {feed.totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={txPage <= 1}
+                  onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={txPage >= feed.totalPages}
+                  onClick={() => setTxPage((p) => p + 1)}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <aside className="flex flex-col gap-6">
@@ -202,7 +314,8 @@ export default function FinanzasPage(): JSX.Element {
         }
       >
         <p className="text-body-sm text-text-secondary">
-          ¿Seguro que deseas eliminar este movimiento manual? No afecta ninguna factura ni reporte fiscal.
+          ¿Seguro que deseas eliminar este movimiento manual? Solo se pueden eliminar movimientos manuales; las
+          facturas y compras no se tocan.
         </p>
       </Modal>
     </div>

@@ -2,6 +2,32 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Finanzas · Transacciones + Export] — 2026-07-20 — Historial unificado y exportación
+
+Sobre el tablero de Finanzas: el historial ya no muestra solo movimientos manuales, sino un
+**feed unificado** de lo que entra y sale, con exportación a Excel. Además, el correo del cliente en
+cotizaciones pasa a ser opcional. NO fiscal (solo lectura sobre lo fiscal).
+
+### Added
+- **`GET /finanzas/transacciones`** (backend) — feed unificado y paginado de las 4 fuentes con `monto`
+  FIRMADO (+entrada / −salida): en `vista=devengado` combina facturas (ingreso), notas de crédito E34
+  (resta), notas de venta, compras (egreso) y movimientos manuales; en `vista=cobrado`, cobros/pagos +
+  manuales. Filtros `tipo` (INGRESO/EGRESO) y `origen` (FACTURA/COMPRA/NOTA_VENTA/NOTA_CREDITO/
+  MOVIMIENTO/COBRO/PAGO), orden por fecha desc, `page`/`limit` (hasta 5000 para export). Solo LEE lo
+  fiscal. Tests: `finanzas.e2e-spec.ts` +3 casos (combinación/orden/filtros/paginación, E34 negativo,
+  tenant isolation). **136 e2e + 118 ecf-engine, build 0.**
+- **Historial unificado en `/finanzas`** — reemplaza la tabla "Movimientos manuales" por
+  **Transacciones**: cada fila con badge de origen, referencia (e-NCF/folio/NCF), monto en verde `+` /
+  rojo `−`, y acciones editar/eliminar **solo** en filas manuales. Sigue la vista Devengado/Cobrado.
+  Filtros por tipo y origen + paginación. `TransaccionesTable` (nueva) reemplaza a `MovimientosTable`.
+- **Exportar a Excel** — botón que descarga un CSV (BOM UTF-8, se abre directo en Excel) con las
+  transacciones del período y filtros actuales (`fetchTransaccionesExport` + `descargarTransaccionesCsv`,
+  `lib/finanzas-export.ts`). Nombre `finanzas-AAAA-MM.csv`.
+
+### Changed
+- **Cotizaciones — correo del cliente opcional.** Se quitó el asterisco "Correo *" en `CotizacionForm`
+  (el campo nunca se validaba ni se enviaba; el asterisco era engañoso).
+
 ## [Sprint 13 · Frontend] — 2026-07-20 — Tablero de Finanzas (flujo de caja)
 
 Tab `/finanzas` que consume el backend del Sprint 13. Sigue el patrón de diseño de los otros tabs

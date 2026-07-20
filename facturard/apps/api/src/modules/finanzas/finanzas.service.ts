@@ -11,6 +11,31 @@ import type { SetCapitalDto } from './dto/set-capital.dto'
 import type { RangoDto } from './dto/rango.dto'
 import type { FlujoDto } from './dto/flujo.dto'
 import type { SaldoDto } from './dto/saldo.dto'
+import type { ListTransaccionesDto } from './dto/list-transacciones.dto'
+
+export type TransaccionOrigen =
+  | 'FACTURA'
+  | 'NOTA_VENTA'
+  | 'NOTA_CREDITO'
+  | 'COMPRA'
+  | 'MOVIMIENTO'
+  | 'COBRO'
+  | 'PAGO'
+
+// Una fila del feed unificado. `monto` va FIRMADO: positivo = entrada, negativo =
+// salida. `tipo` se deriva del signo. `movimientoId` sólo se llena para
+// movimientos manuales (los únicos editables/eliminables desde el feed).
+export interface Transaccion {
+  id: string
+  fecha: string
+  monto: number
+  tipo: 'INGRESO' | 'EGRESO'
+  origen: TransaccionOrigen
+  referencia: string | null
+  descripcion: string | null
+  categoria: string | null
+  movimientoId: string | null
+}
 
 // Estados de un e-CF que cuentan como INGRESO DEVENGADO: aceptados por la DGII
 // y los que van en camino. Un RECHAZADO/ERROR/DRAFT NO es una venta válida y
@@ -457,5 +482,118 @@ export class FinanzasService {
       .sort((a, b) => (a.categoria < b.categoria ? -1 : 1))
 
     return { categorias }
+  }
+
+  // ─── Feed unificado de transacciones (lo que entra y sale) ───────────────
+
+  /**
+   * Lista unificada de entradas/salidas del período, combinando las 4 fuentes.
+   * Devengado: facturas (ingreso), notas de crédito E34 (resta), notas de venta,
+   * compras (egreso) y movimientos manuales. Cobrado: cobros/pagos + manuales.
+   * `monto` firmado (+entrada / −salida); ordenado por fecha desc. Paginado, con
+   * filtros por tipo y origen. Sólo LEE lo fiscal (no lo toca).
+   */
+  async transacciones(tenantId: string, query: ListTransaccionesDto): Promise<PaginatedResponse<Transaccion>> {
+    const vista = query.vista ?? 'devengado'
+    const CAP = 5000
+    const items: Transaccion[] = []
+
+    // Movimientos manuales — cuentan en ambas vistas.
+    const rMov = rango('fecha', query.desde, query.hasta) as Prisma.MovimientoFinancieroWhereInput
+    const movs = await prisma.movimientoFinanciero.findMany({ where: { tenantId, ...rMov }, take: CAP })
+    for (const m of movs) {
+      const signo = m.tipo === 'INGRESO' ? 1 : -1
+      items.push({
+        id: `mov:${m.id}`,
+        fecha: m.fecha.toISOString(),
+        monto: r2(signo * Number(m.monto)),
+        tipo: m.tipo,
+        origen: 'MOVIMIENTO',
+        referencia: null,
+        descripcion: m.descripcion,
+        categoria: m.categoria,
+        movimientoId: m.id,
+      })
+    }
+
+    if (vista === 'devengado') {
+      const rComp = rango('createdAt', query.desde, query.hasta) as Prisma.ComprobanteWhereInput
+      const comps = await prisma.comprobante.findMany({
+        where: {
+          tenantId,
+          eliminado: false,
+          OR: [
+            { esFiscal: true, estado: { in: ESTADOS_INGRESO_DEVENGADO } },
+            { esFiscal: false, estado: 'INTERNO' },
+          ],
+          ...rComp,
+        },
+        take: CAP,
+      })
+      for (const c of comps) {
+        const esNotaCredito = c.tipoECF === 'E34'
+        const origen: TransaccionOrigen = !c.esFiscal ? 'NOTA_VENTA' : esNotaCredito ? 'NOTA_CREDITO' : 'FACTURA'
+        const monto = r2((esNotaCredito ? -1 : 1) * Number(c.montoTotal))
+        items.push({
+          id: `fac:${c.id}`,
+          fecha: c.createdAt.toISOString(),
+          monto,
+          tipo: monto >= 0 ? 'INGRESO' : 'EGRESO',
+          origen,
+          referencia: c.eNCF ?? c.folioInterno,
+          descripcion: c.razonSocial,
+          categoria: null,
+          movimientoId: null,
+        })
+      }
+
+      const rCompra = rango('fechaComprobante', query.desde, query.hasta) as Prisma.CompraRecibidaWhereInput
+      const compras = await prisma.compraRecibida.findMany({ where: { tenantId, ...rCompra }, take: CAP })
+      for (const c of compras) {
+        items.push({
+          id: `com:${c.id}`,
+          fecha: (c.fechaComprobante ?? c.createdAt).toISOString(),
+          monto: r2(-Number(c.total)),
+          tipo: 'EGRESO',
+          origen: 'COMPRA',
+          referencia: c.ncf ?? c.rncProveedor,
+          descripcion: c.razonSocialProveedor,
+          categoria: null,
+          movimientoId: null,
+        })
+      }
+    } else {
+      const rPago = rango('fecha', query.desde, query.hasta) as Prisma.PagoWhereInput
+      const pagos = await prisma.pago.findMany({
+        where: { tenantId, ...rPago },
+        take: CAP,
+        include: { comprobante: true, compra: true },
+      })
+      for (const p of pagos) {
+        const signo = p.tipo === 'COBRO' ? 1 : -1
+        items.push({
+          id: `pag:${p.id}`,
+          fecha: p.fecha.toISOString(),
+          monto: r2(signo * Number(p.monto)),
+          tipo: p.tipo === 'COBRO' ? 'INGRESO' : 'EGRESO',
+          origen: p.tipo,
+          referencia: p.comprobante?.eNCF ?? p.comprobante?.folioInterno ?? p.compra?.ncf ?? null,
+          descripcion: p.comprobante?.razonSocial ?? p.compra?.razonSocialProveedor ?? null,
+          categoria: null,
+          movimientoId: null,
+        })
+      }
+    }
+
+    let filtered = items
+    if (query.tipo) filtered = filtered.filter((t) => t.tipo === query.tipo)
+    if (query.origen) filtered = filtered.filter((t) => t.origen === query.origen)
+    filtered.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
+
+    const total = filtered.length
+    const page = query.page ?? 1
+    const limit = Math.min(query.limit ?? 15, CAP)
+    const data = filtered.slice((page - 1) * limit, (page - 1) * limit + limit)
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 }

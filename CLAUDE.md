@@ -170,7 +170,9 @@ APP_URL=http://localhost:3000
     (`POST`/`GET`/`DELETE :id`) + `GET /saldo?comprobanteId|compraId` (saldo pendiente = monto − abonos,
     **rechaza sobrepago 400**, no cobra DRAFT); `GET|PUT /capital` (upsert); `GET /resumen` (dos vistas
     **devengado** y **cobrado** + capital acumulado); `GET /flujo?agrupacion=mes|semana&vista=…` (serie);
-    `GET /categorias` (desglose de manuales).
+    `GET /categorias` (desglose de manuales); `GET /transacciones` (feed unificado facturas/compras/
+    notas/movimientos/pagos con `monto` firmado, filtros tipo/origen, paginado; base del historial y del
+    export a Excel/CSV).
   - **Devengado vs cobrado:** fuente unificada por CONSULTA de las 4 fuentes (facturas, compras, pagos,
     movimientos) — sin tabla duplicada. **Ingreso fiscal NETO** = facturas (+ nota débito E33) − notas de
     crédito **E34**. Estados devengados: ACEPTADO/ACEPTADO_CONDICIONAL + en vuelo (PENDIENTE/EN_COLA/
@@ -421,10 +423,12 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
                    badge "Facturada" + enlace a la factura; sin historial inventado
 /finanzas        → tablero de flujo de caja (Sprint 13). Toggle Devengado/Cobrado + selector mes/año;
                    KPIs (ingresos/egresos/balance/capital acumulado), gráfico de flujo del año (barras
-                   CSS, ingresos vs egresos por mes), desglose por categoría, capital inicial (editable)
-                   y CRUD de movimientos manuales (modal). Hooks en useFinanzas.ts contra /finanzas/*;
-                   reutiliza Card/Select/ToggleGroup/Modal/Input/Button. Sin librería de gráficos (SVG/CSS
-                   a mano). NO fiscal: sólo lee/registra caja, no toca emisión ni reportes
+                   CSS), desglose por categoría, capital inicial (editable). **Historial = feed unificado
+                   de Transacciones** (facturas +verde / compras −rojo / notas / manuales), con filtros
+                   tipo/origen, paginación, **exportar a Excel/CSV** por período+filtros, y editar/eliminar
+                   solo en filas manuales (+ modal de alta). Hooks en useFinanzas.ts contra /finanzas/*;
+                   reutiliza Card/Select/ToggleGroup/Modal/Input/Button/Badge. Sin librería de gráficos
+                   (SVG/CSS a mano). NO fiscal: sólo lee/registra caja, no toca emisión ni reportes
 /nueva-factura   → formulario emitir comprobante (E31/E32). Sin certificado: *Emitir e-CF* queda
                    deshabilitado con enlace a Configuración → Certificación fiscal; *Guardar
                    borrador* sigue habilitado (DRAFT)

@@ -93,6 +93,45 @@ export interface CapitalInicial {
   fecha: string | null
 }
 
+export type TransaccionOrigen =
+  | 'FACTURA'
+  | 'NOTA_VENTA'
+  | 'NOTA_CREDITO'
+  | 'COMPRA'
+  | 'MOVIMIENTO'
+  | 'COBRO'
+  | 'PAGO'
+
+export const ORIGEN_LABELS: Record<TransaccionOrigen, string> = {
+  FACTURA: 'Factura',
+  NOTA_VENTA: 'Nota de venta',
+  NOTA_CREDITO: 'Nota de crédito',
+  COMPRA: 'Compra',
+  MOVIMIENTO: 'Manual',
+  COBRO: 'Cobro',
+  PAGO: 'Pago',
+}
+
+export interface Transaccion {
+  id: string
+  fecha: string
+  monto: number // firmado: + entrada / − salida
+  tipo: 'INGRESO' | 'EGRESO'
+  origen: TransaccionOrigen
+  referencia: string | null
+  descripcion: string | null
+  categoria: MovimientoCategoria | null
+  movimientoId: string | null
+}
+
+export interface TransaccionesParams extends Rango {
+  tipo?: 'INGRESO' | 'EGRESO'
+  origen?: TransaccionOrigen
+  vista?: Vista
+  page?: number
+  limit?: number
+}
+
 export interface NuevoMovimiento {
   tipo: MovimientoTipo
   categoria: MovimientoCategoria
@@ -164,6 +203,32 @@ export function useCapital() {
     queryFn: () => api.get<CapitalInicial>('/finanzas/capital').then((r) => r.data),
     staleTime: 5 * 60 * 1000,
   })
+}
+
+export function useTransacciones(params: TransaccionesParams) {
+  return useQuery({
+    queryKey: [
+      'finanzas-transacciones',
+      params.desde,
+      params.hasta,
+      params.tipo,
+      params.origen,
+      params.vista,
+      params.page,
+      params.limit,
+    ],
+    queryFn: () =>
+      api.get<PaginatedResponse<Transaccion>>('/finanzas/transacciones', { params }).then((r) => r.data),
+    staleTime: 30 * 1000,
+  })
+}
+
+// Trae TODO el período con los filtros actuales (cap backend 5000) para exportar.
+export async function fetchTransaccionesExport(params: TransaccionesParams): Promise<Transaccion[]> {
+  const res = await api.get<PaginatedResponse<Transaccion>>('/finanzas/transacciones', {
+    params: { ...params, page: 1, limit: 5000 },
+  })
+  return res.data.data
 }
 
 // ─── Mutaciones ──────────────────────────────────────────────────────────────
