@@ -2,6 +2,24 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Dashboard] — 2026-07-20 — Enfocado en datos reales de uso
+
+Se recortó el relleno y se centró en lo que de verdad usas.
+
+### Changed
+- **Métricas reales del mes**: **Ingresos · Gastos · Balance** (flujo de caja real vía `/finanzas/resumen`
+  devengado) + **Facturas emitidas**. Antes eran Facturado/Facturas/ITBIS sin el gasto; ahora se ve
+  cuánto entró y cuánto salió. El subtítulo usa el **mes actual real** (antes "Abril 2026" hardcodeado).
+- **Acciones rápidas** incluye "Registrar movimiento" (→ /finanzas).
+
+### Removed
+- **`StatusCardsRow`** (tarjetas de "Certificado Digital" y "Secuencias e-NCF · B01, B02, B14, B15"):
+  hardcodeadas y no representan uso real (B01/B02 son NCF físicos, no e-CF). Componente eliminado.
+- **Alerta "sin certificado"**: era ruido para quien no factura fiscalmente (onboarding con cédula). Se
+  conservan las accionables: certificado por vencer/vencido (solo si existe), facturas rechazadas,
+  secuencias por agotarse y reportes pendientes.
+- **Widget "Actividad DGII"**: redundante con Facturas recientes.
+
 ## [Finanzas · Transacciones + Export] — 2026-07-20 — Historial unificado y exportación
 
 Sobre el tablero de Finanzas: el historial ya no muestra solo movimientos manuales, sino un
