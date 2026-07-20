@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { JSX } from 'react'
-import { Plus, Send, Download } from 'lucide-react'
+import { Plus, Send, Download, Mail } from 'lucide-react'
 import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
 import { cn } from '@/lib/utils'
 
@@ -40,8 +40,8 @@ export function CotizacionesHeader({
       <div className="flex items-center gap-[8px]">
         {/* EDIT/PENCIL BUTTON - visible only in normal mode, slides/collapses left-to-right (origin-left) */}
         <div className={cn(
-          "transition-all duration-300 ease-in-out origin-left flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[44px] opacity-100 translate-x-0 scale-100"
+          "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+          isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[48px] opacity-100 translate-x-0 scale-100"
         )}>
           <EditActionButton
             onClick={onToggleSelectionMode}
@@ -52,36 +52,22 @@ export function CotizacionesHeader({
         {/* RELOAD/REFRESH BUTTON - always visible */}
         <RefreshActionButton onClick={onRefresh} isLoading={isRefreshing} />
 
-        {/* EXPORT BUTTON - visible only in selection mode, slides/expands right-to-left (origin-right) */}
+        {/* SELECTION ACTIONS CONTAINER */}
         <div className={cn(
-          "transition-all duration-300 ease-in-out origin-right flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-[120px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
+          "transition-all duration-300 ease-in-out origin-right flex items-center gap-[8px] overflow-hidden h-[52px] -my-1 -mx-0.5 px-0.5",
+          isSelectionMode ? "w-[503px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
         )}>
           <ExportActionButton onClick={onExport} disabled={selectedCount === 0} title="Exportar cotizaciones" className="w-[120px] justify-center" />
-        </div>
-
-        {/* ENVIAR BUTTON - visible only in selection mode, slides/expands right-to-left (origin-right) */}
-        <div className={cn(
-          "transition-all duration-300 ease-in-out origin-right flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-[110px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
-        )}>
           <button
             onClick={onBulkSend}
             disabled={selectedCount === 0}
             className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
           >
-            <Send size={14} className="text-[#64748b] shrink-0" />
+            <Mail size={14} className="text-[#64748b] shrink-0" />
             <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-              Enviar
+              Reenviar
             </span>
           </button>
-        </div>
-
-        {/* DESCARGAR BUTTON - visible only in selection mode, slides/expands right-to-left (origin-right) */}
-        <div className={cn(
-          "transition-all duration-300 ease-in-out origin-right flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-[135px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
-        )}>
           <button
             onClick={onBulkDownload}
             disabled={selectedCount === 0}
@@ -92,27 +78,18 @@ export function CotizacionesHeader({
               Descargar
             </span>
           </button>
-        </div>
-
-        {/* CANCELAR BUTTON - visible only in selection mode, slides/expands right-to-left (origin-right) */}
-        <div className={cn(
-          "transition-all duration-300 ease-in-out origin-right flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-[110px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
-        )}>
           <button
             onClick={onToggleSelectionMode}
-            className="h-[44px] px-[17px] flex items-center justify-center border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
+            className="h-[44px] px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
           >
-            <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-              Cancelar
-            </span>
+            Cancelar
           </button>
         </div>
 
         {/* NUEVA COTIZACIÓN BUTTON - visible only in normal mode, slides/collapses left-to-right (origin-left) */}
         <div className={cn(
-          "transition-all duration-300 ease-in-out origin-left flex items-center overflow-hidden h-[44px]",
-          isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[160px] opacity-100 translate-x-0 scale-100"
+          "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
+          isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[164px] opacity-100 translate-x-0 scale-100"
         )}>
           <button
             onClick={onNew}

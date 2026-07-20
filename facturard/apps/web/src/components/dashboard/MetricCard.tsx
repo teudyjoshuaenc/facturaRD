@@ -21,7 +21,15 @@ const MetricCard = React.memo(function MetricCard({ title, value, icon: Icon, ba
         </div>
       </div>
       <div className="flex items-baseline gap-2 mt-1">
-        <p className="text-h3 font-bold text-text-primary tracking-tight">{value}</p>
+        <p className={`font-bold text-text-primary tracking-tight ${
+          value.toString().length > 12
+            ? 'text-h5'
+            : value.toString().length > 10
+            ? 'text-h4'
+            : 'text-h3'
+        }`}>
+          {value}
+        </p>
         {badge}
       </div>
       {subtitle && (

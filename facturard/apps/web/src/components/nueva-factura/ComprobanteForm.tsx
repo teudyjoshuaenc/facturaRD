@@ -230,6 +230,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Popover states for quick mode
   const [showClientDropdown, setShowClientDropdown] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+  const clientSearchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showClientDropdown) {
+      setTimeout(() => {
+        clientSearchInputRef.current?.focus()
+      }, 50)
+    }
+  }, [showClientDropdown])
 
   const tipoECFOptions = useMemo(() => {
     return Object.entries(TIPO_ECF_LABELS).map(([key, label]) => {
@@ -453,8 +462,8 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
       {/* Selector de clase de documento (Fase 2) */}
       <div className={cn(
-        "mx-auto mb-4 w-full",
-        facturacionMode === 'estandar' ? "lg:w-[1336px]" : ""
+        "mx-auto mb-4 w-full text-left",
+        facturacionMode === 'estandar' ? "lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0" : ""
       )}>
         <div className="inline-flex rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-1 gap-1 select-none">
           {([
@@ -470,7 +479,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 onClick={() => !claseLocked && setEsFiscal(opt.val)}
                 className={cn(
                   "h-9 px-4 rounded-[9px] text-[13px] font-semibold transition-colors",
-                  active ? "bg-white text-[#0379D5] shadow-sm" : "text-[#64748B] hover:text-[#334155]",
+                  active ? "bg-[#0379D5] text-white shadow-sm" : "text-[#64748B] hover:text-[#334155]",
                   claseLocked && !active ? "opacity-40 cursor-not-allowed" : ""
                 )}
               >
@@ -490,14 +499,14 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       <div className={cn(
         "w-full",
         facturacionMode === 'estandar'
-          ? "flex flex-col lg:flex-row gap-[24px] lg:w-[1336px] lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
+          ? "flex flex-col lg:flex-row gap-[24px] lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0 lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
           : "grid grid-cols-1 gap-6 lg:grid-cols-3 h-full overflow-hidden"
       )}>
         {/* Left Column */}
         {facturacionMode === 'estandar' ? (
           <Card className={cn(
-            "w-full lg:w-[952px] p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
-            currentStep === 2 ? "lg:h-[810px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
+            "w-full lg:flex-1 lg:max-w-[952px] lg:min-w-0 p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
+            currentStep === 2 ? "lg:h-[850px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
           )}>
             {/* Stepper Wizard centered at top of the panel */}
             <div className="flex justify-center border-[#F5F5F5] pb-5 pt-0">
@@ -592,7 +601,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
         {/* Right Column */}
         <div className={cn(
           "h-full flex flex-col overflow-hidden",
-          facturacionMode === 'estandar' ? "w-full lg:w-[360px]" : "lg:col-span-1"
+          facturacionMode === 'estandar' ? "w-full lg:w-[360px] max-[1200px]:lg:w-[310px] shrink-0" : "lg:col-span-1"
         )}>
           {/* Rápido Mode Selectors (Client, Type, Date) above the card */}
           {facturacionMode === 'rapido' && (
@@ -622,6 +631,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                           <div className="flex items-center gap-3 flex-1">
                             <Search size={18} className="text-[#99A1AF] flex-shrink-0" />
                             <input
+                              ref={clientSearchInputRef}
                               type="text"
                               placeholder="Buscar cliente por nombre o RNC..."
                               value={clientSearch}
@@ -771,7 +781,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           <Card className={cn(
             "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300 gap-[16px] items-stretch p-[21px] relative",
             facturacionMode === 'estandar'
-              ? "w-[360px] shadow-sm h-auto lg:self-start"
+              ? "w-full shadow-sm h-auto lg:self-start"
               : "flex-1 shadow-sm overflow-y-auto h-full"
           )}>
             {/* Header */}
@@ -790,17 +800,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                 >
                   <Eye size={18} />
                 </button>
-                {esFiscal && (
-                  <button
-                    type="button"
-                    title="Guardar Borrador"
-                    onClick={() => handleSubmit(false)}
-                    disabled={submitting || isPlanExpired}
-                    className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Save size={17} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  title="Guardar Borrador"
+                  onClick={() => handleSubmit(false)}
+                  disabled={submitting || isPlanExpired}
+                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={17} />
+                </button>
               </div>
             </div>
 
@@ -848,6 +856,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             </div>
 
             <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Items Summary (List of added products) */}
+            {items.length > 0 && (
+              <>
+                <div className="flex flex-col gap-[10px] w-full text-[12px] text-[#475569] max-h-[160px] overflow-y-auto pr-1">
+                  {items.map((item, index) => {
+                    const itemSubtotal = item.cantidad * item.precioUnitarioItem
+                    return (
+                      <div key={item.key || index} className="flex items-start justify-between w-full gap-2 select-none">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-semibold text-[#334155] truncate text-[13px]" title={item.nombreItem || 'Ítem personalizado'}>
+                            {item.nombreItem || 'Ítem personalizado'}
+                          </span>
+                          <span className="text-[11px] text-[#64748B] mt-0.5">
+                            Cant: {item.cantidad} × {formatCurrency(item.precioUnitarioItem)}
+                          </span>
+                        </div>
+                        <span className="font-bold text-[#334155] shrink-0 text-right text-[13px] self-start mt-0.5">
+                          {formatCurrency(itemSubtotal)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <hr className="border-[#E2E8F0] my-0" />
+              </>
+            )}
 
             {/* Totals Summary breakdown */}
             <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] font-sans select-none">
@@ -994,25 +1029,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </button>
                 )}
 
-                {/* Guardar borrador — visible en modo estándar y solo fiscal. No exige
-                    certificado: es la vía para que un usuario NO certificado cree y
-                    guarde su factura como borrador (DRAFT). Sólo "Emitir e-CF" se bloquea. */}
-                {esFiscal && facturacionMode === 'estandar' && (
-                  <button
-                    type="button"
-                    disabled={submitting || isPlanExpired || items.length === 0}
-                    onClick={() => handleSubmit(false)}
-                    className={cn(
-                      "w-full h-[44px] rounded-[10px] border border-[#0379D5] bg-white text-[#0379D5] text-[15px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none",
-                      (submitting || isPlanExpired || items.length === 0)
-                        ? "opacity-40 cursor-not-allowed"
-                        : "hover:bg-[#0379D5]/5 cursor-pointer"
-                    )}
-                  >
-                    <Save size={15} className="text-[#0379D5]" />
-                    <span>Guardar borrador</span>
-                  </button>
-                )}
+
               </div>
 
               {/* Borrador & Limpiar buttons in quick mode */}

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check } from 'lucide-react'
+import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NuevoClienteModal } from './NuevoClienteModal'
 import { useContactos } from '@/hooks/useContactos'
@@ -128,7 +128,7 @@ export function StepCliente({
   isQuickMode,
   esFiscal = true,
 }: StepClienteProps): JSX.Element {
-  const { contactos: rawContactos, searchQuery, setSearchQuery, crearContacto } = useContactos()
+  const { contactos: rawContactos, crearContacto, searchQuery, setSearchQuery } = useContactos()
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
   const [clienteFocused, setClienteFocused] = useState(false)
@@ -170,10 +170,10 @@ export function StepCliente({
   const canProceed = !esFiscal
     ? true
     : (skipCliente || isE32UnderLimit || (selectedCliente !== null && isRncValid && isIdentificadorExtranjeroValid && isPaisCompradorValid)) &&
-      tipoPago &&
-      isTipoIngresoValid &&
-      isFechaLimiteValid &&
-      isReferenciaValid
+    tipoPago &&
+    isTipoIngresoValid &&
+    isFechaLimiteValid &&
+    isReferenciaValid
 
   async function handleNuevoCliente(data: NuevoContactoData): Promise<void> {
     try {
@@ -192,9 +192,8 @@ export function StepCliente({
   return (
     <>
       <div className="flex flex-col gap-6">
-        {/* Seleccionar cliente */}
         {!skipCliente && (
-          <div className="flex flex-col gap-4 w-[904px]">
+          <div className="flex flex-col gap-4 w-full max-w-[904px]">
             <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Seleccionar Cliente</h3>
 
             {isE32OverLimit && !selectedCliente && (
@@ -212,7 +211,7 @@ export function StepCliente({
             )}
 
             {/* Search and Button horizontally */}
-            <div className="flex gap-[12px] h-[44px] items-center">
+            <div className="flex gap-[12px] h-[44px] items-center relative select-none">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-[16px] top-1/2 -translate-y-1/2 text-[#94A3B8] z-50" />
                 <input
@@ -279,79 +278,79 @@ export function StepCliente({
                     )}
                   </div>
                 )}
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                size="md"
-                onClick={() => setShowNuevoCliente(true)}
-                className="h-[44px] w-[150px] bg-[#0379D5] hover:bg-[#0379D5]/90 rounded-[10px] text-[12px] font-semibold text-white flex items-center justify-center gap-2 whitespace-nowrap flex-shrink-0"
-              >
-                <Plus size={16} className="text-white" />
-                <span>Nuevo Cliente</span>
-              </Button>
             </div>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={() => setShowNuevoCliente(true)}
+              className="h-[44px] w-[150px] bg-[#0379D5] hover:bg-[#0379D5]/90 rounded-[10px] text-[12px] font-semibold text-white flex items-center justify-center gap-2 whitespace-nowrap flex-shrink-0"
+            >
+              <Plus size={16} className="text-white" />
+              <span>Nuevo Cliente</span>
+            </Button>
+          </div>
 
             {selectedCliente && isForeignerType && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full text-left mt-2 animate-in fade-in-50">
-                <div className="flex flex-col gap-[8px] items-start w-full">
-                  <div className="flex justify-between items-center w-full">
-                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
-                      Identificador Extranjero *
-                    </label>
-                    {!identificadorExtranjero && (
-                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
-                        Requerido
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Ej: ID-987654"
-                    value={identificadorExtranjero}
-                    onChange={(e) => onIdentificadorExtranjeroChange(e.target.value)}
-                    className={cn(
-                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
-                      !identificadorExtranjero ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-[8px] items-start w-full">
-                  <div className="flex justify-between items-center w-full">
-                    <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
-                      País del Comprador {isPaisCompradorRequired ? '*' : '(Opcional)'}
-                    </label>
-                    {isPaisCompradorRequired && !paisComprador && (
-                      <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
-                        Requerido
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Ej: US, ES, FR"
-                    value={paisComprador}
-                    onChange={(e) => onPaisCompradorChange(e.target.value)}
-                    className={cn(
-                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
-                      isPaisCompradorRequired && !paisComprador ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
-                  />
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full text-left mt-2 animate-in fade-in-50">
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                  Identificador Extranjero *
+                </label>
+                {!identificadorExtranjero && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                    Requerido
+                  </span>
+                )}
               </div>
-            )}
+              <input
+                type="text"
+                placeholder="Ej: ID-987654"
+                value={identificadorExtranjero}
+                onChange={(e) => onIdentificadorExtranjeroChange(e.target.value)}
+                className={cn(
+                  "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                  !identificadorExtranjero ? "border-danger-500" : "border-[#F5F5F5]"
+                )}
+              />
+            </div>
+
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">
+                  País del Comprador {isPaisCompradorRequired ? '*' : '(Opcional)'}
+                </label>
+                {isPaisCompradorRequired && !paisComprador && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">
+                    Requerido
+                  </span>
+                )}
+              </div>
+              <input
+                type="text"
+                placeholder="Ej: US, ES, FR"
+                value={paisComprador}
+                onChange={(e) => onPaisCompradorChange(e.target.value)}
+                className={cn(
+                  "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors focus:border-brand-500 focus:outline-none bg-white text-[#333333]",
+                  isPaisCompradorRequired && !paisComprador ? "border-danger-500" : "border-[#F5F5F5]"
+                )}
+              />
+            </div>
           </div>
+        )}
+      </div>
         )}
 
         {/* Identificación del Documento */}
-        <div className="flex flex-col gap-4 w-[904px]">
+        <div className="flex flex-col gap-4 w-full max-w-[904px]">
           <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
             {esFiscal ? 'Identificación del Documento' : 'Condiciones de pago (opcional)'}
           </p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 text-left select-none w-full">
-            
+
             {/* Tipo e-CF — solo documentos fiscales (una nota de venta no es un e-CF) */}
             {esFiscal && (
               <div className="flex flex-col gap-[8px] items-start w-full">
@@ -372,7 +371,7 @@ export function StepCliente({
                 <div className="flex justify-between items-center w-full select-none">
                   <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Ingreso</label>
                   {isTipoIngresoRequired && !tipoIngreso && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                   )}
                 </div>
                 {isTipoIngresoRequired ? (
@@ -396,25 +395,25 @@ export function StepCliente({
 
 
 
-            {/* Tipo de Pago */}
-            <div className="flex flex-col gap-[8px] items-start w-full">
-              <div className="flex justify-between items-center w-full select-none">
-                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Pago</label>
-                {!tipoPago && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
-                )}
-              </div>
-              <Select
-                value={tipoPago}
-                onChange={(val) => onTipoPagoChange(val as any)}
-                options={tipoPagoOptions}
-                placeholder="Seleccionar"
-                triggerClassName={cn(
-                  "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
-                  !tipoPago ? "border-danger-500" : "border-[#F5F5F5]"
-                )}
-              />
+          {/* Tipo de Pago */}
+          <div className="flex flex-col gap-[8px] items-start w-full">
+            <div className="flex justify-between items-center w-full select-none">
+              <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Pago</label>
+              {!tipoPago && (
+                <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
+              )}
             </div>
+            <Select
+              value={tipoPago}
+              onChange={(val) => onTipoPagoChange(val as any)}
+              options={tipoPagoOptions}
+              placeholder="Seleccionar"
+              triggerClassName={cn(
+                "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                !tipoPago ? "border-danger-500" : "border-[#F5F5F5]"
+              )}
+            />
+          </div>
 
             {/* Fecha Límite */}
             <div className="flex flex-col gap-[8px] items-start w-full">
@@ -426,7 +425,7 @@ export function StepCliente({
                   Fecha Límite {esFiscal && tipoPago === 'CREDITO' && '*'}
                 </label>
                 {esFiscal && tipoPago === 'CREDITO' && !fechaLimite && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <div
@@ -463,152 +462,152 @@ export function StepCliente({
               </div>
             </div>
 
-            {/* Término de Pago (Spans both columns) */}
-            <div className="flex flex-col gap-[8px] items-start w-full md:col-span-2">
-              <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Término de Pago</label>
-              <input
-                type="text"
-                placeholder="Ej: Neto 30 días"
-                value={terminoPago}
-                onChange={(e) => onTerminoPagoChange(e.target.value)}
-                className="flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] border-[#F5F5F5] bg-white px-[16px] text-[13px] font-normal text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none transition-colors"
-              />
-            </div>
-
+          {/* Término de Pago (Spans both columns) */}
+          <div className="flex flex-col gap-[8px] items-start w-full md:col-span-2">
+            <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Término de Pago</label>
+            <input
+              type="text"
+              placeholder="Ej: Neto 30 días"
+              value={terminoPago}
+              onChange={(e) => onTerminoPagoChange(e.target.value)}
+              className="flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] border-[#F5F5F5] bg-white px-[16px] text-[13px] font-normal text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none transition-colors"
+            />
           </div>
+
         </div>
+      </div>
 
         {/* Información de Referencia — solo fiscal (E33/E34); no aplica a notas */}
         {esFiscal && isReferenciaRequired && (
-          <div className="flex flex-col gap-4 w-[904px]">
+          <div className="flex flex-col gap-4 w-full max-w-[904px]">
             <p className="text-[12px] font-normal text-black/50 leading-[27px] font-sans text-left">
               Información de Referencia
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 text-left select-none w-full">
-              {/* NCF Modificado */}
-              <div className="flex flex-col gap-[8px] items-start w-full">
-                <div className="flex justify-between items-center w-full select-none">
-                  <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">NCF Modificado *</label>
-                  {!ncfModificado && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4 text-left select-none w-full">
+            {/* NCF Modificado */}
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full select-none">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">NCF Modificado *</label>
+                {!ncfModificado && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
+                )}
+              </div>
+              <input
+                type="text"
+                placeholder="B01 - Factura de Crédito Fiscal"
+                value={ncfModificado}
+                onChange={(e) => onNcfModificadoChange(e.target.value)}
+                className="flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] border-[#F5F5F5] bg-white px-[16px] text-[13px] font-normal text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none transition-colors"
+              />
+            </div>
+
+            {/* Código Modificación */}
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full select-none">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Código Modificación *</label>
+                {!codigoModificacion && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
+                )}
+              </div>
+              <Select
+                value={codigoModificacion}
+                onChange={onCodigoModificacionChange}
+                options={codigoModificacionOptions}
+                placeholder="Seleccionar"
+                triggerClassName={cn(
+                  "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
+                  !codigoModificacion ? "border-danger-500" : "border-[#F5F5F5]"
+                )}
+              />
+            </div>
+
+            {/* Fecha NCF Modificado */}
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full select-none">
+                <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Fecha NCF Modificado *</label>
+                {!fechaNCFModificado && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
+                )}
+              </div>
+              <div
+                onClick={() => {
+                  try {
+                    ncfModRef.current?.showPicker()
+                  } catch (e) {
+                    ncfModRef.current?.focus()
+                  }
+                }}
+                className="relative w-full cursor-pointer"
+              >
+                <div
+                  className={cn(
+                    "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors bg-white text-[#333333] select-none",
+                    !fechaNCFModificado ? "border-danger-500" : "border-[#F5F5F5]"
                   )}
+                >
+                  <span className={fechaNCFModificado ? "truncate text-[#333333]" : "truncate text-[#64748B]/70"}>
+                    {fechaNCFModificado ? formatDateSpanish(fechaNCFModificado) : 'DD/MM/AAAA'}
+                  </span>
                 </div>
                 <input
-                  type="text"
-                  placeholder="B01 - Factura de Crédito Fiscal"
-                  value={ncfModificado}
-                  onChange={(e) => onNcfModificadoChange(e.target.value)}
-                  className="flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] border-[#F5F5F5] bg-white px-[16px] text-[13px] font-normal text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none transition-colors"
-                />
-              </div>
-
-              {/* Código Modificación */}
-              <div className="flex flex-col gap-[8px] items-start w-full">
-                <div className="flex justify-between items-center w-full select-none">
-                  <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Código Modificación *</label>
-                  {!codigoModificacion && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
-                  )}
-                </div>
-                <Select
-                  value={codigoModificacion}
-                  onChange={onCodigoModificacionChange}
-                  options={codigoModificacionOptions}
-                  placeholder="Seleccionar"
-                  triggerClassName={cn(
-                    "h-[54.5px] border-[1.25px] bg-white text-[13px] text-[#64748B]",
-                    !codigoModificacion ? "border-danger-500" : "border-[#F5F5F5]"
-                  )}
-                />
-              </div>
-
-              {/* Fecha NCF Modificado */}
-              <div className="flex flex-col gap-[8px] items-start w-full">
-                <div className="flex justify-between items-center w-full select-none">
-                  <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Fecha NCF Modificado *</label>
-                  {!fechaNCFModificado && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
-                  )}
-                </div>
-                <div
-                  onClick={() => {
-                    try {
-                      ncfModRef.current?.showPicker()
-                    } catch (e) {
-                      ncfModRef.current?.focus()
-                    }
-                  }}
-                  className="relative w-full cursor-pointer"
-                >
-                  <div
-                    className={cn(
-                      "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors bg-white text-[#333333] select-none",
-                      !fechaNCFModificado ? "border-danger-500" : "border-[#F5F5F5]"
-                    )}
-                  >
-                    <span className={fechaNCFModificado ? "truncate text-[#333333]" : "truncate text-[#64748B]/70"}>
-                      {fechaNCFModificado ? formatDateSpanish(fechaNCFModificado) : 'DD/MM/AAAA'}
-                    </span>
-                  </div>
-                  <input
-                    ref={ncfModRef}
-                    type="date"
-                    value={fechaNCFModificado}
-                    onChange={(e) => onFechaNCFModificadoChange(e.target.value)}
-                    className="absolute -z-10 opacity-0 invisible w-0 h-0"
-                  />
-                </div>
-              </div>
-
-              {/* Indicador Nota de Crédito */}
-              <div className="flex flex-col gap-[8px] items-start w-full">
-                <div className="flex justify-between items-center w-full select-none">
-                  <label className={cn(
-                    "text-[12px] font-semibold uppercase font-sans transition-colors",
-                    tipoECF === 'E34' ? "text-[#333333]" : "text-[#333333]/50"
-                  )}>
-                    Indicador Nota de Crédito {tipoECF === 'E34' && '*'}
-                  </label>
-                  {tipoECF === 'E34' && !indicadorNotaCredito && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
-                  )}
-                </div>
-                <Select
-                  value={indicadorNotaCredito}
-                  disabled={tipoECF !== 'E34'}
-                  onChange={onIndicadorNotaCreditoChange}
-                  options={indicadorNotaOptions}
-                  placeholder="Seleccionar"
-                  triggerClassName={cn(
-                    "h-[54.5px] border-[1.25px] text-[13px]",
-                    tipoECF === 'E34'
-                      ? cn("bg-white text-[#64748B] focus:border-brand-500", !indicadorNotaCredito ? "border-danger-500" : "border-[#F5F5F5]")
-                      : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed select-none"
-                  )}
+                  ref={ncfModRef}
+                  type="date"
+                  value={fechaNCFModificado}
+                  onChange={(e) => onFechaNCFModificadoChange(e.target.value)}
+                  className="absolute -z-10 opacity-0 invisible w-0 h-0"
                 />
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Next button (full-width) */}
-        {!isQuickMode && (
-          <div className="flex justify-center w-[904px] h-[48px] mt-2">
-            <Button
-              type="button"
-              variant="primary"
-              size="lg"
-              disabled={!canProceed}
-              onClick={onNext}
-              className="w-full h-[48px] rounded-[14px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-[16px] font-normal font-sans text-white flex items-center justify-center gap-2"
-            >
-              <span>siguiente</span>
-              <ChevronRight size={16} className="text-white" />
-            </Button>
+            {/* Indicador Nota de Crédito */}
+            <div className="flex flex-col gap-[8px] items-start w-full">
+              <div className="flex justify-between items-center w-full select-none">
+                <label className={cn(
+                  "text-[12px] font-semibold uppercase font-sans transition-colors",
+                  tipoECF === 'E34' ? "text-[#333333]" : "text-[#333333]/50"
+                )}>
+                  Indicador Nota de Crédito {tipoECF === 'E34' && '*'}
+                </label>
+                {tipoECF === 'E34' && !indicadorNotaCredito && (
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
+                )}
+              </div>
+              <Select
+                value={indicadorNotaCredito}
+                disabled={tipoECF !== 'E34'}
+                onChange={onIndicadorNotaCreditoChange}
+                options={indicadorNotaOptions}
+                placeholder="Seleccionar"
+                triggerClassName={cn(
+                  "h-[54.5px] border-[1.25px] text-[13px]",
+                  tipoECF === 'E34'
+                    ? cn("bg-white text-[#64748B] focus:border-brand-500", !indicadorNotaCredito ? "border-danger-500" : "border-[#F5F5F5]")
+                    : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed select-none"
+                )}
+              />
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Next button (full-width) */}
+      {!isQuickMode && (
+        <div className="flex justify-center w-full max-w-[904px] h-[48px] mt-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            disabled={!canProceed}
+            onClick={onNext}
+            className="w-full h-[48px] rounded-[14px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-[16px] font-normal font-sans text-white flex items-center justify-center gap-2"
+          >
+            <span>siguiente</span>
+            <ChevronRight size={16} className="text-white" />
+          </Button>
+        </div>
+      )}
+    </div >
 
       <NuevoClienteModal
         open={showNuevoCliente}

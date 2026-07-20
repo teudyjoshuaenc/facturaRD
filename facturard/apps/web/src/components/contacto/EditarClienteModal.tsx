@@ -160,7 +160,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
   
   const showRncError = rncTouched && tipo !== 'CONSUMIDOR_FINAL' && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
   const validationError = tipo !== 'CONSUMIDOR_FINAL' && rncStatus === 'invalid' ? rncError : ''
-  const displayRncError = showRncError ? "Este campo es requerido" : validationError
+  const displayRncError = showRncError ? "Campo Requerido" : validationError
   const showNombreError = nombreTouched && !nombre.trim()
 
   const municipiosDisponibles = provincia ? (PROVINCIAS_MUNICIPIOS[provincia] || []) : []
@@ -266,7 +266,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
                 setNombreTouched(true)
               }}
               onBlur={() => setNombreTouched(true)}
-              {...(showNombreError ? { error: "Este campo es requerido" } : {})}
+              {...(showNombreError ? { error: "Campo Requerido" } : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
 

@@ -60,6 +60,15 @@ export function CotizacionForm(): JSX.Element {
   // Search dropdowns state
   const [clientSearch, setClientSearch] = useState('')
   const [showClientDropdown, setShowClientDropdown] = useState(false)
+  const clientSearchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (showClientDropdown) {
+      setTimeout(() => {
+        clientSearchInputRef.current?.focus()
+      }, 50)
+    }
+  }, [showClientDropdown])
 
   const [productSearch, setProductSearch] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
@@ -103,18 +112,18 @@ export function CotizacionForm(): JSX.Element {
   // Search filter for clients
   const filteredClientes = useMemo(() => {
     const q = clientSearch.toLowerCase().trim()
-    if (!q) return contactos
+    if (!q) return contactos.slice(0, 5)
     return contactos.filter(
       (c) =>
         c.nombre.toLowerCase().includes(q) ||
         c.rnc.toLowerCase().includes(q)
-    )
+    ).slice(0, 5)
   }, [contactos, clientSearch])
 
   // Search filter for products
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase().trim()
-    if (!q) return []
+    if (!q) return allProductos.slice(0, 5)
     return allProductos.filter(
       (p) =>
         p.nombre.toLowerCase().includes(q) ||
@@ -375,6 +384,7 @@ export function CotizacionForm(): JSX.Element {
                         <div className="flex items-center gap-3 flex-1">
                           <Search size={18} className="text-[#99A1AF] flex-shrink-0" />
                           <input
+                            ref={clientSearchInputRef}
                             type="text"
                             placeholder="Buscar cliente por nombre o RNC..."
                             value={clientSearch}
@@ -604,7 +614,7 @@ export function CotizacionForm(): JSX.Element {
                   className="w-full border border-[#E2E8F0] rounded-[10px] h-[44px] pl-10 pr-4 text-[14px] focus:outline-none focus:border-brand-500 transition-colors bg-white"
                 />
 
-                {productSearch.trim().length > 0 && showProductDropdown && (
+                {showProductDropdown && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowProductDropdown(false)} />
                     <div className="absolute left-0 mt-1.5 max-h-[248px] w-full overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 z-20 animate-in fade-in-50 duration-150">
@@ -797,7 +807,7 @@ export function CotizacionForm(): JSX.Element {
         </div>
 
         {/* Right Column (Fixed Resumen) */}
-        <div className="w-[360px] shrink-0 sticky top-0 h-fit">
+        <div className="w-[310px] [@media(min-width:1201px)]:w-[360px] shrink-0 sticky top-0 h-fit transition-all duration-300">
           <Card className="flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-[21px] gap-[16px] relative text-left">
             {/* Header */}
             <div className="flex items-center justify-between w-full select-none">
@@ -867,6 +877,33 @@ export function CotizacionForm(): JSX.Element {
             </div>
 
             <hr className="border-[#E2E8F0] my-0" />
+
+            {/* Items Summary (List of added products) */}
+            {items.length > 0 && (
+              <>
+                <div className="flex flex-col gap-[10px] w-full text-[12px] text-[#475569] max-h-[160px] overflow-y-auto pr-1">
+                  {items.map((item, index) => {
+                    const itemSubtotal = item.cantidad * item.precioUnitarioItem
+                    return (
+                      <div key={item.key || index} className="flex items-start justify-between w-full gap-2 select-none">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-semibold text-[#334155] truncate text-[13px]" title={item.nombreItem || 'Ítem personalizado'}>
+                            {item.nombreItem || 'Ítem personalizado'}
+                          </span>
+                          <span className="text-[11px] text-[#64748B] mt-0.5">
+                            Cant: {item.cantidad} × {formatCurrency(item.precioUnitarioItem)}
+                          </span>
+                        </div>
+                        <span className="font-bold text-[#334155] shrink-0 text-right text-[13px] self-start mt-0.5">
+                          {formatCurrency(itemSubtotal)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <hr className="border-[#E2E8F0] my-0" />
+              </>
+            )}
 
             {/* Totals Summary */}
             <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] select-none">

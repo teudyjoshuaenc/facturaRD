@@ -293,3 +293,30 @@ export function useComprobantes() {
     handleDownload,
   }
 }
+
+export interface Cumplimiento {
+  certificado: { existe: boolean; vigente: boolean; vencido: boolean; diasRestantes: number | null }
+  bloqueaEmision: boolean
+  puedeEmitir: boolean
+  motivoNoEmite: string
+  secuencias: Array<{ tipoECF: string; ultimaSecuencia: number; disponibles: number | null; porAgotarse: boolean; venceEn: string | null }>
+  comprobantesConProblema: { count: number; ids: string[] }
+  reportesPendientes: { periodo: string; pendientes: string[] }
+  indicadorGeneral: 'OK' | 'WARN' | 'CRITICAL'
+}
+
+export function useCumplimiento() {
+  const { data, isLoading, error } = useQuery<Cumplimiento>({
+    queryKey: ['cumplimiento'],
+    queryFn: () =>
+      api
+        .get<Cumplimiento>('/cumplimiento')
+        .then((res) => res.data),
+  })
+
+  return {
+    cumplimiento: data ?? null,
+    isLoading,
+    error,
+  }
+}

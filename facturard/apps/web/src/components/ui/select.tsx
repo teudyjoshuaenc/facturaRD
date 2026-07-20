@@ -79,7 +79,7 @@ export function Select({
           <div className="fixed inset-0 z-30" onClick={() => setIsOpen(false)} />
           <div className={cn(
             "absolute left-0 mt-1.5 max-h-[220px] overflow-y-auto rounded-[14px] border border-[#F3F4F6] bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] z-40 py-0 animate-in fade-in-50 duration-150",
-            !hasDropdownWidth && "w-full",
+            !hasDropdownWidth && "min-w-full w-max max-w-[320px]",
             dropdownClassName
           )}>
             {options.map((opt) => {
