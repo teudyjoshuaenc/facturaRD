@@ -2,6 +2,26 @@
 
 Todas las fechas en formato AAAA-MM-DD.
 
+## [Test harness] — 2026-07-20 — Endurecimiento del harness e2e (anti-flakiness)
+
+Deuda técnica del harness pagada antes de que la suite crezca. Sin cambios de producción.
+
+### Fixed
+- **Flakiness intermitente (fallos "404" al azar en distintos specs).** Root cause: read-after-write
+  entre conexiones del pool de Prisma dentro de un mismo archivo (un SELECT en otra conexión no veía la
+  fila recién escrita → parecía "no encontrado"). Fix: `?connection_limit=1` en la `DATABASE_URL` de
+  test (`test:e2e`) → todas las queries serializan en una conexión, consistencia estricta. Suite estable
+  (12+ corridas seguidas 133/133).
+- **Handles abiertos entre specs.** `ReceptorService` cierra su cliente ioredis en `onModuleDestroy`
+  (se dispara en `app.close()`); nuevo teardown por-archivo (`setupFilesAfterEnv`) desconecta el pool de
+  Prisma al terminar cada spec. La suite ahora **sale sola sin `--forceExit`** (se conserva el flag como
+  red de seguridad).
+
+### Changed
+- **Aislamiento entre specs.** Truncate por-archivo: `createTestApp()` limpia la base al arrancar cada
+  archivo (helper compartido `test/helpers/reset-db.ts`, lista de tablas centralizada, usada también por
+  `globalSetup`). Evita contaminación cruzada a medida que crecen los tests.
+
 ## [Sprint 13] — 2026-07-20 — Módulo Finanzas (flujo de caja: ingresos/egresos)
 
 Nuevo módulo NO fiscal para el tablero de flujo financiero. **Aislamiento fiscal total:**
