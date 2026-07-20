@@ -255,7 +255,7 @@ export function EditarProductoModal({
                 setNombreTouched(true)
               }}
               onBlur={() => setNombreTouched(true)}
-              {...(showNombreError ? { error: "Este campo es requerido" } : {})}
+              {...(showNombreError ? { error: "Campo Requerido" } : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
           </div>
@@ -293,7 +293,7 @@ export function EditarProductoModal({
                   setPrecioTouched(true)
                 }}
                 onBlur={() => setPrecioTouched(true)}
-                {...(showPrecioError ? { error: "Este campo es requerido" } : {})}
+                {...(showPrecioError ? { error: "Campo Requerido" } : {})}
                 className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
               />
             </div>

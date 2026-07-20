@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -114,6 +114,14 @@ export default function ContactosPage(): JSX.Element {
   const [soloSinRnc, setSoloSinRnc] = useState(false)
   const [page, setPage] = useState(1)
   const [openModal, setOpenModal] = useState(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('new=true')) {
+      setOpenModal(true)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('new')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [])
   const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
   const [editingContacto, setEditingContacto] = useState<any | null>(null)
   const [togglingContacto, setTogglingContacto] = useState<any | null>(null)

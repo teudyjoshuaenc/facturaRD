@@ -8,8 +8,9 @@ import { MetricCard } from '@/components/dashboard/MetricCard'
 import { StatusCardsRow } from '@/components/dashboard/StatusCardsRow'
 import { FacturasTable } from '@/components/dashboard/FacturasTable'
 import { Button } from '@/components/ui/button'
-import { useDashboardComprobantes, useMonthMetrics } from '@/hooks/useComprobantes'
+import { useDashboardComprobantes, useMonthMetrics, useCumplimiento } from '@/hooks/useComprobantes'
 import { useCertificadoStatus } from '@/hooks/useCertificado'
+import { Spinner } from '@/components/ui/spinner'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
 
 function monthRange(): { fechaDesde: string; fechaHasta: string } {
@@ -35,10 +36,104 @@ export default function DashboardPage(): JSX.Element {
 
   const { diasParaVencer } = useCertificadoStatus()
 
+  const { cumplimiento, isLoading: complianceLoading } = useCumplimiento()
+
+  // Dynamic alerts
+  const alerts = []
+  if (cumplimiento) {
+    const { certificado, comprobantesConProblema, secuencias, reportesPendientes } = cumplimiento
+    if (!certificado.existe) {
+      alerts.push({
+        id: 'no-cert',
+        type: 'critical',
+        message: 'No se ha cargado un certificado digital activo',
+        time: 'Urgente',
+        path: '/certificado-digital',
+      })
+    } else if (certificado.vencido) {
+      alerts.push({
+        id: 'cert-vencido',
+        type: 'critical',
+        message: 'Certificado digital vencido',
+        time: 'Urgente',
+        path: '/certificado-digital',
+      })
+    } else if (certificado.diasRestantes !== null && certificado.diasRestantes <= 60) {
+      alerts.push({
+        id: 'cert-expira',
+        type: certificado.diasRestantes <= 15 ? 'critical' : 'warning',
+        message: `Certificado digital expira en ${certificado.diasRestantes} días`,
+        time: 'Urgente',
+        path: '/certificado-digital',
+      })
+    }
+
+    if (comprobantesConProblema?.count > 0) {
+      alerts.push({
+        id: 'rechazos',
+        type: 'critical',
+        message: `${comprobantesConProblema.count} factura(s) rechazada(s) por DGII`,
+        time: 'Reciente',
+        path: '/facturas?estado=RECHAZADO',
+      })
+    }
+
+    secuencias?.forEach((s) => {
+      if (s.porAgotarse) {
+        alerts.push({
+          id: `sec-${s.tipoECF}`,
+          type: 'warning',
+          message: `Secuencia ${s.tipoECF} por vencer o agotarse`,
+          time: 'Reciente',
+          path: '/cumplimiento',
+        })
+      }
+    })
+
+    if (reportesPendientes?.pendientes?.length > 0) {
+      alerts.push({
+        id: 'reportes-pendientes',
+        type: 'warning',
+        message: `Reportes pendientes del período: ${reportesPendientes.pendientes.join(', ')}`,
+        time: 'Pendiente',
+        path: '/cumplimiento',
+      })
+    }
+  }
+
+  // Dynamic DGII activities
+  const activities = comprobantes.slice(0, 5).map((c) => {
+    let color = 'bg-blue-500'
+    let statusText = 'en proceso'
+
+    if (c.estado === 'ACEPTADO') {
+      color = 'bg-green-500'
+      statusText = 'aceptada'
+    } else if (c.estado === 'ACEPTADO_CONDICIONAL') {
+      color = 'bg-warning-500'
+      statusText = 'aceptada c/obs'
+    } else if (c.estado === 'RECHAZADO') {
+      color = 'bg-red-500'
+      statusText = 'rechazada'
+    }
+
+    const date = new Date(c.createdAt)
+    const time = isNaN(date.getTime())
+      ? '—:—'
+      : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+
+    return {
+      id: c.id,
+      time,
+      msg: `${c.eNCF || 'e-CF'} ${statusText}`,
+      color,
+    }
+  })
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 items-start text-left">
       {/* Column 1: Main Operation Dashboard (Span 3 on large screens) */}
-      <div className="lg:col-span-3 flex flex-col gap-6">
+      <div className="lg:col-span-3 flex flex-col gap-6 min-w-0">
         {/* Status cards row */}
         <StatusCardsRow
           dgiiConectado={diasParaVencer !== null}
@@ -106,58 +201,56 @@ export default function DashboardPage(): JSX.Element {
         <div className="rounded-xl border border-border bg-white shadow-sm p-4 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-body-sm font-bold text-text-primary">Alertas</h3>
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-50 text-[10px] font-bold text-danger-600">
-              4
-            </span>
+            {alerts.length > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-50 text-[10px] font-bold text-danger-600">
+                {alerts.length}
+              </span>
+            )}
           </div>
           <div className="flex flex-col gap-2.5">
-            {/* Alerta 1 */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-danger-50/50 border border-danger-100/50 hover:bg-danger-50 transition-colors cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-danger-100 text-danger-600 flex-shrink-0">
-                  <AlertCircle size={15} />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-ui-xs font-semibold text-danger-700 leading-tight">
-                    Certificado digital expira en 3 días
-                  </span>
-                  <span className="text-[10px] text-danger-600/70 font-medium">Hace 1h</span>
-                </div>
+            {complianceLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Spinner size={16} />
               </div>
-              <ChevronRight size={14} className="text-danger-400 flex-shrink-0" />
-            </div>
-
-            {/* Alerta 2 */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-danger-50/50 border border-danger-100/50 hover:bg-danger-50 transition-colors cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-danger-100 text-danger-600 flex-shrink-0">
-                  <AlertCircle size={15} />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-ui-xs font-semibold text-danger-700 leading-tight">
-                    2 facturas rechazadas por DGII
-                  </span>
-                  <span className="text-[10px] text-danger-600/70 font-medium">Hace 2h</span>
-                </div>
+            ) : alerts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-5 text-center bg-green-50/20 border border-green-100/50 rounded-lg">
+                <span className="text-[12px] font-semibold text-green-700">¡Todo al día!</span>
+                <span className="text-[10px] text-green-600/70 font-medium mt-0.5">No hay alertas fiscales activas</span>
               </div>
-              <ChevronRight size={14} className="text-danger-400 flex-shrink-0" />
-            </div>
-
-            {/* Alerta 3 */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-warning-50/50 border border-warning-100/50 hover:bg-warning-50 transition-colors cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-warning-100 text-warning-600 flex-shrink-0">
-                  <AlertTriangle size={15} />
+            ) : (
+              alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  onClick={() => router.push(alert.path)}
+                  className={`flex items-center justify-between p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                    alert.type === 'critical'
+                      ? 'bg-danger-50/50 border-danger-100/50 hover:bg-danger-50'
+                      : 'bg-warning-50/50 border-warning-100/50 hover:bg-warning-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
+                      alert.type === 'critical' ? 'bg-danger-100 text-danger-600' : 'bg-warning-100 text-warning-600'
+                    }`}>
+                      {alert.type === 'critical' ? <AlertCircle size={15} /> : <AlertTriangle size={15} />}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className={`text-ui-xs font-semibold leading-tight truncate ${
+                        alert.type === 'critical' ? 'text-danger-700' : 'text-warning-700'
+                      }`}>
+                        {alert.message}
+                      </span>
+                      <span className={`text-[10px] font-medium ${
+                        alert.type === 'critical' ? 'text-danger-600/70' : 'text-warning-600/70'
+                      }`}>
+                        {alert.time}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className={alert.type === 'critical' ? 'text-danger-400 flex-shrink-0' : 'text-warning-400 flex-shrink-0'} />
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-ui-xs font-semibold text-warning-700 leading-tight">
-                    Fecha límite reporte mensual: 28 abril
-                  </span>
-                  <span className="text-[10px] text-warning-600/70 font-medium">Hace 5h</span>
-                </div>
-              </div>
-              <ChevronRight size={14} className="text-warning-400 flex-shrink-0" />
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -166,15 +259,15 @@ export default function DashboardPage(): JSX.Element {
           <h3 className="text-body-sm font-bold text-text-primary">Acciones Rápidas</h3>
           <div className="flex flex-col gap-2">
             {[
-              { label: 'Factura de Crédito Fiscal (B01)', mode: 'estandar' },
-              { label: 'Factura de Consumo (B02)', mode: 'estandar' },
-              { label: 'Nota de Débito (B03)', mode: 'estandar' },
-              { label: 'Factura Gubernamental (B14)', mode: 'estandar' },
+              { label: 'Crear factura', path: '/nueva-factura' },
+              { label: 'Crear cotización', path: '/cotizaciones/nueva' },
+              { label: 'Agregar contacto', path: '/contacto?new=true' },
+              { label: 'Agregar producto', path: '/producto?new=true' },
             ].map((action, idx) => (
               <button
                 key={idx}
                 type="button"
-                onClick={() => router.push('/nueva-factura')}
+                onClick={() => router.push(action.path)}
                 className="w-full text-left px-3.5 py-2.5 border border-neutral-100 hover:border-brand-300 hover:bg-neutral-50/50 hover:text-brand-600 rounded-lg text-ui-sm font-semibold text-text-primary transition-all duration-200"
               >
                 {action.label}
@@ -187,23 +280,28 @@ export default function DashboardPage(): JSX.Element {
         <div className="rounded-xl border border-border bg-white shadow-sm p-4 flex flex-col gap-4">
           <h3 className="text-body-sm font-bold text-text-primary">Actividad DGII</h3>
           <div className="flex flex-col gap-3.5 pl-2 relative border-l border-neutral-100 ml-1">
-            {[
-              { time: '14:32', msg: 'B0100000147 aceptada', color: 'bg-green-500' },
-              { time: '14:30', msg: 'B0100000146 aceptada', color: 'bg-green-500' },
-              { time: '13:45', msg: 'B0100000145 en proceso', color: 'bg-blue-500' },
-              { time: '12:10', msg: 'B0100000144 rechazada', color: 'bg-red-500' },
-            ].map((activity, idx) => (
-              <div key={idx} className="flex items-center gap-3 relative">
-                {/* Timeline dot */}
-                <div className={`absolute -left-[13px] h-2 w-2 rounded-full ${activity.color} ring-4 ring-white`} />
-                <span className="text-[10px] font-bold text-text-secondary leading-none">
-                  {activity.time}
-                </span>
-                <span className="text-ui-xs font-semibold text-text-primary truncate leading-none">
-                  {activity.msg}
-                </span>
+            {tableLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Spinner size={16} />
               </div>
-            ))}
+            ) : activities.length === 0 ? (
+              <div className="text-[11px] text-text-secondary italic pl-1">
+                No hay actividad reciente
+              </div>
+            ) : (
+              activities.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-3 relative">
+                  {/* Timeline dot */}
+                  <div className={`absolute -left-[13px] h-2 w-2 rounded-full ${activity.color} ring-4 ring-white`} />
+                  <span className="text-[10px] font-bold text-text-secondary leading-none">
+                    {activity.time}
+                  </span>
+                  <span className="text-ui-xs font-semibold text-text-primary truncate leading-none">
+                    {activity.msg}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -73,6 +73,8 @@ export function FacturaFilters({
 }: Props): JSX.Element {
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
+  const minAmountRef = useRef<HTMLInputElement>(null)
+  const maxAmountRef = useRef<HTMLInputElement>(null)
 
   return (
     <div className="flex flex-col gap-[12px] bg-white p-[17px] rounded-[14px] border border-[#e4e7ec] shadow-sm w-full font-sans">
@@ -177,25 +179,35 @@ export function FacturaFilters({
 
         {/* Price Range Input Group */}
         <div className="flex w-full sm:flex-1 sm:min-w-[180px] h-[44px] items-center rounded-[10px] border border-[#e2e8f0] bg-white px-[10px] gap-1">
-          <div className="flex-1 min-w-0 flex items-center gap-[2px] text-[13px] text-[#99a1af]">
+          <div
+            onClick={() => minAmountRef.current?.focus()}
+            className="flex-1 min-w-0 flex items-center justify-end gap-[2px] text-[13px] text-[#99a1af] cursor-text"
+          >
             <span className="select-none font-normal">$</span>
             <input
+              ref={minAmountRef}
               type="number"
               placeholder="Mín"
               value={minAmount}
               onChange={(e) => onMinAmountChange(e.target.value)}
-              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af] min-w-0"
+              className="text-[13px] text-[#333333] bg-transparent focus:outline-none placeholder:text-[#99a1af] text-left px-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              style={{ width: `${Math.max(3, minAmount.length) + 0.5}ch` }}
             />
           </div>
           <span className="text-[#99a1af] select-none text-[14px] leading-none px-0.5">–</span>
-          <div className="flex-1 min-w-0 flex items-center gap-[2px] text-[13px] text-[#99a1af]">
+          <div
+            onClick={() => maxAmountRef.current?.focus()}
+            className="flex-1 min-w-0 flex items-center justify-start gap-[2px] text-[13px] text-[#99a1af] cursor-text"
+          >
             <span className="select-none font-normal">$</span>
             <input
+              ref={maxAmountRef}
               type="number"
               placeholder="Máx"
               value={maxAmount}
               onChange={(e) => onMaxAmountChange(e.target.value)}
-              className="text-[13px] text-[#333333] bg-transparent focus:outline-none w-full placeholder:text-[#99a1af] min-w-0"
+              className="text-[13px] text-[#333333] bg-transparent focus:outline-none placeholder:text-[#99a1af] text-left px-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              style={{ width: `${Math.max(3, maxAmount.length) + 0.5}ch` }}
             />
           </div>
         </div>

@@ -371,7 +371,7 @@ export function StepCliente({
                 <div className="flex justify-between items-center w-full select-none">
                   <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Ingreso</label>
                   {isTipoIngresoRequired && !tipoIngreso && (
-                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                    <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                   )}
                 </div>
                 {isTipoIngresoRequired ? (
@@ -400,7 +400,7 @@ export function StepCliente({
             <div className="flex justify-between items-center w-full select-none">
               <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Pago</label>
               {!tipoPago && (
-                <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
               )}
             </div>
             <Select
@@ -425,7 +425,7 @@ export function StepCliente({
                   Fecha Límite {esFiscal && tipoPago === 'CREDITO' && '*'}
                 </label>
                 {esFiscal && tipoPago === 'CREDITO' && !fechaLimite && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <div
@@ -490,7 +490,7 @@ export function StepCliente({
               <div className="flex justify-between items-center w-full select-none">
                 <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">NCF Modificado *</label>
                 {!ncfModificado && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <input
@@ -507,7 +507,7 @@ export function StepCliente({
               <div className="flex justify-between items-center w-full select-none">
                 <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Código Modificación *</label>
                 {!codigoModificacion && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <Select
@@ -527,7 +527,7 @@ export function StepCliente({
               <div className="flex justify-between items-center w-full select-none">
                 <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Fecha NCF Modificado *</label>
                 {!fechaNCFModificado && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <div
@@ -570,7 +570,7 @@ export function StepCliente({
                   Indicador Nota de Crédito {tipoECF === 'E34' && '*'}
                 </label>
                 {tipoECF === 'E34' && !indicadorNotaCredito && (
-                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Este campo es requerido</span>
+                  <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <Select

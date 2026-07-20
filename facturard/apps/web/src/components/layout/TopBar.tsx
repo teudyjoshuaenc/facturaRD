@@ -66,10 +66,22 @@ export function TopBar({
 
         {/* Certificado status chip */}
         {!isEmitir && certDias !== null && (
-          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50/50 px-2.5 py-1 text-ui-xs font-semibold text-orange-700">
-            <ShieldCheck size={13} className="text-orange-600" />
-            Certificado <span className="text-orange-600 font-bold">{certDias} días</span>
-          </span>
+          (() => {
+            const isRed = certDias < 15
+            const isOrange = certDias < 60
+            const colorClass = isRed
+              ? 'border-red-200 bg-red-50/50 text-red-700'
+              : isOrange
+              ? 'border-orange-200 bg-orange-50/50 text-orange-700'
+              : 'border-green-200 bg-green-50/50 text-green-700'
+            const iconClass = isRed ? 'text-red-600' : isOrange ? 'text-orange-600' : 'text-green-600'
+            return (
+              <span className={`hidden lg:inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-ui-xs font-semibold ${colorClass}`}>
+                <ShieldCheck size={13} className={iconClass} />
+                Certificado <span className="font-bold">{certDias} días</span>
+              </span>
+            )
+          })()
         )}
       </div>
     </header>
