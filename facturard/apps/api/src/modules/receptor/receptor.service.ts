@@ -5,7 +5,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common'
-import { Inject } from '@nestjs/common'
+import { Inject, OnModuleDestroy } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { Redis } from 'ioredis'
 import { randomUUID } from 'crypto'
@@ -96,7 +96,7 @@ function buildArecfXml(
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable()
-export class ReceptorService {
+export class ReceptorService implements OnModuleDestroy {
   private readonly logger = new Logger(ReceptorService.name)
 
   constructor(
@@ -104,6 +104,16 @@ export class ReceptorService {
     private readonly jwtService: JwtService,
     private readonly certificadosService: CertificadosService,
   ) {}
+
+  /**
+   * Cierra la conexión Redis al destruir el módulo (lo dispara `app.close()`).
+   * Sin esto, el cliente ioredis (lazyConnect) queda como handle abierto entre
+   * specs e2e y se acumula a lo largo de la suite. `disconnect()` es síncrono y
+   * seguro aunque la conexión nunca se haya abierto.
+   */
+  onModuleDestroy(): void {
+    this.redis.disconnect()
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // TAREA 1A — Generar semilla

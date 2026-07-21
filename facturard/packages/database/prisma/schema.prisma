@@ -55,6 +55,30 @@ enum ComprobanteEstado {
   INTERNO
 }
 
+// ─── Finanzas (módulo de flujo de caja — NO fiscal) ──────────────────────────
+// Estas tablas son 100% lectura/registro contable interno. NUNCA participan del
+// ciclo DGII: no consumen e-NCF, no firman, no tocan estados de comprobantes.
+
+enum MovimientoTipo {
+  INGRESO
+  EGRESO
+}
+
+enum MovimientoCategoria {
+  NOMINA
+  ALQUILER
+  SERVICIOS
+  PRESTAMO
+  APORTE_CAPITAL
+  IMPUESTOS
+  OTROS
+}
+
+enum PagoTipo {
+  COBRO // entra dinero — sobre una factura (comprobante)
+  PAGO  // sale dinero  — sobre una compra
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model Tenant {
@@ -95,6 +119,9 @@ model Tenant {
   contactos            Contacto[]
   cotizaciones         Cotizacion[]
   comprasRecibidas     CompraRecibida[]
+  movimientos          MovimientoFinanciero[]
+  pagos                Pago[]
+  capitalInicial       CapitalInicial?
 
   @@map("tenants")
 }
@@ -118,6 +145,7 @@ model CompraRecibida {
   updatedAt            DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+  pagos  Pago[] // relación virtual — no agrega columnas a esta tabla fiscal
 
   @@index([tenantId, fechaComprobante])
   @@map("compras_recibidas")
@@ -321,6 +349,7 @@ model Comprobante {
   updatedAt    DateTime          @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+  pagos  Pago[] // relación virtual — no agrega columnas a esta tabla fiscal
 
   @@unique([tenantId, eNCF])
   @@unique([tenantId, folioInterno])
@@ -426,4 +455,68 @@ model Secuencia {
   @@unique([tenantId, tipoECF])
   @@index([tenantId, activo])
   @@map("secuencias")
+}
+
+// ─── Finanzas ────────────────────────────────────────────────────────────────
+
+// Movimiento manual de caja (nómina, alquiler, aporte de capital, impuestos…).
+// No deriva de ningún documento fiscal.
+model MovimientoFinanciero {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tipo        MovimientoTipo
+  categoria   MovimientoCategoria
+  monto       Decimal             @db.Decimal(18, 2)
+  moneda      String              @default("DOP")
+  fecha       DateTime
+  descripcion String?
+  metodoPago  String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, fecha])
+  @@map("movimientos_financieros")
+}
+
+// Cobro (sobre una factura) o pago (sobre una compra). Es SÓLO una referencia
+// contable: registrar un Pago NO modifica el estado DGII ni ningún campo del
+// comprobante/compra. Soporta pagos parciales (varios Pago por documento).
+model Pago {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tipo          PagoTipo
+  comprobanteId String? // FK a la factura si es COBRO
+  compraId      String? // FK a la compra si es PAGO
+  monto         Decimal  @db.Decimal(18, 2)
+  moneda        String   @default("DOP")
+  fecha         DateTime
+  metodoPago    String?
+  createdAt     DateTime @default(now())
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  comprobante Comprobante?    @relation(fields: [comprobanteId], references: [id])
+  compra      CompraRecibida? @relation(fields: [compraId], references: [id])
+
+  @@index([tenantId, fecha])
+  @@index([comprobanteId])
+  @@index([compraId])
+  @@map("pagos")
+}
+
+// Saldo de partida del negocio (uno por tenant). Punto de arranque del capital
+// acumulado.
+model CapitalInicial {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  monto     Decimal  @db.Decimal(18, 2)
+  moneda    String   @default("DOP")
+  fecha     DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("capital_inicial")
 }

@@ -15,6 +15,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: 'Resumen de tu operación del mes' },
   '/facturas': { title: 'Facturas', subtitle: 'Historial de comprobantes fiscales electrónicos' },
   '/cotizaciones': { title: 'Cotizaciones', subtitle: 'Presupuestos y cotizaciones de clientes' },
+  '/finanzas': { title: 'Finanzas', subtitle: 'Flujo de caja: ingresos, egresos y capital' },
   '/compras': { title: 'Recepción y Compras', subtitle: 'Gastos y comprobantes recibidos de proveedores' },
   '/nueva-factura': {
     title: 'Crear factura',

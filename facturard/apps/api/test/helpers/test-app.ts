@@ -1,8 +1,10 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { getQueueToken } from '@nestjs/bullmq'
+import { prisma } from '@facturard/database'
 import { AppModule } from '../../src/app.module'
 import { EcfEmissionProcessor } from '../../src/modules/comprobantes/ecf-emission.processor'
+import { resetDatabase } from './reset-db'
 
 export interface TestContext {
   app: INestApplication
@@ -21,6 +23,11 @@ export interface ProviderOverride { provide: any; useValue: any }
  * `overrides` permite mockear servicios adicionales (p.ej. DgiiContribuyentesService).
  */
 export async function createTestApp(overrides: ProviderOverride[] = []): Promise<TestContext> {
+  // Limpia la base al arrancar cada archivo de test (aislamiento entre specs en
+  // la corrida in-band con base compartida). Los fixtures que cada spec crea
+  // después en su beforeAll sobreviven, porque esto corre primero.
+  await resetDatabase(prisma)
+
   const queueAdd = jest.fn().mockResolvedValue({ id: 'test-job' })
 
   let builder = Test.createTestingModule({ imports: [AppModule] })
