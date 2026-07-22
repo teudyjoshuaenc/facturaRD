@@ -62,13 +62,11 @@ export function useNuevaFactura() {
       if (data.condicionPago === 'CREDITO') backendTipoPago = 2
       else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
 
-      // Nota de venta interna: se manda esFiscal=false y NO emitir (no aplica).
-      const esNota = data.esFiscal === false
-
       const res = await api.post<{ id: string; eNCF: string; montoTotal: number }>('/comprobantes', {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
-        ...(esNota ? { esFiscal: false } : { emitir: data.emitirConComprobante }),
+        ...(data.esFiscal !== undefined && { esFiscal: data.esFiscal }),
+        ...(data.emitirConComprobante !== undefined && { emitir: data.emitirConComprobante }),
         ...(tiposConTipoIngresos.includes(data.tipoECF) && data.tipoIngresos && { tipoIngresos: data.tipoIngresos }),
         ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),

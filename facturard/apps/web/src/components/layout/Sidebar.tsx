@@ -49,12 +49,15 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
   
   // Collapse preference state persisted in localStorage
   const [collapsed, setCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Initialize collapse preference and handle window resizing dynamically
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleResize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
       if (window.innerWidth < 1201) {
         setCollapsed(true)
       } else {
@@ -77,6 +80,8 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
       return next
     })
   }
+
+  const isEffectiveCollapsed = isMobile ? false : collapsed
 
   const showWip = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_SHOW_WIP_TABS === 'true'
   const visibleOperacionItems = OPERACION_ITEMS.filter((item) => !('wip' in item && item.wip) || showWip)
@@ -101,16 +106,16 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           'fixed inset-y-0 left-0 z-50 w-64 md:static md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           // Tablet/Desktop width based on collapse state
-          collapsed ? 'md:w-[76px]' : 'md:w-[280px]'
+          collapsed ? 'md:w-[76px]' : 'md:w-[215px]'
         )}
       >
         {/* Top Header Section (Logo + Chevron Toggle) */}
         <div className={cn(
           "w-full h-[68px] border-b border-[rgba(10,10,10,0.08)] flex items-center shrink-0 select-none transition-all duration-300",
-          collapsed ? "justify-center px-0" : "justify-between px-[24px]"
+          isEffectiveCollapsed ? "justify-center px-0" : "justify-between px-[18px]"
         )}>
           {/* Show Figma Logo when expanded */}
-          {!collapsed && (
+          {!isEffectiveCollapsed && (
             <div className="flex-1 truncate pr-2">
               <img
                 src="/assets/22b4dc8b6ae6de4c06772d04d2c2aa7596c38f4a.svg"
@@ -157,11 +162,11 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
         {/* Scrollable Navigation Area */}
         <div className={cn(
           "flex flex-col gap-4 flex-1 select-none px-[16px] py-[16px]",
-          collapsed ? "overflow-visible" : "overflow-y-auto"
+          isEffectiveCollapsed ? "overflow-visible" : "overflow-y-auto"
         )}>
           {/* Navigation group: OPERACION */}
           <div className="flex flex-col gap-2 w-full">
-            {!collapsed && (
+            {!isEffectiveCollapsed && (
               <span className="px-3 text-[10px] font-bold text-[#667085] tracking-[0.8px] uppercase font-sans">
                 Operación
               </span>
@@ -174,14 +179,15 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                   iconPath={item.iconPath}
                   label={item.label}
                   active={isRouteActive(activeRoute, item.href)}
-                  collapsed={collapsed}
+                  collapsed={isEffectiveCollapsed}
+                  onClick={() => setSidebarOpen(false)}
                 />
               ))}
             </nav>
           </div>
 
           {/* Divider line using original SVG image (Only in collapsed mode) */}
-          {collapsed && (
+          {isEffectiveCollapsed && (
             <div
               className="h-[1px] relative shrink-0 w-[29px] mx-auto my-1"
               style={{
@@ -194,7 +200,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
 
           {/* Navigation group: SISTEMA */}
           <div className="flex flex-col gap-2 w-full">
-            {!collapsed && (
+            {!isEffectiveCollapsed && (
               <span className="px-3 text-[10px] font-bold text-[#667085] tracking-[0.8px] uppercase font-sans">
                 Sistema
               </span>
@@ -207,7 +213,8 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                   iconPath={item.iconPath}
                   label={item.label}
                   active={isRouteActive(activeRoute, item.href)}
-                  collapsed={collapsed}
+                  collapsed={isEffectiveCollapsed}
+                  onClick={() => setSidebarOpen(false)}
                 />
               ))}
             </nav>

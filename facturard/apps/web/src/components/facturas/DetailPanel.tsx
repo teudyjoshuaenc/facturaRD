@@ -26,6 +26,7 @@ import {
 } from '@/lib/comprobantes'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 
 interface DetailPanelProps {
   open: boolean
@@ -261,12 +262,12 @@ export function DetailPanel({
             {/* Items Section: Figma h=87. Label 10px, card bg-f8fafc rounded-10 p-12 h=62 */}
             {items.length > 0 && (
               <div className="flex flex-col gap-[8px] items-start text-left w-full">
-                <span className="text-[10px] font-semibold text-[#64748b] tracking-[0.44px] leading-[16.5px] uppercase">DETALLE</span>
-                <div className="flex flex-col gap-2 w-full">
+                <span className="text-[10px] font-semibold text-[#64748b] tracking-[0.44px] leading-[16.5px] uppercase">DETALLE ({items.length})</span>
+                <div className={cn("flex flex-col gap-2 w-full", items.length > 3 && "max-h-[204px] overflow-y-auto pr-1")}>
                   {items.map((it: any, index: number) => (
                     <div key={index} className="bg-[#f8fafc] rounded-[10px] p-[12px] flex items-center justify-between w-full">
                       <div className="flex flex-col items-start min-w-0 max-w-[143px]">
-                        <span className="text-[13px] font-normal text-[#333] leading-[19.5px] line-clamp-2 break-words">
+                        <span className="text-[13px] font-normal text-[#333] leading-[19.5px] truncate w-full block" title={it.nombreItem}>
                           {it.nombreItem}
                         </span>
                         <span className="text-[12px] font-normal text-[#64748b] leading-[18px] whitespace-nowrap">

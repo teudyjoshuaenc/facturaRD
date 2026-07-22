@@ -22,14 +22,18 @@ function NuevaFacturaContent(): JSX.Element {
       // 1. Update the draft/nota with the corrected values first
       await updateComprobante(draftId, data)
 
-      if (esNota) {
-        toast.success('Nota de venta actualizada exitosamente')
+      if (data.emitirConComprobante === false) {
+        toast.success(esNota ? 'Borrador de nota de venta actualizado' : 'Borrador actualizado exitosamente')
         router.push('/facturas')
-      } else if (data.emitirConComprobante === false) {
-        toast.success('Borrador actualizado exitosamente')
+      } else if (esNota) {
+        // Transition draft to final internal Nota de Venta (assigns NV-XXXXXX)
+        const emitRes = await api.post(`/comprobantes/${draftId}/emitir`)
+        toast.success('Nota de venta creada exitosamente', {
+          description: `Folio asignado: ${emitRes.data.folioInterno || 'NV'}`,
+        })
         router.push('/facturas')
       } else {
-        // 2. Transition it to emission pipeline (real send)
+        // 2. Transition it to emission pipeline (real send to DGII)
         const emitRes = await api.post(`/comprobantes/${draftId}/emitir`)
         const emitData = emitRes.data
         toast.success('Comprobante emitido exitosamente y enviado a la DGII', {
@@ -40,14 +44,14 @@ function NuevaFacturaContent(): JSX.Element {
     } else {
       // Create new comprobante
       const res = await createComprobante(data)
-      if (esNota) {
-        toast.success('Nota de venta creada exitosamente', {
-          description: 'Documento interno (no fiscal).',
+      if (data.emitirConComprobante === false) {
+        toast.success(esNota ? 'Borrador de nota de venta guardado' : 'Factura creada exitosamente como borrador', {
+          description: 'Documento guardado como borrador.',
         })
         router.push('/facturas')
-      } else if (data.emitirConComprobante === false) {
-        toast.success('Factura creada exitosamente como borrador', {
-          description: `Código asignado: ${res.eNCF || 'DRAFT'}`,
+      } else if (esNota) {
+        toast.success('Nota de venta creada exitosamente', {
+          description: `Folio asignado: ${res.eNCF || 'NV'}`,
         })
         router.push('/facturas')
       } else {
