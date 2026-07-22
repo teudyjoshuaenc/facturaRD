@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
 import { Comprobante } from '@/lib/comprobantes'
-import { useComprobantes } from '@/hooks/useComprobantes'
+import { useComprobantes, useEnviarComprobante } from '@/hooks/useComprobantes'
 import { api, getErrorMessage } from '@/lib/api'
 import { toast } from 'sonner'
 import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
@@ -65,7 +65,6 @@ export default function FacturasPage(): JSX.Element {
 
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isBulkReenviarOpen, setIsBulkReenviarOpen] = useState(false)
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
@@ -147,15 +146,12 @@ export default function FacturasPage(): JSX.Element {
     printWindow.document.close()
   }
 
-  const handleBulkSend = () => {
-    toast.success(`Enviando ${selectedIds.size} facturas seleccionadas...`)
-  }
-
   const handleBulkDownload = () => {
     toast.success(`Descargando ${selectedIds.size} facturas seleccionadas...`)
   }
 
   const [reenviarComprobante, setReenviarComprobante] = useState<Comprobante | null>(null)
+  const enviarComprobante = useEnviarComprobante()
   const [comprobanteToEmit, setComprobanteToEmit] = useState<Comprobante | null>(null)
   const [emittingId, setEmittingId] = useState<string | null>(null)
 
@@ -233,10 +229,14 @@ export default function FacturasPage(): JSX.Element {
               title="Exportar comprobantes"
               className="w-[114px] justify-center"
             />
+            {/* Envío masivo: PENDIENTE de backend (el endpoint es 1 comprobante
+                por llamada). Se deja visible pero deshabilitado — antes simulaba
+                un envío exitoso que nunca ocurría. */}
             <button
-              onClick={() => setIsBulkReenviarOpen(true)}
-              disabled={selectedIds.size === 0}
-              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
+              type="button"
+              disabled
+              title="Próximamente: el envío en lote aún no está disponible"
+              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] text-[#64748b] opacity-50 cursor-not-allowed transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
             >
               <Mail size={14} className="text-[#64748b] shrink-0" />
               <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
@@ -439,38 +439,15 @@ export default function FacturasPage(): JSX.Element {
         <ReenviarModal
           isOpen={!!reenviarComprobante}
           onClose={() => setReenviarComprobante(null)}
-          title="Reenviar factura"
-          defaultEmail={reenviarComprobante.datos?.receptor?.email || ''}
-          defaultPhone={reenviarComprobante.datos?.receptor?.telefono || ''}
-          isBulk={false}
-          onSend={async (data) => {
-            await new Promise((r) => setTimeout(r, 1000))
-            if (data.enviarAContactoIndividual) {
-              toast.success(`Factura reenviada al correo/whatsapp correspondiente del cliente`)
-            } else {
-              toast.success(`Comprobante reenviado exitosamente a: ${data.para}`)
-            }
-          }}
-        />
-      )}
-
-      {isBulkReenviarOpen && (
-        <ReenviarModal
-          isOpen={isBulkReenviarOpen}
-          onClose={() => setIsBulkReenviarOpen(false)}
-          title="Reenviar facturas"
-          defaultEmail=""
-          defaultPhone=""
-          isBulk={true}
-          onSend={async (data) => {
-            await new Promise((r) => setTimeout(r, 1000))
-            if (data.enviarAContactoIndividual) {
-              toast.success(`${selectedIds.size} comprobantes reenviados al correo/whatsapp de cada cliente correspondientemente`)
-            } else {
-              toast.success(`${selectedIds.size} comprobantes reenviados exitosamente a: ${data.para}`)
-            }
-            setIsBulkReenviarOpen(false)
-            toggleSelectionMode()
+          title="Enviar factura"
+          destinatario={reenviarComprobante.datos?.receptor?.email || ''}
+          onSend={async ({ asunto, mensaje }) => {
+            await enviarComprobante.mutateAsync({
+              comprobanteId: reenviarComprobante.id,
+              canal: 'email',
+              ...(asunto.trim() ? { asunto: asunto.trim() } : {}),
+              ...(mensaje.trim() ? { mensaje: mensaje.trim() } : {}),
+            })
           }}
         />
       )}

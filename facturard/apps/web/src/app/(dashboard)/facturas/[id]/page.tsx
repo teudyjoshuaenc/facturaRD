@@ -33,6 +33,7 @@ import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
 import { toast } from 'sonner'
 import { useEmissionStatus } from '@/hooks/useEmissionStatus'
+import { useEnviarComprobante, useEnviosComprobante } from '@/hooks/useComprobantes'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -52,6 +53,10 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
   const [isReenviarOpen, setIsReenviarOpen] = useState(false)
   const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
   const [emitting, setEmitting] = useState(false)
+
+  // Envío al cliente por GoHighLevel (post-emisión, no toca el estado DGII).
+  const enviarComprobante = useEnviarComprobante()
+  const { envios, isLoading: enviosLoading } = useEnviosComprobante(id)
 
   const handleEmitir = async () => {
     setEmitting(true)
@@ -706,20 +711,68 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           </div>
         )}
 
-        {/* PDF Y CORREO TAB */}
+        {/* PDF Y CORREO TAB — historial real de envíos (GET :id/envios) */}
         {activeTab === 'pdf_correo' && (
-          <div className="bg-white border border-[#e2e8f0] rounded-[14px] p-[24px] flex flex-col h-[182px] items-center justify-center w-full text-center">
-            <div className="flex flex-col gap-[8px] items-center justify-center">
-              <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full bg-neutral-100 text-[#475467] shrink-0 mb-1">
-                <Mail size={20} />
+          <div className="bg-white border border-[#e2e8f0] rounded-[14px] p-[24px] flex flex-col gap-[16px] w-full text-left">
+            <h3 className="text-[16px] font-semibold text-[#333]">Envíos al cliente</h3>
+
+            {enviosLoading ? (
+              <div className="flex h-[100px] items-center justify-center">
+                <Spinner size={20} />
               </div>
-              <p className="text-[15px] font-medium text-[#101828] leading-[22.5px]">
-                Sin datos disponibles
-              </p>
-              <p className="text-[13px] font-normal text-[#475467] leading-[19.5px]">
-                No se han enviado correos para este comprobante.
-              </p>
-            </div>
+            ) : envios.length === 0 ? (
+              <div className="flex flex-col gap-[8px] items-center justify-center h-[120px] text-center">
+                <div className="flex h-[40px] w-[40px] items-center justify-center rounded-full bg-neutral-100 text-[#475467] shrink-0 mb-1">
+                  <Mail size={20} />
+                </div>
+                <p className="text-[15px] font-medium text-[#101828] leading-[22.5px]">
+                  Sin envíos todavía
+                </p>
+                <p className="text-[13px] font-normal text-[#475467] leading-[19.5px]">
+                  No se ha enviado este comprobante al cliente.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[12px]">
+                {envios.map((envio) => {
+                  const ok = envio.estado === 'ENVIADO'
+                  const canal = envio.canal === 'EMAIL' ? 'correo' : 'WhatsApp'
+                  return (
+                    <div
+                      key={envio.id}
+                      className="flex items-start gap-[12px] rounded-[12px] border border-[#f1f5f9] px-[16px] py-[12px]"
+                    >
+                      <div
+                        className={`flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full ${
+                          ok ? 'bg-[#ecfdf3] text-[#027a48]' : 'bg-[#fef3f2] text-[#b42318]'
+                        }`}
+                      >
+                        <Mail size={16} />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-[2px]">
+                        <span className="text-[13px] font-medium leading-[19px] text-[#333]">
+                          {ok ? `Enviado por ${canal}` : `Falló el envío por ${canal}`}
+                          {envio.destino ? ` a ${envio.destino}` : ''}
+                        </span>
+                        <span className="text-[12px] leading-[18px] text-[rgba(51,51,51,0.5)]">
+                          {new Date(envio.createdAt).toLocaleString('es-DO', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                        {!ok && envio.error && (
+                          <span className="text-[12px] leading-[18px] text-[#b42318]">{envio.error}</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                <p className="text-[11px] leading-[16px] text-[#64748b]">
+                  &quot;Enviado&quot; significa que GoHighLevel aceptó el mensaje; la entrega al buzón
+                  del cliente puede tardar unos minutos.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -727,17 +780,17 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
       <ReenviarModal
         isOpen={isReenviarOpen}
         onClose={() => setIsReenviarOpen(false)}
-        title="Reenviar factura"
-        defaultEmail={comprobante.datos?.receptor?.email || ''}
-        defaultPhone={comprobante.datos?.receptor?.telefono || ''}
-        isBulk={false}
-        onSend={async (data) => {
-          await new Promise((r) => setTimeout(r, 1000))
-          if (data.enviarAContactoIndividual) {
-            toast.success(`Factura reenviada al correo/whatsapp correspondiente del cliente`)
-          } else {
-            toast.success(`Comprobante reenviado exitosamente a: ${data.para}`)
-          }
+        title="Enviar factura"
+        destinatario={comprobante.datos?.receptor?.email || ''}
+        onSend={async ({ asunto, mensaje }) => {
+          // Llamada REAL. El toast de éxito/error lo emite el hook a partir de
+          // la respuesta del backend; aquí no se asume nada.
+          await enviarComprobante.mutateAsync({
+            comprobanteId: id,
+            canal: 'email',
+            ...(asunto.trim() ? { asunto: asunto.trim() } : {}),
+            ...(mensaje.trim() ? { mensaje: mensaje.trim() } : {}),
+          })
         }}
       />
 

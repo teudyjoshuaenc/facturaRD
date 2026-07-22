@@ -7,6 +7,10 @@ interface ToggleOption<T extends string> {
   value: T
   label: string
   icon?: ComponentType<{ size?: number; className?: string }>
+  /** Opción visible pero no seleccionable (p.ej. un canal aún no disponible). */
+  disabled?: boolean
+  /** Tooltip nativo; útil para explicar por qué está deshabilitada. */
+  title?: string
 }
 
 interface ToggleGroupProps<T extends string> {
@@ -39,11 +43,14 @@ export function ToggleGroup<T extends string>({
           <button
             key={opt.value}
             type="button"
+            disabled={opt.disabled}
+            {...(opt.title ? { title: opt.title } : {})}
             onClick={() => onChange(opt.value)}
             className={cn(
               isModal
                 ? 'flex-1 flex items-center justify-center gap-2 rounded-[8px] h-10 text-[13px] font-normal transition-all active:scale-[0.98] duration-150'
                 : 'flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-ui-sm font-semibold transition-all active:scale-[0.98] duration-150',
+              opt.disabled && 'opacity-40 cursor-not-allowed active:scale-100 pointer-events-none',
               isSelected
                 ? isModal 
                   ? 'bg-white text-[#0379D5] shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]'

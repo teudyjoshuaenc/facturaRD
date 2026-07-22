@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, getErrorMessage } from '@/lib/api'
 import {
   downloadComprobantePdf,
   type Comprobante,
@@ -292,6 +292,74 @@ export function useComprobantes() {
     downloadingId,
     handleDownload,
   }
+}
+
+// ─── Envío del comprobante al cliente (vía GoHighLevel) ──────────────────────
+// Post-emisión: NO cambia el estado DGII del comprobante. Hoy sólo email;
+// WhatsApp exige plantillas aprobadas por Meta y el backend lo rechaza con 400.
+
+export type CanalEnvio = 'EMAIL' | 'WHATSAPP'
+export type EstadoEnvio = 'ENVIADO' | 'FALLIDO'
+
+export interface EnvioComprobante {
+  id: string
+  canal: CanalEnvio
+  /** ENVIADO = GoHighLevel aceptó el mensaje, NO que el cliente lo recibió. */
+  estado: EstadoEnvio
+  destino: string | null
+  ghlMessageId: string | null
+  ghlConversationId: string | null
+  error: string | null
+  createdAt: string
+}
+
+export interface EnviarComprobantePayload {
+  comprobanteId: string
+  canal: 'email'
+  asunto?: string
+  mensaje?: string
+}
+
+export interface EnvioResultado {
+  canal: CanalEnvio
+  estado: EstadoEnvio
+  destino: string
+  ghlMessageId: string | null
+  enviadoEn: string
+}
+
+/** Historial de envíos de un comprobante. */
+export function useEnviosComprobante(comprobanteId: string | null | undefined) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['comprobante-envios', comprobanteId],
+    queryFn: () =>
+      api.get<EnvioComprobante[]>(`/comprobantes/${comprobanteId}/envios`).then((res) => res.data),
+    enabled: !!comprobanteId,
+  })
+
+  return { envios: data ?? [], isLoading }
+}
+
+/**
+ * Envía el comprobante al cliente. El destinatario lo resuelve el BACKEND a
+ * partir del contacto del comprobante — no se manda desde el front, para que
+ * una factura no pueda dirigirse al correo de un tercero.
+ */
+export function useEnviarComprobante() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ comprobanteId, ...body }: EnviarComprobantePayload) =>
+      api.post<EnvioResultado>(`/comprobantes/${comprobanteId}/enviar`, body).then((r) => r.data),
+    onSuccess: (data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['comprobante-envios', variables.comprobanteId] })
+      // El toast usa el destino REAL que devolvió el backend, no lo que se tecleó.
+      toast.success('Comprobante enviado', { description: `Enviado a ${data.destino}` })
+    },
+    // Aquí llegan los 400 accionables del backend ("cliente no sincronizado con
+    // GoHighLevel", "no tiene correo registrado"). Sin esto el usuario no ve nada.
+    onError: (err) => toast.error('No se pudo enviar', { description: getErrorMessage(err) }),
+  })
 }
 
 export interface Cumplimiento {

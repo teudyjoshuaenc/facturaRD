@@ -30,7 +30,6 @@ import { useCotizaciones } from '@/hooks/useCotizaciones'
 import type { Cotizacion } from '@/hooks/useCotizaciones'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
-import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 
 const LIMIT = 10
 
@@ -132,9 +131,7 @@ function CotizacionesPageInner(): JSX.Element {
   const [page, setPage] = useState(1)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isBulkReenviarOpen, setIsBulkReenviarOpen] = useState(false)
   const [convertTarget, setConvertTarget] = useState<Cotizacion | null>(null)
-  const [reenviarCotizacion, setReenviarCotizacion] = useState<Cotizacion | null>(null)
   const [converting, setConverting] = useState(false)
 
   const { cotizaciones, loading, error, total, totalPages, fetchCotizaciones, deleteCotizacion } = useCotizaciones()
@@ -188,10 +185,6 @@ function CotizacionesPageInner(): JSX.Element {
         return next
       })
     }
-  }
-
-  const handleBulkSend = () => {
-    setIsBulkReenviarOpen(true)
   }
 
   const handleBulkDownload = () => {
@@ -311,7 +304,6 @@ function CotizacionesPageInner(): JSX.Element {
         isSelectionMode={isSelectionMode}
         onToggleSelectionMode={toggleSelectionMode}
         selectedCount={selectedIds.size}
-        onBulkSend={handleBulkSend}
         onBulkDownload={handleBulkDownload}
       />
 
@@ -493,14 +485,13 @@ function CotizacionesPageInner(): JSX.Element {
                         >
                           <Pencil size={14} className={c.estado === 'CONVERTIDA' ? 'opacity-30' : ''} />
                         </button>
+                        {/* Envío de cotizaciones: sin backend todavía (ver
+                            CotizacionesHeader). Deshabilitado, no simulado. */}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setReenviarCotizacion(c)
-                          }}
-                          className="text-[#64748b] hover:text-[#333] transition-colors focus:outline-none"
-                          title="Reenviar correo"
+                          disabled
+                          className="text-[#64748b] opacity-30 cursor-not-allowed focus:outline-none"
+                          title="Próximamente: el envío de cotizaciones aún no está disponible"
                         >
                           <Mail size={14} />
                         </button>
@@ -572,45 +563,6 @@ function CotizacionesPageInner(): JSX.Element {
         </p>
       </Modal>
 
-      {isBulkReenviarOpen && (
-        <ReenviarModal
-          isOpen={isBulkReenviarOpen}
-          onClose={() => setIsBulkReenviarOpen(false)}
-          title="Reenviar cotizaciones"
-          defaultEmail=""
-          defaultPhone=""
-          isBulk={true}
-          onSend={async (data) => {
-            await new Promise((r) => setTimeout(r, 1000))
-            if (data.enviarAContactoIndividual) {
-              toast.success(`${selectedIds.size} cotizaciones reenviadas al correo/whatsapp de cada cliente correspondientemente`)
-            } else {
-              toast.success(`${selectedIds.size} cotizaciones reenviadas exitosamente a: ${data.para}`)
-            }
-            setIsBulkReenviarOpen(false)
-            toggleSelectionMode()
-          }}
-        />
-      )}
-
-      {reenviarCotizacion && (
-        <ReenviarModal
-          isOpen={!!reenviarCotizacion}
-          onClose={() => setReenviarCotizacion(null)}
-          title="Reenviar cotización"
-          defaultEmail={reenviarCotizacion.contacto?.email || ''}
-          defaultPhone={reenviarCotizacion.contacto?.telefono || ''}
-          isBulk={false}
-          onSend={async (data) => {
-            await new Promise((r) => setTimeout(r, 1000))
-            if (data.enviarAContactoIndividual) {
-              toast.success(`Cotización reenviada al correo/whatsapp correspondiente del cliente`)
-            } else {
-              toast.success(`Cotización reenviada exitosamente a: ${data.para}`)
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

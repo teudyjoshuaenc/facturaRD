@@ -14,7 +14,8 @@ interface Props {
   isSelectionMode: boolean
   onToggleSelectionMode: () => void
   selectedCount: number
-  onBulkSend: () => void
+  /** Ya no se usa: el envío de cotizaciones no tiene backend todavía. */
+  onBulkSend?: () => void
   onBulkDownload: () => void
 }
 
@@ -26,7 +27,6 @@ export function CotizacionesHeader({
   isSelectionMode,
   onToggleSelectionMode,
   selectedCount,
-  onBulkSend,
   onBulkDownload
 }: Props): JSX.Element {
   return (
@@ -58,10 +58,13 @@ export function CotizacionesHeader({
           isSelectionMode ? "w-[503px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
         )}>
           <ExportActionButton onClick={onExport} disabled={selectedCount === 0} title="Exportar cotizaciones" className="w-[120px] justify-center" />
+          {/* Envío de cotizaciones: SIN backend todavía. Deshabilitado en vez de
+              simular un envío exitoso que nunca ocurre. */}
           <button
-            onClick={onBulkSend}
-            disabled={selectedCount === 0}
-            className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
+            type="button"
+            disabled
+            title="Próximamente: el envío de cotizaciones aún no está disponible"
+            className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] text-[#64748b] opacity-50 cursor-not-allowed transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
           >
             <Mail size={14} className="text-[#64748b] shrink-0" />
             <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
