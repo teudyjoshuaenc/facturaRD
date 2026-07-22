@@ -25,7 +25,7 @@ import { Select } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { ProductDetailPanel } from '@/components/producto/ProductDetailPanel'
 import { EditarProductoModal } from '@/components/producto/EditarProductoModal'
-import { ConfirmDeleteModal } from '@/components/producto/ConfirmDeleteModal'
+import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { Modal } from '@/components/ui/modal'
 import { useUI } from '@/lib/context/UIContext'
 import { toast } from 'sonner'
@@ -664,7 +664,7 @@ export default function ProductosPage(): JSX.Element {
 
       <ConfirmDeleteModal
         open={!!deletingProducto}
-        producto={deletingProducto}
+        itemName={deletingProducto?.nombre ?? null}
         onClose={() => setDeletingProducto(null)}
         onConfirm={handleDeleteConfirm}
       />

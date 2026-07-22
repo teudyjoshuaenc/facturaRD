@@ -1,13 +1,37 @@
 import { IsOptional, IsEnum, IsDateString, IsNumber, IsString, IsIn, Min, Max } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Type, Transform } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { ComprobanteEstado, TipoECF } from '@facturard/database'
 
 export class ListComprobantesDto {
-  @ApiPropertyOptional({ enum: ComprobanteEstado })
-  @IsEnum(ComprobanteEstado)
+  /**
+   * Uno o VARIOS estados separados por coma. El agrupado "En proceso" de la UI
+   * es `PENDIENTE,EN_COLA,ENVIANDO` — se filtra en el servidor para que la
+   * paginación sea correcta (antes se filtraba en el cliente sobre la página
+   * traída y con >100 comprobantes devolvía resultados incompletos en silencio).
+   * Un solo valor (`?estado=ACEPTADO`) sigue funcionando igual.
+   */
+  @ApiPropertyOptional({
+    enum: ComprobanteEstado,
+    isArray: true,
+    description: 'Uno o varios estados separados por coma (ej. PENDIENTE,EN_COLA,ENVIANDO)',
+  })
   @IsOptional()
-  estado?: ComprobanteEstado
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value.split(',').map((v) => v.trim()).filter((v) => v !== '')
+      : value,
+  )
+  @IsEnum(ComprobanteEstado, { each: true })
+  estado?: ComprobanteEstado[]
+
+  @ApiPropertyOptional({
+    enum: ['cotizacion'],
+    description: 'Procedencia del documento. `cotizacion` = comprobantes convertidos desde una cotización.',
+  })
+  @IsIn(['cotizacion'])
+  @IsOptional()
+  origen?: 'cotizacion'
 
   @ApiPropertyOptional({
     enum: ['fiscal', 'borrador', 'nota'],

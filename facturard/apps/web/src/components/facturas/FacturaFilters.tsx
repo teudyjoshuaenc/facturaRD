@@ -1,48 +1,32 @@
 import { type JSX, useRef } from 'react'
 import { Search, Calendar } from 'lucide-react'
-import type { EstadoFilter } from '@/hooks/useComprobantes'
 import { Select } from '@/components/ui/select'
-import { formatDate } from '@/lib/comprobantes'
+import {
+  formatDate,
+  CLASE_FILTER_OPTIONS,
+  ESTADO_FILTER_OPTIONS,
+  ORIGEN_FILTER_OPTIONS,
+  TIPO_FILTER_OPTIONS,
+  type ClaseFiltro,
+  type EstadoFiltro,
+  type OrigenFiltro,
+} from '@/lib/comprobantes'
 
-const tipoOptions = [
-  { value: 'todos', label: 'Tipo' },
-  { value: 'E31', label: 'E31 – Crédito Fiscal' },
-  { value: 'E32', label: 'E32 – Consumo' },
-  { value: 'E33', label: 'E33 – Nota de Débito' },
-  { value: 'E34', label: 'E34 – Nota de Crédito' },
-  { value: 'E41', label: 'E41 – Compras' },
-  { value: 'E43', label: 'E43 – Gastos Menores' },
-  { value: 'E44', label: 'E44 – Reg. Especiales' },
-  { value: 'E45', label: 'E45 – Gubernamental' },
-  { value: 'E46', label: 'E46 – Exportaciones' },
-  { value: 'E47', label: 'E47 – Pagos al Exterior' },
-]
-
-const estadoOptions = [
-  { value: 'todos', label: 'Estado' },
-  { value: 'ACEPTADO', label: 'Aceptado' },
-  { value: 'PENDIENTE', label: 'En proceso' },
-  { value: 'RECHAZADO', label: 'Rechazado' },
-  { value: 'DRAFT', label: 'Borrador' },
-  { value: 'COTIZACION_CONVERTIDA', label: 'Cotización convertida' },
-]
-
-const claseOptions = [
-  { value: 'todos', label: 'Clase' },
-  { value: 'fiscal', label: 'Fiscal (e-CF)' },
-  { value: 'borrador', label: 'Borrador' },
-  { value: 'nota', label: 'Nota de venta' },
-]
+// Las opciones salen de lib/comprobantes (fuente única): el filtro de Estado
+// cubre TODOS los estados DGII reales, "Borrador"/"Nota de venta" viven sólo en
+// Clase, y la procedencia (cotización) es su propio filtro, no un estado.
 
 interface Props {
-  estadoFilter: EstadoFilter
+  estadoFilter: EstadoFiltro
   search: string
-  onEstadoChange: (v: EstadoFilter) => void
+  onEstadoChange: (v: EstadoFiltro) => void
   onSearchChange: (v: string) => void
   tipoFilter: string
   onTipoFilterChange: (v: string) => void
-  claseFilter: 'todos' | 'fiscal' | 'borrador' | 'nota'
-  onClaseFilterChange: (v: 'todos' | 'fiscal' | 'borrador' | 'nota') => void
+  claseFilter: ClaseFiltro
+  onClaseFilterChange: (v: ClaseFiltro) => void
+  origenFilter: OrigenFiltro
+  onOrigenFilterChange: (v: OrigenFiltro) => void
   startDate: string
   onStartDateChange: (v: string) => void
   endDate: string
@@ -62,6 +46,8 @@ export function FacturaFilters({
   onTipoFilterChange,
   claseFilter,
   onClaseFilterChange,
+  origenFilter,
+  onOrigenFilterChange,
   startDate,
   onStartDateChange,
   endDate,
@@ -95,20 +81,20 @@ export function FacturaFilters({
           />
         </div>
 
-        {/* Clase Dropdown */}
+        {/* Clase Dropdown — QUÉ ES el documento (fiscal / borrador / nota) */}
         <Select
           value={claseFilter}
-          onChange={(val) => onClaseFilterChange(val as 'todos' | 'fiscal' | 'borrador' | 'nota')}
-          options={claseOptions}
+          onChange={(val) => onClaseFilterChange(val as ClaseFiltro)}
+          options={CLASE_FILTER_OPTIONS}
           className="w-full sm:flex-1 sm:min-w-[132px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />
 
-        {/* Tipo Dropdown */}
+        {/* Tipo Dropdown — sólo los tipos e-CF que el sistema emite hoy */}
         <Select
           value={tipoFilter}
           onChange={onTipoFilterChange}
-          options={tipoOptions}
+          options={TIPO_FILTER_OPTIONS}
           className="w-full sm:flex-1 sm:min-w-[126px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />
@@ -116,11 +102,20 @@ export function FacturaFilters({
 
       {/* Row 2: Estado, Desde, Hasta, Rango Precios */}
       <div className="flex flex-wrap items-center gap-[12px] w-full">
-        {/* Estado Dropdown */}
+        {/* Estado DGII Dropdown — sólo estados reales del ciclo DGII */}
         <Select
           value={estadoFilter}
-          onChange={(val) => onEstadoChange(val as EstadoFilter)}
-          options={estadoOptions}
+          onChange={(val) => onEstadoChange(val as EstadoFiltro)}
+          options={ESTADO_FILTER_OPTIONS}
+          className="w-full sm:flex-1 sm:min-w-[126px]"
+          triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
+        />
+
+        {/* Origen Dropdown — procedencia, eje aparte del estado */}
+        <Select
+          value={origenFilter}
+          onChange={(val) => onOrigenFilterChange(val as OrigenFiltro)}
+          options={ORIGEN_FILTER_OPTIONS}
           className="w-full sm:flex-1 sm:min-w-[126px]"
           triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50"
         />

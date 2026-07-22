@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
-import { Calendar, FileText, User, ChevronDown, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { Calendar, FileText, User, ChevronDown, ChevronRight, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
@@ -448,6 +448,21 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
 
+  // ─── Wizard: navegación desde el botón principal de la derecha ─────────────
+  // Cuando NO estás en el paso final, ese botón actúa como "Siguiente" (misma
+  // acción que el "siguiente" de abajo, que se mantiene) en vez de quedarse
+  // bloqueado. Las validaciones son las MISMAS que gatean el botón de abajo:
+  // paso 1 → datos del cliente, paso 2 → líneas del detalle.
+  // 'estandar' es exactamente la condición con la que se renderiza el wizard de
+  // 3 pasos; en modo 'rapido' no hay pasos y el botón no debe navegar.
+  const isWizardMode = facturacionMode === 'estandar'
+  const isOnLastStep = currentStep >= 3
+  const showStepNav = isWizardMode && !isOnLastStep
+  const isCurrentStepValid =
+    currentStep === 1 ? isClienteStepValid
+    : currentStep === 2 ? isDetalleStepValid
+    : true
+
   if (loadingDraft) {
     return (
       <div className="flex h-64 items-center justify-center bg-white rounded-xl border border-neutral-200">
@@ -578,6 +593,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   fechaLimite={fechaLimite}
                   terminoPago={terminoPago}
                   onBack={() => goToStep(2)}
+                  esFiscal={esFiscal}
                 />
               )}
             </div>
@@ -939,28 +955,40 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
               <div className="flex flex-col gap-[8px] w-full">
                 {/* Nota de venta interna: un solo botón, sin certificado ni campos fiscales */}
-                {!esFiscal && (
-                  <button
-                    type="button"
-                    disabled={submitting || isPlanExpired || !isDetalleStepValid}
-                    onClick={() => handleSubmit(false)}
-                    className={cn(
-                      "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
-                      (submitting || isPlanExpired || !isDetalleStepValid)
-                        ? "opacity-20 cursor-not-allowed"
-                        : "hover:bg-[#0379D5]/90 cursor-pointer"
-                    )}
-                  >
-                    {submitting ? (
-                      <Spinner size={18} className="text-white" />
-                    ) : (
-                      <>
-                        <FilePlus size={15} className="text-white" />
-                        <span>{draftId ? 'Guardar cambios' : 'Crear nota de venta'}</span>
-                      </>
-                    )}
-                  </button>
-                )}
+                {!esFiscal && (() => {
+                  // Fuera del paso final este botón avanza el wizard; en el
+                  // paso final vuelve a ser el de crear la nota de venta.
+                  const disabled = showStepNav
+                    ? !isCurrentStepValid
+                    : submitting || isPlanExpired || !isDetalleStepValid
+                  return (
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => (showStepNav ? goToStep(currentStep + 1) : handleSubmit(false))}
+                      className={cn(
+                        "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                        disabled
+                          ? "opacity-20 cursor-not-allowed"
+                          : "hover:bg-[#0379D5]/90 cursor-pointer"
+                      )}
+                    >
+                      {submitting ? (
+                        <Spinner size={18} className="text-white" />
+                      ) : showStepNav ? (
+                        <>
+                          <span>Siguiente</span>
+                          <ChevronRight size={16} className="text-white" />
+                        </>
+                      ) : (
+                        <>
+                          <FilePlus size={15} className="text-white" />
+                          <span>{draftId ? 'Guardar cambios' : 'Crear nota de venta'}</span>
+                        </>
+                      )}
+                    </button>
+                  )
+                })()}
 
                 {esFiscal && isE32OverLimit && (!selectedCliente || !selectedCliente.rnc.trim()) && (
                   <p className="text-[11px] font-semibold text-danger-600 text-left leading-normal animate-in fade-in-50 mb-1 font-sans">

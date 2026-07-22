@@ -1,8 +1,11 @@
 import type { JSX } from 'react'
-import { Download, CheckCircle2, XCircle, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Download, CheckCircle2, XCircle, RefreshCw, AlertTriangle, AlertCircle } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import {
   type Comprobante,
+  type ComprobanteEstado,
+  estadoDgiiBadge,
   formatCurrency,
   formatDate,
 } from '@/lib/comprobantes'
@@ -14,35 +17,46 @@ interface Props {
   onDownload: (c: Comprobante) => void
 }
 
-function getStatusBadge(estado: string): JSX.Element {
-  if (estado === 'ACEPTADO') {
+/**
+ * Mismo criterio que la lista de /facturas: labels y tono salen de
+ * `estadoDgiiBadge()`. ERROR ya no se disfraza de "En proceso", y borrador /
+ * nota de venta no fingen tener un estado DGII.
+ */
+function getStatusBadge(estado: ComprobanteEstado): JSX.Element {
+  const { label, tono, aplicaDgii, titulo } = estadoDgiiBadge(estado)
+
+  if (!aplicaDgii) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50/70 px-2.5 py-1 text-ui-xs font-semibold text-green-700 whitespace-nowrap">
-        <CheckCircle2 size={12} className="text-green-600 flex-shrink-0" />
-        Aceptado
+      <span className="text-text-secondary opacity-40 select-none font-medium" title={titulo}>
+        {label}
       </span>
     )
   }
-  if (estado === 'ACEPTADO_CONDICIONAL') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50/70 px-2.5 py-1 text-ui-xs font-semibold text-warning-700 whitespace-nowrap">
-        <AlertTriangle size={12} className="text-warning-600 flex-shrink-0" />
-        Aceptado c/obs.
-      </span>
-    )
+
+  const estilos: Record<string, { wrap: string; icon: string }> = {
+    success: { wrap: 'border-green-200 bg-green-50/70 text-green-700', icon: 'text-green-600' },
+    warning: { wrap: 'border-warning-200 bg-warning-50/70 text-warning-700', icon: 'text-warning-600' },
+    danger: { wrap: 'border-red-200 bg-red-50/70 text-red-700', icon: 'text-red-600' },
+    proceso: { wrap: 'border-blue-200 bg-blue-50/70 text-blue-700', icon: 'text-blue-600' },
   }
-  if (estado === 'RECHAZADO') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50/70 px-2.5 py-1 text-ui-xs font-semibold text-red-700 whitespace-nowrap">
-        <XCircle size={12} className="text-red-600 flex-shrink-0" />
-        Rechazado
-      </span>
-    )
-  }
+  const estilo = estilos[tono] ?? estilos.proceso!
+
+  const Icono =
+    tono === 'success' ? CheckCircle2
+    : tono === 'warning' ? AlertTriangle
+    : tono === 'danger' ? (estado === 'ERROR' ? AlertCircle : XCircle)
+    : RefreshCw
+
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/70 px-2.5 py-1 text-ui-xs font-semibold text-blue-700 whitespace-nowrap">
-      <RefreshCw size={12} className="text-blue-600 animate-spin flex-shrink-0" />
-      En proceso
+    <span
+      title={titulo}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-ui-xs font-semibold whitespace-nowrap',
+        estilo.wrap,
+      )}
+    >
+      <Icono size={12} className={cn(estilo.icon, 'flex-shrink-0', tono === 'proceso' && 'animate-spin')} />
+      {label}
     </span>
   )
 }

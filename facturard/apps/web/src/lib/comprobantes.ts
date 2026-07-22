@@ -35,9 +35,18 @@ export interface Comprobante {
 // Clase de documento derivada (para badge/filtro en la lista).
 export type ClaseDocumento = 'fiscal' | 'borrador' | 'nota'
 
+/**
+ * Clase de un documento. El ORDEN importa: `DRAFT` manda sobre todo lo demás.
+ *
+ * Una nota de venta TAMBIÉN puede estar en borrador: el backend guarda
+ * `estado='DRAFT', esFiscal=false` y sólo le asigna el folio `NV-` cuando se
+ * finaliza (pasa a `INTERNO`). Si se mirara `esFiscal` primero, ese documento
+ * se mostraría como "Nota de venta" ya creada cuando en realidad es un borrador
+ * sin folio. Un borrador es un borrador sea fiscal (E31/E34/…) o no.
+ */
 export function claseDocumento(c: Pick<Comprobante, 'esFiscal' | 'estado'>): ClaseDocumento {
-  if (c.esFiscal === false) return 'nota'
   if (c.estado === 'DRAFT') return 'borrador'
+  if (c.esFiscal === false) return 'nota'
   return 'fiscal'
 }
 
@@ -45,6 +54,116 @@ export const CLASE_LABELS: Record<ClaseDocumento, string> = {
   fiscal: 'Fiscal',
   borrador: 'Borrador',
   nota: 'Nota de venta',
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FUENTE ÚNICA de presentación de un comprobante en listas.
+//
+// Tres dimensiones ORTOGONALES, cada una en su propia columna/filtro:
+//   1. ESTADO DGII  → qué dijo la DGII. Sólo aplica a lo que viaja a la DGII.
+//   2. TIPO/CLASE   → qué ES el documento (e-CF E31/E32/…, borrador, nota).
+//   3. ORIGEN       → de dónde viene (cotización convertida). Nunca sustituye
+//                     al estado: una factura rechazada que vino de cotización
+//                     se muestra RECHAZADA.
+//
+// Ningún componente debe declarar labels propios: todo sale de aquí.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Estados transitorios del ciclo DGII: el comprobante sigue viajando. */
+export const ESTADOS_EN_PROCESO: readonly ComprobanteEstado[] = ['PENDIENTE', 'EN_COLA', 'ENVIANDO']
+
+/** Estados que NO pertenecen al ciclo DGII (el documento nunca se envía). */
+export const ESTADOS_SIN_DGII: readonly ComprobanteEstado[] = ['DRAFT', 'INTERNO']
+
+export type EstadoDgiiTono = 'success' | 'warning' | 'danger' | 'proceso' | 'noAplica'
+
+export interface EstadoDgiiBadge {
+  /** Texto a mostrar en la columna "Estado DGII" ('—' si no aplica). */
+  label: string
+  tono: EstadoDgiiTono
+  /** false → borrador o nota de venta: no tiene estado fiscal que mostrar. */
+  aplicaDgii: boolean
+  /** Tooltip explicativo (por qué ese estado / por qué no aplica). */
+  titulo: string
+}
+
+/**
+ * Estado del ciclo DGII de un comprobante. Es la ÚNICA función que decide qué
+ * se pinta en la columna "Estado DGII".
+ *
+ * ERROR es TERMINAL (se agotaron los reintentos de BullMQ): se muestra como
+ * fallo que requiere atención, nunca con el spinner de "en proceso".
+ */
+export function estadoDgiiBadge(estado: ComprobanteEstado): EstadoDgiiBadge {
+  switch (estado) {
+    case 'ACEPTADO':
+      return { label: 'Aceptado', tono: 'success', aplicaDgii: true, titulo: 'Aceptado por la DGII' }
+    case 'ACEPTADO_CONDICIONAL':
+      return {
+        label: 'Aceptado c/obs.',
+        tono: 'warning',
+        aplicaDgii: true,
+        titulo: 'Aceptado por la DGII con observaciones',
+      }
+    case 'RECHAZADO':
+      return { label: 'Rechazado', tono: 'danger', aplicaDgii: true, titulo: 'Rechazado por la DGII' }
+    case 'ERROR':
+      return {
+        label: 'Error',
+        tono: 'danger',
+        aplicaDgii: true,
+        titulo: 'Error de envío: no se pudo entregar a la DGII tras los reintentos. Requiere atención.',
+      }
+    case 'PENDIENTE':
+    case 'EN_COLA':
+    case 'ENVIANDO':
+      return { label: 'En proceso', tono: 'proceso', aplicaDgii: true, titulo: 'En proceso ante la DGII' }
+    case 'DRAFT':
+      return {
+        label: '—',
+        tono: 'noAplica',
+        aplicaDgii: false,
+        titulo: 'Borrador: todavía no se ha enviado a la DGII',
+      }
+    case 'INTERNO':
+      return {
+        label: '—',
+        tono: 'noAplica',
+        aplicaDgii: false,
+        titulo: 'Nota de venta interna: no es un e-CF, no se envía a la DGII',
+      }
+  }
+}
+
+export interface TipoClaseBadge {
+  /** Qué ES el documento: tipo e-CF legible, "Borrador" o "Nota de venta". */
+  label: string
+  clase: ClaseDocumento
+  /** Tooltip: en borradores conserva el tipo e-CF que se emitiría. */
+  titulo: string
+}
+
+/** Qué ES el documento. Única fuente de la columna "Tipo / Clase". */
+export function tipoClaseBadge(
+  c: Pick<Comprobante, 'esFiscal' | 'estado' | 'tipoECF'>,
+): TipoClaseBadge {
+  const clase = claseDocumento(c)
+  const tipoLabel = TIPO_ECF_LABELS[c.tipoECF] ?? c.tipoECF
+  if (clase === 'nota') {
+    return { label: 'Nota de venta', clase, titulo: 'Documento interno sin valor fiscal (no es un e-CF)' }
+  }
+  if (clase === 'borrador') {
+    // Un borrador de nota de venta no "sería" un e-CF: no anunciar un tipo fiscal.
+    return {
+      label: 'Borrador',
+      clase,
+      titulo:
+        c.esFiscal === false
+          ? 'Borrador de nota de venta — aún sin folio NV'
+          : `Borrador de ${tipoLabel} — aún no emitido`,
+    }
+  }
+  return { label: tipoLabel, clase, titulo: tipoLabel }
 }
 
 export interface PaginatedResponse<T> {
@@ -55,6 +174,11 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
+/**
+ * Label granular de cada estado — para vistas de DETALLE (historial, tarjeta de
+ * estado), donde distinguir "En cola" de "Enviando" sí aporta. En las LISTAS se
+ * usa `estadoDgiiBadge()`, que agrupa los transitorios en "En proceso".
+ */
 export const ESTADO_LABELS: Record<ComprobanteEstado, string> = {
   PENDIENTE: 'Pendiente',
   EN_COLA: 'En cola',
@@ -64,7 +188,7 @@ export const ESTADO_LABELS: Record<ComprobanteEstado, string> = {
   RECHAZADO: 'Rechazado',
   ERROR: 'Error',
   DRAFT: 'Borrador',
-  INTERNO: 'No fiscal',
+  INTERNO: 'Nota de venta',
 }
 
 export const ESTADO_BADGE_VARIANT: Record<ComprobanteEstado, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -91,6 +215,61 @@ export const TIPO_ECF_LABELS: Record<TipoECF, string> = {
   E46: 'Exportaciones (E46)',
   E47: 'Pagos al Exterior (E47)',
 }
+
+/**
+ * Tipos que el sistema emite hoy en la práctica (los que ofrece el formulario y
+ * para los que hay secuencias configuradas). El filtro de Tipo se limita a
+ * éstos: ofrecer E41/E43/E44/E45/E46/E47 daba filtros que nunca devuelven nada.
+ * Los demás siguen mostrándose en la columna Tipo si existiera alguno.
+ */
+export const TIPOS_ECF_EMITIDOS: readonly TipoECF[] = ['E31', 'E32', 'E33', 'E34']
+
+// ─── Opciones de filtro (compartidas por la barra de filtros y el hook) ──────
+
+/** Filtro de Estado DGII. 'EN_PROCESO' agrupa PENDIENTE|EN_COLA|ENVIANDO. */
+export type EstadoFiltro =
+  | 'todos'
+  | 'ACEPTADO'
+  | 'ACEPTADO_CONDICIONAL'
+  | 'RECHAZADO'
+  | 'EN_PROCESO'
+  | 'ERROR'
+
+export type ClaseFiltro = 'todos' | ClaseDocumento
+export type OrigenFiltro = 'todos' | 'cotizacion'
+
+/** Estados reales que el backend debe filtrar para cada opción del selector. */
+export function estadosDeFiltro(filtro: EstadoFiltro): ComprobanteEstado[] {
+  if (filtro === 'todos') return []
+  if (filtro === 'EN_PROCESO') return [...ESTADOS_EN_PROCESO]
+  return [filtro]
+}
+
+export const ESTADO_FILTER_OPTIONS: { value: EstadoFiltro; label: string }[] = [
+  { value: 'todos', label: 'Estado DGII' },
+  { value: 'ACEPTADO', label: 'Aceptado' },
+  { value: 'ACEPTADO_CONDICIONAL', label: 'Aceptado c/obs.' },
+  { value: 'EN_PROCESO', label: 'En proceso' },
+  { value: 'RECHAZADO', label: 'Rechazado' },
+  { value: 'ERROR', label: 'Error' },
+]
+
+export const CLASE_FILTER_OPTIONS: { value: ClaseFiltro; label: string }[] = [
+  { value: 'todos', label: 'Clase' },
+  { value: 'fiscal', label: 'Fiscal (e-CF)' },
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'nota', label: 'Nota de venta' },
+]
+
+export const TIPO_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'todos', label: 'Tipo' },
+  ...TIPOS_ECF_EMITIDOS.map((t) => ({ value: t, label: TIPO_ECF_LABELS[t] })),
+]
+
+export const ORIGEN_FILTER_OPTIONS: { value: OrigenFiltro; label: string }[] = [
+  { value: 'todos', label: 'Origen' },
+  { value: 'cotizacion', label: 'Desde cotización' },
+]
 
 export function formatCurrency(value: string | number): string {
   const n = typeof value === 'string' ? Number(value) : value

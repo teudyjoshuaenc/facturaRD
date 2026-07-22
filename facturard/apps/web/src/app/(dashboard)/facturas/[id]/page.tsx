@@ -17,13 +17,14 @@ import {
   RefreshCw,
   Mail,
   AlertTriangle,
+  AlertCircle,
   Pencil,
 } from 'lucide-react'
 import {
   type Comprobante,
-  TIPO_ECF_LABELS,
+  estadoDgiiBadge,
+  tipoClaseBadge,
   ESTADO_LABELS,
-  ESTADO_BADGE_VARIANT,
   formatCurrency,
   downloadComprobantePdf,
 } from '@/lib/comprobantes'
@@ -304,40 +305,38 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
         {/* Title and Badge */}
         <div className="flex flex-col items-start font-sans">
           <div className="flex gap-[12px] items-center">
+            {/* Identificador real: e-NCF, o folio NV- de la nota de venta. */}
             <h1 className="text-[24px] font-semibold text-[#333333] leading-[36px]">
-              {comprobante.eNCF || 'Borrador'}
+              {comprobante.eNCF || comprobante.folioInterno || 'Sin e-NCF'}
             </h1>
-            <div
-              className={`inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[10px] text-[12px] font-normal leading-[18px] ${comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL'
-                  ? 'bg-[rgba(6,118,71,0.1)] text-[#067647]'
-                  : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR'
-                    ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
-                    : 'bg-neutral-100 text-[#64748b]'
-                }`}
-            >
-              {comprobante.estado === 'ACEPTADO' || comprobante.estado === 'ACEPTADO_CONDICIONAL' ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0">
-                    <path d="M10.5 4.08337L5.25 9.33337L3.5 7.58337" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12.8333 7.00004C12.8333 10.2217 10.2217 12.8334 7.00004 12.8334C3.77838 12.8334 1.16671 10.2217 1.16671 7.00004C1.16671 3.77838 3.77838 1.16671 7.00004 1.16671C10.2217 1.16671 12.8333 3.77838 12.8333 7.00004Z" stroke="#067647" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>Aceptado</span>
-                </>
-              ) : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
-                <>
-                  <XCircle size={13} className="text-[#b42318] shrink-0" />
-                  <span>Rechazado</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={13} className="text-neutral-500 shrink-0 animate-spin" />
-                  <span>En proceso</span>
-                </>
-              )}
-            </div>
+            {/* Estado DGII — misma fuente única que la lista. Antes este badge
+                etiquetaba ERROR como "Rechazado" y ponía spinner a borradores. */}
+            {(() => {
+              const { label, tono, aplicaDgii, titulo } = estadoDgiiBadge(comprobante.estado)
+              if (!aplicaDgii) return null
+              const wrap =
+                tono === 'success' ? 'bg-[rgba(6,118,71,0.1)] text-[#067647]'
+                : tono === 'warning' ? 'bg-[rgba(225,113,0,0.1)] text-[#e17100]'
+                : tono === 'danger' ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
+                : 'bg-neutral-100 text-[#64748b]'
+              const Icono =
+                tono === 'success' ? CheckCircle2
+                : tono === 'warning' ? AlertTriangle
+                : tono === 'danger' ? (comprobante.estado === 'ERROR' ? AlertCircle : XCircle)
+                : RefreshCw
+              return (
+                <div
+                  title={titulo}
+                  className={`inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[10px] text-[12px] font-normal leading-[18px] ${wrap}`}
+                >
+                  <Icono size={13} className={`shrink-0 ${tono === 'proceso' ? 'animate-spin' : ''}`} />
+                  <span>{label}</span>
+                </div>
+              )
+            })()}
           </div>
           <p className="text-[14px] text-[#64748b] leading-[21px] mt-0.5">
-            {TIPO_ECF_LABELS[comprobante.tipoECF] || 'Comprobante'} • {comprobante.razonSocial} • {formatCurrency(total)}
+            {tipoClaseBadge(comprobante).label} • {comprobante.razonSocial} • {formatCurrency(total)}
           </p>
         </div>
       </div>

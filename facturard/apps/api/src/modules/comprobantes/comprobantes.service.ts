@@ -542,21 +542,33 @@ export class ComprobantesService {
     const limit = Math.min(query.limit ?? 20, 100)
     const skip = (page - 1) * limit
 
-    // Clase de documento (filtro de la lista):
-    //  fiscal   → e-CF fiscal en cualquier estado salvo borrador
-    //  borrador → borrador fiscal (DRAFT)
-    //  nota     → Nota de venta interna (esFiscal=false)
+    // Clase de documento (filtro de la lista). DRAFT manda sobre esFiscal, igual
+    // que en el front (`claseDocumento`): una nota de venta también puede estar
+    // en borrador (esFiscal=false + DRAFT, todavía sin folio NV-) y debe caer en
+    // "borrador", no en "nota". Las tres clases son mutuamente excluyentes.
+    //  fiscal   → e-CF fiscal ya emitido / en curso (no borrador)
+    //  borrador → cualquier DRAFT (fiscal o de nota de venta)
+    //  nota     → Nota de venta ya creada (esFiscal=false y no borrador)
     const claseWhere: Prisma.ComprobanteWhereInput =
-        query.clase === 'nota' ? { esFiscal: false }
-      : query.clase === 'borrador' ? { esFiscal: true, estado: 'DRAFT' }
+        query.clase === 'nota' ? { esFiscal: false, estado: { not: 'DRAFT' } }
+      : query.clase === 'borrador' ? { estado: 'DRAFT' }
       : query.clase === 'fiscal' ? { esFiscal: true, estado: { not: 'DRAFT' } }
       : {}
+
+    // Estado(s) DGII. Llega como lista para poder pedir el agrupado "En proceso"
+    // (PENDIENTE|EN_COLA|ENVIANDO) en UNA consulta paginada por el servidor.
+    // Va en AND con la clase: si ambos se combinan, ninguno pisa al otro.
+    const estadoWhere: Prisma.ComprobanteWhereInput =
+      query.estado !== undefined && query.estado.length > 0 ? { estado: { in: query.estado } } : {}
+
+    // Procedencia: convertido desde una cotización. Es un eje aparte del estado.
+    const origenWhere: Prisma.ComprobanteWhereInput =
+      query.origen === 'cotizacion' ? { cotizacionId: { not: null } } : {}
 
     const where: Prisma.ComprobanteWhereInput = {
       tenantId,
       eliminado: false, // las notas de venta soft-deleted no se listan
-      ...claseWhere,
-      ...(query.estado !== undefined && { estado: query.estado }),
+      AND: [claseWhere, estadoWhere, origenWhere],
       ...(query.tipoECF !== undefined && { tipoECF: query.tipoECF }),
       ...rangoFechas(query.fechaDesde, query.fechaHasta),
       ...(query.search !== undefined && query.search.trim() !== ''

@@ -6,13 +6,18 @@ import { toast } from 'sonner'
 import { api, getErrorMessage } from '@/lib/api'
 import {
   downloadComprobantePdf,
+  estadosDeFiltro,
+  type ClaseFiltro,
   type Comprobante,
+  type EstadoFiltro,
+  type OrigenFiltro,
   type PaginatedResponse,
 } from '@/lib/comprobantes'
 import { useUI } from '@/lib/context/UIContext'
 import { useSearchParams } from 'next/navigation'
 
-export type EstadoFilter = 'todos' | 'ACEPTADO' | 'PENDIENTE' | 'RECHAZADO' | 'DRAFT' | 'COTIZACION_CONVERTIDA'
+/** @deprecated Alias de `EstadoFiltro` (fuente única en lib/comprobantes). */
+export type EstadoFilter = EstadoFiltro
 
 const PAGE_SIZE = 10
 
@@ -93,8 +98,9 @@ export function useComprobantes() {
   const searchParams = useSearchParams()
   const initialSearch = searchParams.get('search') || ''
   const [page, setPage] = useState(1)
-  const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>('todos')
-  const [claseFilter, setClaseFilter] = useState<'todos' | 'fiscal' | 'borrador' | 'nota'>('todos')
+  const [estadoFilter, setEstadoFilter] = useState<EstadoFiltro>('todos')
+  const [claseFilter, setClaseFilter] = useState<ClaseFiltro>('todos')
+  const [origenFilter, setOrigenFilter] = useState<OrigenFiltro>('todos')
   const [search, setSearch] = useState(initialSearch)
   const [tipoFilter, setTipoFilter] = useState<string>('todos')
   const [startDate, setStartDate] = useState<string>('')
@@ -110,19 +116,27 @@ export function useComprobantes() {
   // Build server-side query params
   const serverTipo = tipoFilter !== 'todos' ? tipoFilter : undefined
   const serverClase = claseFilter !== 'todos' ? claseFilter : undefined
+  const serverOrigen = origenFilter !== 'todos' ? origenFilter : undefined
   const serverSearch = activeSearch || undefined
   const serverFechaDesde = startDate || undefined
   const serverFechaHasta = endDate || undefined
+  // El estado (incluido el agrupado "En proceso") lo resuelve el BACKEND: antes
+  // se filtraba en cliente sobre un limit:100 y con más comprobantes la lista
+  // salía incompleta sin avisar.
+  const estadosServer = estadosDeFiltro(estadoFilter)
+  const serverEstado = estadosServer.length > 0 ? estadosServer.join(',') : undefined
 
-  // Determine if any client-side-only filter is active (amount range, estado grouping)
-  const hasClientFilter = minAmount !== '' || maxAmount !== '' || estadoFilter !== 'todos'
+  // Único filtro que sigue siendo client-side: el rango de monto (el backend no
+  // lo soporta). Mientras esté activo, paginamos en cliente sobre 100 registros.
+  const hasClientFilter = minAmount !== '' || maxAmount !== ''
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [
       'comprobantes-lista',
       page,
-      estadoFilter,
-      claseFilter,
+      serverEstado,
+      serverClase,
+      serverOrigen,
       serverSearch,
       serverTipo,
       serverFechaDesde,
@@ -137,8 +151,10 @@ export function useComprobantes() {
             page: hasClientFilter ? 1 : page,
             limit: hasClientFilter ? 100 : PAGE_SIZE,
             ...(serverSearch && { search: serverSearch }),
+            ...(serverEstado && { estado: serverEstado }),
             ...(serverTipo && { tipoECF: serverTipo }),
             ...(serverClase && { clase: serverClase }),
+            ...(serverOrigen && { origen: serverOrigen }),
             ...(serverFechaDesde && { fechaDesde: serverFechaDesde }),
             ...(serverFechaHasta && { fechaHasta: serverFechaHasta }),
           },
@@ -156,23 +172,7 @@ export function useComprobantes() {
   const filtered = useMemo(() => {
     let all = data?.data ?? []
 
-    // 1. Estado Filter (En proceso = PENDIENTE, EN_COLA, ENVIANDO) — client-side grouping
-    if (estadoFilter !== 'todos') {
-      if (estadoFilter === 'PENDIENTE') {
-        all = all.filter(
-          (c) =>
-            c.estado === 'PENDIENTE' ||
-            c.estado === 'EN_COLA' ||
-            c.estado === 'ENVIANDO'
-        )
-      } else if (estadoFilter === 'COTIZACION_CONVERTIDA') {
-        all = all.filter((c) => !!c.cotizacionId)
-      } else {
-        all = all.filter((c) => c.estado === estadoFilter)
-      }
-    }
-
-    // 2. Amount Range — client-side only
+    // Rango de monto — único filtro client-side (sin soporte en el backend).
     if (minAmount) {
       const min = Number(minAmount)
       all = all.filter((c) => Number(c.montoTotal) >= min)
@@ -183,7 +183,7 @@ export function useComprobantes() {
     }
 
     return all
-  }, [data, estadoFilter, minAmount, maxAmount])
+  }, [data, minAmount, maxAmount])
 
   const paginatedComprobantes = useMemo(() => {
     if (hasClientFilter) {
@@ -221,8 +221,13 @@ export function useComprobantes() {
     }
   }, [])
 
-  const handleEstadoChange = useCallback((f: EstadoFilter) => {
+  const handleEstadoChange = useCallback((f: EstadoFiltro) => {
     setEstadoFilter(f)
+    setPage(1)
+  }, [])
+
+  const handleOrigenChange = useCallback((o: OrigenFiltro) => {
+    setOrigenFilter(o)
     setPage(1)
   }, [])
 
@@ -236,7 +241,7 @@ export function useComprobantes() {
     setPage(1)
   }, [])
 
-  const handleClaseFilterChange = useCallback((c: 'todos' | 'fiscal' | 'borrador' | 'nota') => {
+  const handleClaseFilterChange = useCallback((c: ClaseFiltro) => {
     setClaseFilter(c)
     setPage(1)
   }, [])
@@ -277,6 +282,8 @@ export function useComprobantes() {
     setTipoFilter: handleTipoFilterChange,
     claseFilter,
     setClaseFilter: handleClaseFilterChange,
+    origenFilter,
+    setOrigenFilter: handleOrigenChange,
     startDate,
     setStartDate: handleStartDateChange,
     endDate,

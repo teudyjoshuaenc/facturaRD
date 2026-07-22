@@ -20,7 +20,8 @@ import {
 import {
   type Comprobante,
   type ComprobanteEstado,
-  TIPO_ECF_LABELS,
+  claseDocumento,
+  tipoClaseBadge,
   formatCurrency,
   formatDate,
 } from '@/lib/comprobantes'
@@ -108,8 +109,14 @@ export function DetailPanel({
   const historyEvents: { title: string; description: string; date: string; status: string }[] = []
   if (comprobante) {
     // 1. Creación / emisión (createdAt real).
+    // El título sale del ESTADO, no de tener e-NCF: una nota de venta interna
+    // tampoco tiene e-NCF y no es un borrador.
+    const claseDoc = claseDocumento(comprobante)
     historyEvents.push({
-      title: comprobante.eNCF ? 'Emitido' : 'Borrador creado',
+      title:
+        claseDoc === 'borrador' ? 'Borrador creado'
+        : claseDoc === 'nota' ? 'Nota de venta creada'
+        : 'Emitido',
       description: comprobante.eNCF ? `e-NCF ${comprobante.eNCF}` : 'Registro creado en el sistema',
       date: formatTimelineDate(comprobante.createdAt),
       status: 'success',
@@ -158,11 +165,13 @@ export function DetailPanel({
           <div className="h-5 w-28 bg-neutral-100 animate-pulse rounded-md" />
         ) : (
           <div className="flex flex-col items-start">
+            {/* Identificador real (e-NCF o folio NV-). El "qué es" va debajo y
+                sale de la clase por ESTADO, no de tener o no e-NCF. */}
             <h2 className="text-[14px] font-semibold text-[#333] leading-[21px]">
-              {comprobante.eNCF || 'Borrador'}
+              {comprobante.eNCF || comprobante.folioInterno || 'Sin e-NCF'}
             </h2>
             <p className="text-[12px] font-normal text-[#64748b] leading-[18px]">
-              {TIPO_ECF_LABELS[comprobante.tipoECF] || 'Comprobante'}
+              {tipoClaseBadge(comprobante).label}
             </p>
           </div>
         )}

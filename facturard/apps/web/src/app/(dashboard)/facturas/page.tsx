@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
+import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { Comprobante } from '@/lib/comprobantes'
 import { useComprobantes, useEnviarComprobante } from '@/hooks/useComprobantes'
 import { api, getErrorMessage } from '@/lib/api'
@@ -20,9 +21,8 @@ import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/com
 import { cn } from '@/lib/utils'
 import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 import {
-  ESTADO_LABELS,
-  ESTADO_BADGE_VARIANT,
-  TIPO_ECF_LABELS,
+  estadoDgiiBadge,
+  tipoClaseBadge,
   formatCurrency,
   formatDate,
 } from '@/lib/comprobantes'
@@ -43,6 +43,8 @@ export default function FacturasPage(): JSX.Element {
     setTipoFilter,
     claseFilter,
     setClaseFilter,
+    origenFilter,
+    setOrigenFilter,
     startDate,
     setStartDate,
     endDate,
@@ -105,27 +107,32 @@ export default function FacturasPage(): JSX.Element {
                 <th>RNC</th>
                 <th>Fecha</th>
                 <th>ITBIS</th>
-                <th>Estado</th>
+                <th>Tipo / Clase</th>
+                <th>Estado DGII</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               ${selectedList.map(c => {
                 const itbisVal = Number(c.montoTotal || 0) * 18 / 118
-                const folioVal = c.eNCF || c.folioInterno || 'NV'
+                const folioVal = c.eNCF || c.folioInterno || '—'
                 const cleanRnc = c.rnc ? (c.rnc.length === 9 ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3') : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')) : '—'
+                // Mismas dos dimensiones (y misma fuente de labels) que la tabla.
+                const tipoVal = tipoClaseBadge(c).label
+                const estadoVal = estadoDgiiBadge(c.estado).label
                 return "<tr>" +
                   "<td><b>" + folioVal + "</b></td>" +
                   "<td>" + (c.razonSocial || '—') + "</td>" +
                   "<td>" + cleanRnc + "</td>" +
                   "<td>" + formatDate(c.createdAt) + "</td>" +
                   "<td>" + formatCurrency(itbisVal) + "</td>" +
-                  "<td>" + (ESTADO_LABELS[c.estado] || c.estado) + "</td>" +
+                  "<td>" + tipoVal + "</td>" +
+                  "<td>" + estadoVal + "</td>" +
                   "<td>" + formatCurrency(c.montoTotal) + "</td>" +
                   "</tr>"
               }).join('')}
               <tr class="total-row">
-                <td colspan="6" style="text-align: right;">Total General:</td>
+                <td colspan="7" style="text-align: right;">Total General:</td>
                 <td>${formatCurrency(selectedList.reduce((sum, c) => sum + Number(c.montoTotal || 0), 0))}</td>
               </tr>
             </tbody>
@@ -179,8 +186,15 @@ export default function FacturasPage(): JSX.Element {
     setComprobanteToEmit(c)
   }
 
-  async function handleDelete(c: Comprobante) {
-    if (!window.confirm(`¿Eliminar la nota de venta ${c.folioInterno ?? ''}? Esta acción no se puede deshacer.`)) return
+  // Borrado de nota de venta: confirma con el modal compartido de la app
+  // (el mismo de productos), no con el window.confirm nativo.
+  const [comprobanteToDelete, setComprobanteToDelete] = useState<Comprobante | null>(null)
+
+  function handleDelete(c: Comprobante) {
+    setComprobanteToDelete(c)
+  }
+
+  async function executeDelete(c: Comprobante) {
     try {
       await api.delete(`/comprobantes/${c.id}`)
       toast.success('Nota de venta eliminada')
@@ -188,6 +202,8 @@ export default function FacturasPage(): JSX.Element {
       refetch()
     } catch (err) {
       toast.error('No se pudo eliminar', { description: getErrorMessage(err) })
+    } finally {
+      setComprobanteToDelete(null)
     }
   }
 
@@ -292,6 +308,8 @@ export default function FacturasPage(): JSX.Element {
             onTipoFilterChange={setTipoFilter}
             claseFilter={claseFilter}
             onClaseFilterChange={setClaseFilter}
+            origenFilter={origenFilter}
+            onOrigenFilterChange={setOrigenFilter}
             startDate={startDate}
             onStartDateChange={setStartDate}
             endDate={endDate}
@@ -313,7 +331,7 @@ export default function FacturasPage(): JSX.Element {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-left border-collapse table-fixed">
+                <table className="w-full min-w-[1200px] text-left border-collapse table-fixed">
                   <thead>
                     <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px] select-none">
                       <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#e2e8f0] bg-[#f8fafc]", isSelectionMode ? "w-10" : "w-0")}>
@@ -350,7 +368,8 @@ export default function FacturasPage(): JSX.Element {
                       <th className="px-[16px] py-[10px] w-[130px] min-w-[130px] font-normal">Total</th>
                       <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">ITBIS</th>
                       <th className="px-[16px] py-[10px] w-[95px] min-w-[95px] font-normal">Fecha</th>
-                      <th className="px-[8px] py-[10px] w-[195px] min-w-[195px] font-normal">Estado DGII</th>
+                      <th className="px-[8px] py-[10px] w-[170px] min-w-[170px] font-normal">Tipo / Clase</th>
+                      <th className="px-[8px] py-[10px] w-[150px] min-w-[150px] font-normal">Estado DGII</th>
                       <th className="px-[8px] py-[10px] w-[145px] min-w-[145px] font-normal">Acciones</th>
                     </tr>
                   </thead>
@@ -451,6 +470,19 @@ export default function FacturasPage(): JSX.Element {
           }}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={comprobanteToDelete !== null}
+        title="Eliminar nota de venta"
+        itemName={comprobanteToDelete?.folioInterno ?? null}
+        fallbackName="esta nota de venta"
+        onClose={() => setComprobanteToDelete(null)}
+        onConfirm={() => {
+          if (comprobanteToDelete) {
+            void executeDelete(comprobanteToDelete)
+          }
+        }}
+      />
 
       <ConfirmReemitirModal
         open={comprobanteToEmit !== null}

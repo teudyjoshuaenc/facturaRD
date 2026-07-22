@@ -8,7 +8,9 @@ import {
   XCircle,
   RefreshCw,
   AlertTriangle,
+  AlertCircle,
   FileText,
+  FileSignature,
   Pencil,
   Mail,
   Copy,
@@ -18,6 +20,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import {
   type Comprobante,
+  type ComprobanteEstado,
+  estadoDgiiBadge,
+  tipoClaseBadge,
   formatCurrency,
   formatDate,
 } from '@/lib/comprobantes'
@@ -36,60 +41,92 @@ interface Props {
   onToggleSelectInBulk?: () => void
 }
 
-function getStatusBadge(estado: string, cotizacionId?: string | null): JSX.Element {
-  if (cotizacionId) {
+/**
+ * Columna "Estado DGII": SOLO el estado del ciclo DGII, y sólo para documentos
+ * que viajan a la DGII. Borrador y nota de venta muestran "—" (su naturaleza se
+ * ve en la columna Tipo/Clase). El origen (cotización) NO participa aquí.
+ * Labels y tonos vienen de `estadoDgiiBadge()` — sin textos propios.
+ */
+function EstadoDgiiCell({ estado }: { estado: ComprobanteEstado }): JSX.Element {
+  const { label, tono, aplicaDgii, titulo } = estadoDgiiBadge(estado)
+
+  if (!aplicaDgii) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(3,121,213,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#0379d5] font-sans">
-        <CheckCircle2 size={14} className="text-[#0379d5] flex-shrink-0" />
-        Cotización convertida
+      <span className="text-[13px] text-[#cbd5e1] font-normal font-sans select-none" title={titulo}>
+        {label}
       </span>
     )
   }
-  if (estado === 'ACEPTADO') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(6,118,71,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#067647] font-sans">
-        <CheckCircle2 size={14} className="text-[#067647] flex-shrink-0" />
-        Aceptado
-      </span>
-    )
+
+  const estilos: Record<string, { wrap: string; icon: string }> = {
+    success: { wrap: 'bg-[rgba(6,118,71,0.1)] text-[#067647]', icon: 'text-[#067647]' },
+    warning: { wrap: 'bg-[rgba(225,113,0,0.1)] text-[#e17100]', icon: 'text-[#e17100]' },
+    danger: { wrap: 'bg-[rgba(180,35,24,0.1)] text-[#b42318]', icon: 'text-[#b42318]' },
+    proceso: { wrap: 'bg-[#f1f5f9] text-[#64748b]', icon: 'text-[#64748b]' },
   }
-  if (estado === 'ACEPTADO_CONDICIONAL') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(225,113,0,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#e17100] font-sans">
-        <AlertTriangle size={14} className="text-[#e17100] flex-shrink-0" />
-        Aceptado c/obs.
-      </span>
-    )
-  }
-  if (estado === 'RECHAZADO') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(180,35,24,0.1)] px-[10px] py-[5px] text-[12px] font-normal text-[#b42318] font-sans">
-        <XCircle size={14} className="text-[#b42318] flex-shrink-0" />
-        Rechazado
-      </span>
-    )
-  }
-  if (estado === 'DRAFT') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.1)] px-[10px] py-[5px] text-[12px] font-semibold text-[#64748b] font-sans">
-        <FileText size={14} className="text-[#64748b] flex-shrink-0" />
-        Borrador
-      </span>
-    )
-  }
-  if (estado === 'INTERNO') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[rgba(100,116,139,0.12)] px-[10px] py-[5px] text-[12px] font-semibold text-[#475569] font-sans">
-        <FileText size={14} className="text-[#475569] flex-shrink-0" />
-        Nota de venta
-      </span>
-    )
-  }
-  // En proceso / Pendiente
+  const estilo = estilos[tono] ?? estilos.proceso!
+
+  const Icono =
+    tono === 'success' ? CheckCircle2
+    : tono === 'warning' ? AlertTriangle
+    : tono === 'danger' ? (estado === 'ERROR' ? AlertCircle : XCircle)
+    : RefreshCw
+
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-[#f1f5f9] px-[10px] py-[5px] text-[12px] font-normal text-[#64748b] font-sans">
-      <RefreshCw size={14} className="text-[#64748b] animate-spin flex-shrink-0" />
-      En proceso
+    <span
+      title={titulo}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-[10px] px-[10px] py-[5px] text-[12px] font-normal font-sans',
+        estilo.wrap,
+      )}
+    >
+      <Icono
+        size={14}
+        className={cn(estilo.icon, 'flex-shrink-0', tono === 'proceso' && 'animate-spin')}
+      />
+      {label}
+    </span>
+  )
+}
+
+/**
+ * Columna "Tipo / Clase": QUÉ ES el documento — tipo e-CF legible para los
+ * fiscales, "Borrador" o "Nota de venta" para los que no van a la DGII.
+ *
+ * "Borrador" se decide SIEMPRE por `estado === 'DRAFT'` (vía `claseDocumento`),
+ * nunca por tener o no e-NCF: un borrador de nota de crédito (E34) tampoco
+ * tiene e-NCF y debe verse igual que un borrador de factura.
+ *
+ * El borrador va en ROJO (convención tipo Gmail). No se confunde con
+ * "Rechazado": viven en columnas distintas y con íconos distintos
+ * (Borrador = documento, Rechazado = ✕ en Estado DGII).
+ */
+function TipoClaseCell({ comprobante }: { comprobante: Comprobante }): JSX.Element {
+  const { label, clase, titulo } = tipoClaseBadge(comprobante)
+
+  if (clase === 'fiscal') {
+    return (
+      <span className="block truncate text-[12px] font-normal text-[#333] font-sans" title={titulo}>
+        {label}
+      </span>
+    )
+  }
+
+  const estilo =
+    clase === 'borrador'
+      ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
+      : 'bg-[rgba(100,116,139,0.12)] text-[#475569]'
+
+  return (
+    <span
+      title={titulo}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-[10px] px-[10px] py-[5px] text-[12px] font-semibold font-sans max-w-full',
+        estilo,
+      )}
+    >
+      <FileText size={14} className="flex-shrink-0" />
+      <span className="truncate">{label}</span>
     </span>
   )
 }
@@ -146,11 +183,27 @@ const FacturaRow = React.memo(function FacturaRow({
         onClick={handleCellClick}
         className="px-[16px] py-[16px] w-[110px] min-w-[110px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
-        {c.eNCF
-          ? c.eNCF
-          : c.esFiscal === false
-            ? <span className="text-[#475569] font-semibold">{c.folioInterno || 'NV'}</span>
-            : <span className="text-[#64748b]/60 italic font-normal">Borrador</span>}
+        {/* Identificador real del documento. El "qué es" (borrador / nota) vive
+            en la columna Tipo/Clase — aquí ya no se repite. */}
+        <div className="flex items-center gap-1">
+          {/* Sólo identificadores REALES. Un borrador (fiscal o de nota de
+              venta) todavía no tiene ninguno: e-NCF se asigna al emitir y el
+              folio NV- al finalizar la nota. Antes se pintaba un "NV" literal
+              que parecía un identificador y no lo era. */}
+          <span className="truncate">
+            {c.eNCF
+              ? c.eNCF
+              : c.folioInterno
+                ? <span className="text-[#475569] font-semibold">{c.folioInterno}</span>
+                : <span className="text-[#cbd5e1] font-normal">—</span>}
+          </span>
+          {/* Procedencia (no es estado ni tipo): marca discreta, nunca sustituye nada. */}
+          {c.cotizacionId && (
+            <span title="Convertida desde cotización" className="flex-shrink-0 leading-none">
+              <FileSignature size={12} className="text-[#0379d5] opacity-70" />
+            </span>
+          )}
+        </div>
       </td>
       <td
         onClick={handleCellClick}
@@ -186,9 +239,15 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[8px] py-[16px] w-[195px] min-w-[195px] text-left align-middle cursor-pointer whitespace-nowrap"
+        className="px-[8px] py-[16px] w-[170px] min-w-[170px] text-left align-middle cursor-pointer whitespace-nowrap overflow-hidden"
       >
-        {getStatusBadge(c.estado, c.cotizacionId)}
+        <TipoClaseCell comprobante={c} />
+      </td>
+      <td
+        onClick={handleCellClick}
+        className="px-[8px] py-[16px] w-[150px] min-w-[150px] text-left align-middle cursor-pointer whitespace-nowrap"
+      >
+        <EstadoDgiiCell estado={c.estado} />
       </td>
       <td className="px-[8px] py-[16px] w-[145px] min-w-[145px] text-right align-middle">
         <div className="flex items-center justify-end gap-[4px] w-full">

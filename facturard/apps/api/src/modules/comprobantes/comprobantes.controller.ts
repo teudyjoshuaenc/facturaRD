@@ -63,7 +63,14 @@ export class ComprobantesController {
 
   @Get()
   @ApiOperation({ summary: 'Lista comprobantes con filtros y paginación' })
-  @ApiQuery({ name: 'estado', enum: ComprobanteEstado, required: false })
+  @ApiQuery({
+    name: 'estado',
+    enum: ComprobanteEstado,
+    required: false,
+    description: 'Uno o varios estados separados por coma (ej. PENDIENTE,EN_COLA,ENVIANDO)',
+  })
+  @ApiQuery({ name: 'clase', enum: ['fiscal', 'borrador', 'nota'], required: false })
+  @ApiQuery({ name: 'origen', enum: ['cotizacion'], required: false })
   @ApiQuery({ name: 'tipoECF', enum: TipoECF, required: false })
   @ApiQuery({ name: 'fechaDesde', required: false })
   @ApiQuery({ name: 'fechaHasta', required: false })

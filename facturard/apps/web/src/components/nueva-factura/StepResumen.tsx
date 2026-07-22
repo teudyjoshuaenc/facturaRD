@@ -40,6 +40,13 @@ interface StepResumenProps {
   fechaLimite?: string
   terminoPago?: string
   onBack: () => void
+  /**
+   * Este paso lo comparten el flujo FISCAL (e-CF, sí va a la DGII) y el de
+   * NOTA DE VENTA interna (no tiene e-NCF, no se firma, no se envía). El texto
+   * de confirmación se condiciona: mencionar la DGII en una nota de venta es
+   * incorrecto. Por defecto `true` para no alterar el flujo fiscal existente.
+   */
+  esFiscal?: boolean
 }
 
 function formatDateSpanish(isoDate: string): string {
@@ -59,6 +66,7 @@ export function StepResumen({
   fechaLimite,
   terminoPago,
   onBack,
+  esFiscal = true,
 }: StepResumenProps): JSX.Element {
 
   // Calculate detailed totals
@@ -111,17 +119,20 @@ export function StepResumen({
       {/* Title Header */}
       <div className="border-[#dde5ef] border-b border-solid pb-[11px] w-full">
         <h4 className="font-sans font-semibold text-[#374b6a] text-[13px] uppercase tracking-wider">
-          Confirmación del comprobante
+          {esFiscal ? 'Confirmación del comprobante' : 'Confirmación de la nota de venta'}
         </h4>
       </div>
 
-      {/* Warning Banner */}
+      {/* Warning Banner — el aviso de envío a la DGII SOLO aplica al e-CF fiscal.
+          Una nota de venta interna no tiene e-NCF, no se firma y no se envía. */}
       <div className="bg-[#ebf4fd] border border-[rgba(3,121,213,0.2)] border-solid rounded-[10px] w-full px-[21px] py-[17px]">
         <p className="font-sans font-semibold text-[#0379d5] text-[13px] leading-[20.8px]">
-          Revisa los datos antes de emitir
+          {esFiscal ? 'Revisa los datos antes de emitir' : 'Revisa los datos antes de crear'}
         </p>
         <p className="font-sans font-normal text-[13px] text-[rgba(0,0,0,0.8)] leading-[20.8px] mt-[6px]">
-          Al confirmar, el comprobante será enviado a la DGII para su validación y no podrá ser modificado. Asegúrate de que todos los datos del documento, comprador y detalle estén correctos.
+          {esFiscal
+            ? 'Al confirmar, el comprobante será enviado a la DGII para su validación y no podrá ser modificado. Asegúrate de que todos los datos del documento, comprador y detalle estén correctos.'
+            : 'Al confirmar, se creará la nota de venta interna. Es un documento sin valor fiscal: no se envía a la DGII y podrás editarla después. Revisa que los datos del cliente y el detalle estén correctos.'}
         </p>
       </div>
 
@@ -143,9 +154,13 @@ export function StepResumen({
 
         {/* NCF & Método Pago Row */}
         <div className="flex gap-[24px] items-center w-full font-sans">
+          {/* Una nota de venta no tiene tipo de NCF: mostrarlo sería inventarle
+              naturaleza fiscal a un documento interno. */}
           <div className="flex flex-col gap-[4px] flex-1">
-            <span className="text-[#94a3b8] text-[12px]">Tipo NCF</span>
-            <span className="text-[#333] text-[14px] font-normal">{SHORTHAND_NCF[tipoECF] || tipoECF}</span>
+            <span className="text-[#94a3b8] text-[12px]">{esFiscal ? 'Tipo NCF' : 'Tipo de documento'}</span>
+            <span className="text-[#333] text-[14px] font-normal">
+              {esFiscal ? (SHORTHAND_NCF[tipoECF] || tipoECF) : 'Nota de venta (documento interno)'}
+            </span>
           </div>
           <div className="flex flex-col gap-[4px] flex-1">
             <span className="text-[#94a3b8] text-[12px]">Método Pago</span>
