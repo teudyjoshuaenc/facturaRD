@@ -8,11 +8,12 @@ interface Props {
   label: string
   active: boolean
   collapsed: boolean
+  onClick?: () => void
 }
 
-const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, active, collapsed }: Props) {
+const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, active, collapsed, onClick }: Props) {
   return (
-    <div className="relative group w-full">
+    <div className="relative group w-full" onClick={onClick}>
       <Link
         href={href}
         className={cn(

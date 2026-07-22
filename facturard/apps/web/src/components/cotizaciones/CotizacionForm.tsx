@@ -351,9 +351,9 @@ export function CotizacionForm(): JSX.Element {
       </div>
 
       {/* Main 2-column scroll/fixed container */}
-      <div className="flex gap-6 mt-6 flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-6 mt-6 flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
         {/* Left Column (Scrollable Form) */}
-        <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-12">
+        <div className="flex-1 overflow-y-auto pr-0 lg:pr-2 space-y-6 pb-6 lg:pb-12 min-w-0">
           
           {/* Card 1: Datos generales */}
           <Card className="p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px] gap-5 text-left">
@@ -685,8 +685,9 @@ export function CotizacionForm(): JSX.Element {
                           <input
                             type="text"
                             value={item.nombreItem}
+                            title={item.nombreItem}
                             onChange={(e) => handleUpdateItem(item.key, { nombreItem: e.target.value })}
-                            className="w-full bg-transparent font-semibold text-[13px] text-text-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 rounded px-1 py-0.5 border-none"
+                            className="w-full bg-transparent font-bold text-[16px] text-text-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 rounded px-1.5 py-1 border-none truncate"
                             placeholder="Nombre del servicio o bien"
                           />
                         </td>
@@ -807,7 +808,7 @@ export function CotizacionForm(): JSX.Element {
         </div>
 
         {/* Right Column (Fixed Resumen) */}
-        <div className="w-[310px] [@media(min-width:1201px)]:w-[360px] shrink-0 sticky top-0 h-fit transition-all duration-300">
+        <div className="w-full lg:w-[360px] shrink-0 sticky lg:top-0 h-fit transition-all duration-300">
           <Card className="flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-[21px] gap-[16px] relative text-left">
             {/* Header */}
             <div className="flex items-center justify-between w-full select-none">

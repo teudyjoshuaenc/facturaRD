@@ -123,7 +123,7 @@ export default function DashboardPage(): JSX.Element {
       {/* Columna principal (span 3) */}
       <div className="lg:col-span-3 flex flex-col gap-6 min-w-0">
         {/* Métricas reales del mes */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-[1400px]:grid-cols-4">
           <MetricCard
             title="Ingresos"
             value={flujoLoading ? '…' : formatCurrencyCompact(flujo?.ingresos ?? 0)}

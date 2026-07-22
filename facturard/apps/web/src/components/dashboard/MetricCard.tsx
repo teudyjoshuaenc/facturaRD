@@ -2,6 +2,7 @@ import React from 'react'
 import type { JSX, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface Props {
   title: string
@@ -12,28 +13,33 @@ interface Props {
 }
 
 const MetricCard = React.memo(function MetricCard({ title, value, icon: Icon, badge, subtitle }: Props): JSX.Element {
+  const valStr = String(value)
   return (
-    <Card className="hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-1.5 p-5 text-left">
-      <div className="flex items-center justify-between text-text-secondary w-full">
-        <span className="text-ui-sm font-semibold text-text-secondary uppercase tracking-wider">{title}</span>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-50 text-text-secondary">
+    <Card className="hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-1.5 p-4 sm:p-5 text-left min-w-0 overflow-hidden">
+      <div className="flex items-center justify-between text-text-secondary w-full min-w-0">
+        <span className="text-ui-xs sm:text-ui-sm font-semibold text-text-secondary uppercase tracking-wider truncate">{title}</span>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-50 text-text-secondary shrink-0">
           <Icon size={16} />
         </div>
       </div>
-      <div className="flex items-baseline gap-2 mt-1">
-        <p className={`font-bold text-text-primary tracking-tight ${
-          value.toString().length > 12
-            ? 'text-h5'
-            : value.toString().length > 10
-            ? 'text-h4'
-            : 'text-h3'
-        }`}>
+      <div className="flex items-baseline gap-2 mt-1 min-w-0 w-full overflow-hidden">
+        <p
+          title={valStr}
+          className={cn(
+            "font-bold text-text-primary tracking-tight truncate min-w-0 max-w-full",
+            valStr.length > 14
+              ? "text-[16px] sm:text-[18px]"
+              : valStr.length > 10
+              ? "text-[18px] sm:text-[22px]"
+              : "text-[22px] sm:text-[26px]"
+          )}
+        >
           {value}
         </p>
         {badge}
       </div>
       {subtitle && (
-        <span className="text-ui-xs text-text-secondary font-medium mt-0.5">{subtitle}</span>
+        <span className="text-ui-xs text-text-secondary font-medium mt-0.5 truncate">{subtitle}</span>
       )}
     </Card>
   )
