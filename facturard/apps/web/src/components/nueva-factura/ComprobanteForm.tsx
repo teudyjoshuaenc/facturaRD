@@ -792,24 +792,6 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   {esFiscal ? 'Resumen e-CF' : 'Resumen'}
                 </span>
               </div>
-              <div className="flex items-center gap-[12px]">
-                <button
-                  type="button"
-                  title="Vista Previa"
-                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors"
-                >
-                  <Eye size={18} />
-                </button>
-                <button
-                  type="button"
-                  title="Guardar Borrador"
-                  onClick={() => handleSubmit(false)}
-                  disabled={submitting || isPlanExpired}
-                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save size={17} />
-                </button>
-              </div>
             </div>
 
             {/* Metadata (Invoice Info) */}
@@ -1028,6 +1010,26 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     )}
                   </button>
                 )}
+
+                {/* Secondary Actions: Borrador & Cancelar */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit(false)}
+                    disabled={submitting || isPlanExpired}
+                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center gap-1.5 hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
+                  >
+                    <Save size={15} className="text-[#64748B]" />
+                    <span>Borrador</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/facturas')}
+                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    <span>Cancelar</span>
+                  </button>
+                </div>
 
 
               </div>

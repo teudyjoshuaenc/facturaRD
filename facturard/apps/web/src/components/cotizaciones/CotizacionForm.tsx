@@ -627,13 +627,13 @@ export function CotizacionForm(): JSX.Element {
                             onClick={() => {
                               handleAddProduct(p)
                             }}
-                            className="flex w-full h-[62px] items-center justify-between px-4 py-2.5 text-left border-b border-neutral-50 last:border-none bg-white hover:bg-[#F0F5FF] transition-colors focus:bg-[#F0F5FF] focus:outline-none cursor-pointer"
+                            className="flex w-full min-h-[58px] h-auto items-center justify-between gap-3 px-4 py-2 text-left border-b border-neutral-50 last:border-none bg-white hover:bg-[#F0F5FF] transition-colors focus:bg-[#F0F5FF] focus:outline-none cursor-pointer"
                           >
-                            <div className="flex flex-col">
-                              <span className="text-[16px] font-semibold text-[#333333] leading-6">{p.nombre}</span>
-                              <span className="text-[12px] font-medium text-[#99A1AF] leading-[18px]">{p.codigo}</span>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="text-[15px] font-semibold text-[#333333] leading-5 truncate" title={p.nombre}>{p.nombre}</span>
+                              <span className="text-[12px] font-medium text-[#99A1AF] leading-[18px] truncate">{p.codigo}</span>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 shrink-0">
                               <span className="text-[16px] font-semibold text-[#333333] leading-6">{formatCurrency(p.precio)}</span>
                               {hasTax && (
                                 <div className="flex items-center justify-center w-[40px] h-[20px] bg-[#FFFBEB] rounded-[4px] relative">
@@ -817,35 +817,6 @@ export function CotizacionForm(): JSX.Element {
                   Resumen
                 </span>
               </div>
-              <div className="flex items-center gap-[12px]">
-                <button
-                  type="button"
-                  title={id ? 'Descargar PDF' : 'Guarda la cotización para generar su PDF'}
-                  onClick={async () => {
-                    if (!id) {
-                      toast.info('Guarda la cotización primero para generar su PDF')
-                      return
-                    }
-                    try {
-                      await downloadCotizacionPdf(api, id, folio || 'cotizacion')
-                    } catch {
-                      toast.error('No se pudo generar el PDF')
-                    }
-                  }}
-                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors cursor-pointer"
-                >
-                  <Eye size={18} />
-                </button>
-                <button
-                  type="button"
-                  title="Guardar Borrador"
-                  disabled={submitting}
-                  onClick={() => handleSaveQuote()}
-                  className="text-[#0379D5] hover:text-[#0379D5]/80 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <Save size={18} />
-                </button>
-              </div>
             </div>
 
             {/* Metadata info */}
@@ -947,13 +918,24 @@ export function CotizacionForm(): JSX.Element {
                     </>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => router.push('/cotizaciones')}
-                  className="w-full h-[44px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer"
-                >
-                  <span>Cancelar</span>
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveQuote()}
+                    disabled={submitting}
+                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center gap-1.5 hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
+                  >
+                    <Save size={15} className="text-[#64748B]" />
+                    <span>Borrador</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/cotizaciones')}
+                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    <span>Cancelar</span>
+                  </button>
+                </div>
               </div>
 
               {/* Info text */}

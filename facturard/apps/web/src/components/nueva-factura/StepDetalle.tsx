@@ -173,10 +173,7 @@ export function StepDetalle({
 
               {/* Dropdown: se abre al enfocar; tope de productos activos, filtra al teclear */}
               {productFocused && (
-                <div className={cn(
-                  "absolute z-50 mt-1.5 overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 animate-in fade-in-50 duration-150",
-                  isQuickMode ? "max-h-[310px] w-full md:w-[684px]" : "max-h-[248px] w-full md:w-[742px]"
-                )}>
+                <div className="absolute left-0 right-0 z-50 mt-1.5 max-h-[248px] w-full overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_20px_25px_-5px_rgba(0,0,0,0.1),0px_8px_10px_-6px_rgba(0,0,0,0.1)] py-0 animate-in fade-in-50 duration-150">
                   {filteredProducts.slice(0, 15).map((p) => {
                     const hasTax = p.indicadorFacturacion === 'I1' || p.indicadorFacturacion === 'I2'
                     return (
@@ -188,13 +185,13 @@ export function StepDetalle({
                           setProductSearch('')
                           setProductFocused(false)
                         }}
-                        className="flex w-full h-[62px] items-center justify-between px-4 py-2.5 text-left border-b border-neutral-50 last:border-none bg-white hover:bg-[#F0F5FF] transition-colors focus:bg-[#F0F5FF] focus:outline-none"
+                        className="flex w-full min-h-[58px] h-auto items-center justify-between gap-3 px-4 py-2 text-left border-b border-neutral-50 last:border-none bg-white hover:bg-[#F0F5FF] transition-colors focus:bg-[#F0F5FF] focus:outline-none"
                       >
-                        <div className="flex flex-col">
-                          <span className="text-[16px] font-semibold text-[#333333] leading-6">{p.nombre}</span>
-                          <span className="text-[12px] font-medium text-[#99A1AF] leading-[18px]">{p.codigo}</span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-[15px] font-semibold text-[#333333] leading-5 truncate" title={p.nombre}>{p.nombre}</span>
+                          <span className="text-[12px] font-medium text-[#99A1AF] leading-[18px] truncate">{p.codigo}</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0">
                           <span className="text-[16px] font-semibold text-[#333333] leading-6">{formatCurrency(p.precio)}</span>
                           {hasTax && (
                             <div className="flex items-center justify-center w-[40px] h-[20px] bg-[#FFFBEB] rounded-[4px] relative">
@@ -240,7 +237,7 @@ export function StepDetalle({
             <table className="w-full text-left text-body-sm border-collapse">
               <thead className="sticky top-0 bg-neutral-50 z-10 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
                 <tr className="text-[11px] uppercase tracking-wider text-text-secondary bg-neutral-50 border-b border-neutral-100 select-none">
-                  <th className="py-3 px-4 font-semibold text-text-secondary">Producto</th>
+                  <th className="py-3 px-4 font-semibold text-text-secondary min-w-[240px] max-w-[320px]">Producto</th>
                   <th className="py-3 px-4 font-semibold text-text-secondary">Unidad de Medida</th>
                   <th className="py-3 px-4 font-semibold text-text-secondary text-center">Bien o Servicio</th>
                   <th className={cn("py-3 px-4 font-semibold text-text-secondary", isQuickMode ? "w-28 text-center" : "w-24")}>Cant.</th>
@@ -266,8 +263,8 @@ export function StepDetalle({
 
                   return (
                     <tr key={item.key} className="border-t border-neutral-100 hover:bg-neutral-50/40">
-                      <td className="py-3.5 px-4 font-semibold text-text-primary">
-                        {item.nombreItem}
+                      <td className="py-3.5 px-4 font-semibold text-text-primary max-w-[280px]">
+                        <span className="block truncate" title={item.nombreItem}>{item.nombreItem}</span>
                       </td>
                       <td className="py-3.5 px-4 text-text-secondary font-medium">
                         {UNIDADES_MEDIDA_MAP[item.unidadMedida ?? 43] ?? 'Unidad'}

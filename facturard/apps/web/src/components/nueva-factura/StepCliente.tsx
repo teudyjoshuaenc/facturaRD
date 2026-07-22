@@ -217,9 +217,15 @@ export function StepCliente({
                 <input
                   type="text"
                   placeholder="Buscar por nombre o RNC..."
-                  value={searchQuery}
+                  value={
+                    clienteFocused
+                      ? searchQuery
+                      : searchQuery || (selectedCliente ? `${selectedCliente.nombre}${selectedCliente.rnc ? ` - RNC: ${selectedCliente.rnc}` : ''}` : '')
+                  }
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setClienteFocused(true)}
+                  onFocus={() => {
+                    setClienteFocused(true)
+                  }}
                   className="relative z-50 h-[44px] w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] pl-[40px] pr-4 text-[14px] font-normal leading-[19px] text-[#333333] placeholder:text-[#0A0A0A]/50 focus:border-[#0379D5] focus:bg-white focus:outline-none focus:ring-0 transition-colors"
                 />
 
@@ -230,7 +236,7 @@ export function StepCliente({
 
                 {/* Dropdown: se abre al enfocar; tope de clientes activos, filtra al teclear */}
                 {showSearch && (
-                  <div className="absolute z-50 mt-1.5 max-h-[337px] w-full md:w-[742px] overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
+                  <div className="absolute left-0 right-0 z-50 mt-1.5 max-h-[337px] w-full overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
                     {clientesVisibles.map((c: Contacto) => {
                       const isSelected = selectedCliente?.id === c.id
                       return (
@@ -396,7 +402,7 @@ export function StepCliente({
 
 
           {/* Tipo de Pago */}
-          <div className="flex flex-col gap-[8px] items-start w-full">
+          <div className={cn("flex flex-col gap-[8px] items-start w-full", tipoPago !== 'CREDITO' && "md:col-span-2")}>
             <div className="flex justify-between items-center w-full select-none">
               <label className="text-[12px] font-semibold text-[#333333] uppercase font-sans">Tipo de Pago</label>
               {!tipoPago && (
@@ -415,37 +421,31 @@ export function StepCliente({
             />
           </div>
 
-            {/* Fecha Límite */}
+          {/* Fecha Límite - Solo visible si es pago a Crédito */}
+          {tipoPago === 'CREDITO' && (
             <div className="flex flex-col gap-[8px] items-start w-full">
               <div className="flex justify-between items-center w-full select-none">
-                <label className={cn(
-                  "text-[12px] font-semibold uppercase font-sans transition-colors",
-                  tipoPago === 'CREDITO' ? "text-[#333333]" : "text-[#333333]/50"
-                )}>
-                  Fecha Límite {esFiscal && tipoPago === 'CREDITO' && '*'}
+                <label className="text-[12px] font-semibold uppercase font-sans transition-colors text-[#333333]">
+                  Fecha Límite {esFiscal && '*'}
                 </label>
-                {esFiscal && tipoPago === 'CREDITO' && !fechaLimite && (
+                {esFiscal && !fechaLimite && (
                   <span className="text-[11px] font-semibold text-danger-600 animate-in fade-in-50">Campo Requerido</span>
                 )}
               </div>
               <div
                 onClick={() => {
-                  if (tipoPago === 'CREDITO') {
-                    try {
-                      limiteRef.current?.showPicker()
-                    } catch (e) {
-                      limiteRef.current?.focus()
-                    }
+                  try {
+                    limiteRef.current?.showPicker()
+                  } catch (e) {
+                    limiteRef.current?.focus()
                   }
                 }}
                 className="relative w-full cursor-pointer"
               >
                 <div
                   className={cn(
-                    "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors select-none",
-                    tipoPago === 'CREDITO'
-                      ? cn("bg-white text-[#333333]", !fechaLimite ? "border-danger-500" : "border-[#F5F5F5]")
-                      : "bg-[#F8FAFC] text-[#64748B]/40 border-[#F5F5F5] cursor-not-allowed"
+                    "flex w-full h-[54.5px] items-center justify-between gap-1.5 rounded-[10px] border-[1.25px] px-[16px] text-[13px] font-normal transition-colors select-none bg-white text-[#333333]",
+                    !fechaLimite ? "border-danger-500" : "border-[#F5F5F5]"
                   )}
                 >
                   <span className={fechaLimite ? "truncate text-[#333333]" : "truncate text-[#64748B]/70"}>
@@ -461,6 +461,7 @@ export function StepCliente({
                 />
               </div>
             </div>
+          )}
 
           {/* Término de Pago (Spans both columns) */}
           <div className="flex flex-col gap-[8px] items-start w-full md:col-span-2">

@@ -101,13 +101,13 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           'fixed inset-y-0 left-0 z-50 w-64 md:static md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           // Tablet/Desktop width based on collapse state
-          collapsed ? 'md:w-[76px]' : 'md:w-[280px]'
+          collapsed ? 'md:w-[76px]' : 'md:w-[215px]'
         )}
       >
         {/* Top Header Section (Logo + Chevron Toggle) */}
         <div className={cn(
           "w-full h-[68px] border-b border-[rgba(10,10,10,0.08)] flex items-center shrink-0 select-none transition-all duration-300",
-          collapsed ? "justify-center px-0" : "justify-between px-[24px]"
+          collapsed ? "justify-center px-0" : "justify-between px-[18px]"
         )}>
           {/* Show Figma Logo when expanded */}
           {!collapsed && (
