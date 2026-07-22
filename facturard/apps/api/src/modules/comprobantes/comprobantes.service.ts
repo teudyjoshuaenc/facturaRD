@@ -201,6 +201,24 @@ export class ComprobantesService {
     const dto = await this.resolverDto(tenantId, dtoOriginal)
     const totales = calcularTotales(dto.items)
 
+    // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
+    if (dto.emitir === false) {
+      return prisma.comprobante.create({
+        data: {
+          tenantId,
+          eNCF: null,
+          esFiscal: dto.esFiscal ?? true,
+          tipoECF: dto.tipoECF ?? 'E32',
+          estado: 'DRAFT',
+          montoTotal: totales.montoTotal,
+          rnc: dto.rncComprador ?? '',
+          razonSocial: dto.razonSocialComprador ?? '',
+          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
+          datos: JSON.parse(JSON.stringify(dto)) as object,
+        },
+      })
+    }
+
     // esFiscal=false → "Nota de venta" interna: documento NO fiscal. NO consume
     // e-NCF, NO firma, NO encola, NO toca la DGII y queda fuera de 606/607/608.
     // Numeración interna propia (NV-000001). No exige certificado ni campos
@@ -217,23 +235,6 @@ export class ComprobantesService {
           // default-ea a E32 solo para satisfacer la columna NOT NULL del schema.
           tipoECF: dto.tipoECF ?? 'E32',
           estado: 'INTERNO',
-          montoTotal: totales.montoTotal,
-          rnc: dto.rncComprador ?? '',
-          razonSocial: dto.razonSocialComprador ?? '',
-          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
-          datos: JSON.parse(JSON.stringify(dto)) as object,
-        },
-      })
-    }
-
-    // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
-    if (dto.emitir === false) {
-      return prisma.comprobante.create({
-        data: {
-          tenantId,
-          eNCF: null,
-          tipoECF: dto.tipoECF,
-          estado: 'DRAFT',
           montoTotal: totales.montoTotal,
           rnc: dto.rncComprador ?? '',
           razonSocial: dto.razonSocialComprador ?? '',
@@ -421,6 +422,18 @@ export class ComprobantesService {
     const comprobante = await this.findOne(tenantId, id)
     if (comprobante.estado !== 'DRAFT') {
       throw new ConflictException('El comprobante ya fue emitido o no es un borrador')
+    }
+
+    // Si es una Nota de venta interna (esFiscal=false), transiciona a INTERNO y asigna el folio NV-
+    if (comprobante.esFiscal === false) {
+      const folioInterno = await this.documentoFolioService.siguienteFolio(tenantId)
+      return prisma.comprobante.update({
+        where: { id },
+        data: {
+          folioInterno,
+          estado: 'INTERNO',
+        },
+      })
     }
 
     await this.assertPuedeEmitir(tenantId)
