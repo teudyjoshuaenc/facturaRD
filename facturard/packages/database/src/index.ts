@@ -10,6 +10,8 @@ export {
   MovimientoTipo,
   MovimientoCategoria,
   PagoTipo,
+  CanalEnvio,
+  EstadoEnvio,
 } from '@prisma/client'
 
 // Model types
@@ -31,6 +33,7 @@ export type {
   MovimientoFinanciero,
   Pago,
   CapitalInicial,
+  EnvioComprobante,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'

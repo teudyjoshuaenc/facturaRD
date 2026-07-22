@@ -1,11 +1,11 @@
 import { Injectable, BadRequestException, ServiceUnavailableException, Logger } from '@nestjs/common'
 import { prisma } from '@facturard/database'
 import { CryptoService } from '../../common/services/crypto.service'
+import { GhlHttpService, GHL_BASE_URL } from '../../common/services/ghl-http.service'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import type { ConfigurarGhlDto } from './dto/configurar-ghl.dto'
 
-const GHL_CONTACTS_URL = 'https://services.leadconnectorhq.com/contacts/'
-const GHL_VERSION = '2021-07-28'
+const GHL_CONTACTS_URL = `${GHL_BASE_URL}/contacts/`
 
 export interface SyncResultado {
   importados: number
@@ -56,6 +56,7 @@ export class GhlContactosService {
   constructor(
     private readonly crypto: CryptoService,
     private readonly dgii: DgiiContribuyentesService,
+    private readonly ghlHttp: GhlHttpService,
   ) {}
 
   async configurar(tenantId: string, dto: ConfigurarGhlDto): Promise<{ ok: true }> {
@@ -132,17 +133,12 @@ export class GhlContactosService {
   }
 
   /**
-   * Llama a GHL con el token. Los Private Integration Tokens se documentan tanto
-   * con 'Authorization: Bearer <token>' como con 'Authorization: <token>'; se
-   * intenta Bearer y, si devuelve 401/403, se reintenta sin 'Bearer'.
+   * Llama a GHL con el token. La lógica de auth (Bearer con fallback sin Bearer
+   * ante 401/403 + header Version) vive en GhlHttpService, compartida con el
+   * envío de comprobantes.
    */
   private async fetchGhl(url: string, token: string): Promise<Response> {
-    const headers = (auth: string): Record<string, string> => ({ Authorization: auth, Version: GHL_VERSION })
-    let res = await fetch(url, { headers: headers(`Bearer ${token}`) })
-    if (res.status === 401 || res.status === 403) {
-      res = await fetch(url, { headers: headers(token) })
-    }
-    return res
+    return this.ghlHttp.request(url, token)
   }
 
   /**
@@ -260,7 +256,7 @@ export class GhlContactosService {
 
     try {
       const res = await this.fetchGhl(
-        `https://services.leadconnectorhq.com/locations/${encodeURIComponent(locationId)}/customFields`,
+        `${GHL_BASE_URL}/locations/${encodeURIComponent(locationId)}/customFields`,
         token,
       )
       if (res.ok) {

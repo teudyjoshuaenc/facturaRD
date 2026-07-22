@@ -2,6 +2,8 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Re
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import type { Response } from 'express'
 import { ComprobantesService } from './comprobantes.service'
+import { EnvioComprobanteService } from './envio-comprobante.service'
+import { EnviarComprobanteDto } from './dto/enviar-comprobante.dto'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import { CrearNotaDto } from './dto/crear-nota.dto'
@@ -17,7 +19,10 @@ import { ComprobanteEstado, TipoECF } from '@facturard/database'
 @UseGuards(JwtAuthGuard, PlanActivoGuard)
 @Controller('comprobantes')
 export class ComprobantesController {
-  constructor(private readonly service: ComprobantesService) {}
+  constructor(
+    private readonly service: ComprobantesService,
+    private readonly envios: EnvioComprobanteService,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -81,6 +86,26 @@ export class ComprobantesController {
   @ApiOperation({ summary: 'Detalle de un comprobante con su estado actual' })
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.findOne(tenantId, id)
+  }
+
+  @Post(':id/enviar')
+  @ApiOperation({
+    summary:
+      'Envía el comprobante al cliente por GoHighLevel (PDF adjunto). Post-emisión: NO cambia el estado DGII. ' +
+      'Hoy sólo canal="email"; whatsapp/ambos responden 400.',
+  })
+  enviar(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: EnviarComprobanteDto,
+  ) {
+    return this.envios.enviar(tenantId, id, dto)
+  }
+
+  @Get(':id/envios')
+  @ApiOperation({ summary: 'Historial de envíos del comprobante (canal, estado, destino, messageId de GHL).' })
+  historialEnvios(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.envios.historial(tenantId, id)
   }
 
   @Get(':id/pdf')

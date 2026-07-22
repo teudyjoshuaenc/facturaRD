@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 // pero listamos las hijas de finanzas primero por claridad. Mantener sincronizada
 // con el schema al agregar tablas nuevas.
 export const E2E_TABLES = [
+  'envios_comprobante',
   'pagos',
   'movimientos_financieros',
   'capital_inicial',
