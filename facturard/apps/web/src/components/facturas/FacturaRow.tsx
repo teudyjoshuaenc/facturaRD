@@ -119,7 +119,6 @@ const FacturaRow = React.memo(function FacturaRow({
 }: Props): JSX.Element {
   const router = useRouter()
   const esNota = c.esFiscal === false
-  const itbis = Number(c.montoTotal) * 18 / 118
 
   // Format RNC nicely: e.g. 130-87456-2
   const formattedRnc = c.rnc
@@ -150,7 +149,7 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[110px] min-w-[110px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {/* Identificador real del documento. El "qué es" (borrador / nota) vive
             en la columna Tipo/Clase — aquí ya no se repite. */}
@@ -176,7 +175,7 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[160px] min-w-[160px] text-left align-middle cursor-pointer"
+        className="px-[16px] py-[16px] text-left align-middle cursor-pointer"
       >
         <div className="w-full truncate text-[#333] font-normal text-[12px]" title={c.razonSocial}>
           {c.razonSocial}
@@ -184,41 +183,35 @@ const FacturaRow = React.memo(function FacturaRow({
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[110px] min-w-[110px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formattedRnc}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[130px] min-w-[130px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] text-left text-[#333] font-semibold text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatCurrency(c.montoTotal)}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[120px] min-w-[120px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
-      >
-        {formatCurrency(itbis)}
-      </td>
-      <td
-        onClick={handleCellClick}
-        className="px-[16px] py-[16px] w-[95px] min-w-[95px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
+        className="px-[16px] py-[16px] text-left text-[#64748b] font-normal text-[12px] align-middle cursor-pointer whitespace-nowrap"
       >
         {formatDate(c.createdAt)}
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[8px] py-[16px] w-[170px] min-w-[170px] text-left align-middle cursor-pointer whitespace-nowrap overflow-hidden"
+        className="px-[8px] py-[16px] text-left align-middle cursor-pointer whitespace-nowrap overflow-hidden"
       >
         <TipoClaseCell comprobante={c} />
       </td>
       <td
         onClick={handleCellClick}
-        className="px-[8px] py-[16px] w-[150px] min-w-[150px] text-left align-middle cursor-pointer whitespace-nowrap"
+        className="px-[8px] py-[16px] text-left align-middle cursor-pointer whitespace-nowrap"
       >
         <EstadoDgiiCell estado={c.estado} />
       </td>
-      <td className="px-[8px] py-[16px] w-[145px] min-w-[145px] text-right align-middle">
+      <td className="px-[8px] py-[16px] text-right align-middle">
         <div className="flex items-center justify-end gap-[4px] w-full">
 
           {/* Descargar button */}

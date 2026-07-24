@@ -22,6 +22,8 @@ import {
 import { api, getErrorMessage } from '@/lib/api'
 import { toast } from 'sonner'
 import { RefreshActionButton } from '@/components/ui/table-actions'
+import { ColResizer } from '@/components/ui/col-resizer'
+import { useResizableColumns, type ResizableColumn } from '@/hooks/useResizableColumns'
 import {
   estadoDgiiBadge,
   tipoClaseBadge,
@@ -29,6 +31,19 @@ import {
   formatDate,
   tienePdfEnviable,
 } from '@/lib/comprobantes'
+
+// Columnas redimensionables de la lista de facturas (la 1ª es el checkbox, fija).
+const FACTURAS_COLUMNS: ResizableColumn[] = [
+  { key: 'sel', width: 40, min: 40 },
+  { key: 'encf', width: 120, min: 90 },
+  { key: 'cliente', width: 180, min: 120 },
+  { key: 'rnc', width: 120, min: 90 },
+  { key: 'total', width: 130, min: 100 },
+  { key: 'fecha', width: 100, min: 80 },
+  { key: 'tipo', width: 180, min: 120 },
+  { key: 'estado', width: 150, min: 110 },
+  { key: 'acciones', width: 150, min: 120 },
+]
 
 export default function FacturasPage(): JSX.Element {
   const router = useRouter()
@@ -65,6 +80,8 @@ export default function FacturasPage(): JSX.Element {
     isFetching,
     refetch,
   } = useComprobantes()
+
+  const { widths: colWidths, startResize } = useResizableColumns('facturas', FACTURAS_COLUMNS)
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
@@ -330,9 +347,15 @@ export default function FacturasPage(): JSX.Element {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1200px] text-left border-collapse table-fixed">
+                  {/* Anchos redimensionables (arrastrar el borde del encabezado). */}
+                  <colgroup>
+                    {FACTURAS_COLUMNS.map((col) => (
+                      <col key={col.key} style={{ width: colWidths[col.key] }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px] select-none">
-                      <th className="w-10 p-0 text-center align-middle border-b border-[#e2e8f0] bg-[#f8fafc]">
+                      <th className="p-0 text-center align-middle border-b border-[#e2e8f0] bg-[#f8fafc]">
                         <div className="flex h-[40px] w-10 items-center justify-center pl-4">
                           {/* Estado indeterminado cuando hay selección parcial:
                               comunica "algunas, no todas" sin texto. */}
@@ -349,15 +372,14 @@ export default function FacturasPage(): JSX.Element {
                           />
                         </div>
                       </th>
-                      <th className="px-[16px] py-[10px] w-[110px] min-w-[110px] font-normal">e-NCF</th>
-                      <th className="px-[16px] py-[10px] w-[160px] min-w-[160px] font-normal">Cliente</th>
-                      <th className="px-[16px] py-[10px] w-[110px] min-w-[110px] font-normal">RNC</th>
-                      <th className="px-[16px] py-[10px] w-[130px] min-w-[130px] font-normal">Total</th>
-                      <th className="px-[16px] py-[10px] w-[120px] min-w-[120px] font-normal">ITBIS</th>
-                      <th className="px-[16px] py-[10px] w-[95px] min-w-[95px] font-normal">Fecha</th>
-                      <th className="px-[8px] py-[10px] w-[170px] min-w-[170px] font-normal">Tipo / Clase</th>
-                      <th className="px-[8px] py-[10px] w-[150px] min-w-[150px] font-normal">Estado DGII</th>
-                      <th className="px-[8px] py-[10px] w-[145px] min-w-[145px] font-normal">Acciones</th>
+                      <th className="relative px-[16px] py-[10px] font-normal">e-NCF<ColResizer onStart={(e) => startResize('encf', e)} /></th>
+                      <th className="relative px-[16px] py-[10px] font-normal">Cliente<ColResizer onStart={(e) => startResize('cliente', e)} /></th>
+                      <th className="relative px-[16px] py-[10px] font-normal">RNC<ColResizer onStart={(e) => startResize('rnc', e)} /></th>
+                      <th className="relative px-[16px] py-[10px] font-normal">Total<ColResizer onStart={(e) => startResize('total', e)} /></th>
+                      <th className="relative px-[16px] py-[10px] font-normal">Fecha<ColResizer onStart={(e) => startResize('fecha', e)} /></th>
+                      <th className="relative px-[8px] py-[10px] font-normal">Tipo / Clase<ColResizer onStart={(e) => startResize('tipo', e)} /></th>
+                      <th className="relative px-[8px] py-[10px] font-normal">Estado DGII<ColResizer onStart={(e) => startResize('estado', e)} /></th>
+                      <th className="px-[8px] py-[10px] font-normal">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -212,9 +212,20 @@ export default function FinanzasPage(): JSX.Element {
       {/* Flujo (año completo) */}
       <FlujoChart serie={flujo.data?.serie ?? []} isLoading={flujo.isLoading} vistaLabel={vistaLabel} />
 
-      {/* Transacciones + aside */}
+      {/* Capital + categorías: fila propia, para dejar la tabla a ancho completo.
+          Flujo top-down: números (KPIs) → tendencia (gráfico) → desglose (capital/
+          categorías) → detalle (transacciones). */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
+        <CapitalCard />
+        <div className="lg:col-span-2">
+          <CategoriasBreakdown categorias={categorias.data?.categorias ?? []} isLoading={categorias.isLoading} />
+        </div>
+      </div>
+
+      {/* Transacciones — ancho completo (ya no comparte fila con el aside, así el
+          "Origen" no se colapsa cuando el "Detalle" es largo). */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col text-left">
               <h3 className="text-body-base font-bold text-text-primary">Transacciones</h3>
@@ -288,11 +299,6 @@ export default function FinanzasPage(): JSX.Element {
             </div>
           )}
         </div>
-
-        <aside className="flex flex-col gap-6">
-          <CapitalCard />
-          <CategoriasBreakdown categorias={categorias.data?.categorias ?? []} isLoading={categorias.isLoading} />
-        </aside>
       </div>
 
       <MovimientoModal open={modalOpen} onClose={() => setModalOpen(false)} movimiento={editTarget} />
