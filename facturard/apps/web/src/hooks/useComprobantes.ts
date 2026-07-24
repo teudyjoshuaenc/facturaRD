@@ -327,12 +327,36 @@ export interface EnviarComprobantePayload {
   mensaje?: string
 }
 
+/** Contacto de GHL bajo el que quedó el hilo del correo. */
+export interface AnclaEnvio {
+  ghlContactId: string
+  razonSocial: string
+  origen: 'contactoLocal' | 'contactoGhl' | 'primerComprobante' | 'creado'
+  email: string | null
+  /** true si ESTE envío creó un contacto nuevo en el CRM del cliente. */
+  creado: boolean
+}
+
 export interface EnvioResultado {
   canal: CanalEnvio
   estado: EstadoEnvio
   destino: string
+  ancla: AnclaEnvio
   ghlMessageId: string | null
   enviadoEn: string
+}
+
+/**
+ * Avisa cuando el envío creó un contacto en el CRM del cliente. Va en un toast
+ * APARTE del de éxito: escribir en GoHighLevel no puede pasar desapercibido
+ * entre el "enviado correctamente".
+ */
+function avisarSiCreoContacto(ancla: AnclaEnvio | undefined): void {
+  if (!ancla?.creado) return
+  toast.info('Se creó un contacto en GoHighLevel', {
+    description: `${ancla.email ?? 'el destinatario'} no existía como contacto y GoHighLevel exige uno para enviar. Se creó con la etiqueta "facturard-envio".`,
+    duration: 8000,
+  })
 }
 
 /** Historial de envíos de un comprobante. */
@@ -362,10 +386,61 @@ export function useEnviarComprobante() {
       void queryClient.invalidateQueries({ queryKey: ['comprobante-envios', variables.comprobanteId] })
       // El toast usa el destino REAL que devolvió el backend, no lo que se tecleó.
       toast.success('Comprobante enviado', { description: `Enviado a ${data.destino}` })
+      avisarSiCreoContacto(data.ancla)
     },
     // Aquí llegan los 400 accionables del backend ("cliente no sincronizado con
     // GoHighLevel", "no tiene correo registrado"). Sin esto el usuario no ve nada.
     onError: (err) => toast.error('No se pudo enviar', { description: getErrorMessage(err) }),
+  })
+}
+
+/**
+ * Máximo de comprobantes por correo. Es el límite de adjuntos de GoHighLevel
+ * (5 archivos por request de upload) y el backend lo valida igual: esta
+ * constante existe para poder EXPLICARLO en la UI, no para sostenerlo.
+ */
+export const MAX_COMPROBANTES_POR_CORREO = 5
+
+export interface EnviarLotePayload {
+  comprobanteIds: string[]
+  destinatarios: string[]
+  asunto?: string
+  mensaje?: string
+}
+
+export interface EnvioLoteResultado {
+  loteId: string
+  destinatarios: string[]
+  ancla: AnclaEnvio
+  comprobantes: { id: string; referencia: string }[]
+  adjuntos: number
+  ghlMessageId: string | null
+  enviadoEn: string
+}
+
+/**
+ * Envío EN LOTE: UN SOLO correo con los PDFs de varios comprobantes adjuntos.
+ * No es un correo por comprobante.
+ */
+export function useEnviarLote() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (body: EnviarLotePayload) =>
+      api.post<EnvioLoteResultado>('/comprobantes/enviar-lote', { canal: 'email', ...body }).then((r) => r.data),
+    onSuccess: (data, variables) => {
+      for (const id of variables.comprobanteIds) {
+        void queryClient.invalidateQueries({ queryKey: ['comprobante-envios', id] })
+      }
+      // Se nombra el destino REAL y dónde quedó el hilo en GHL: el usuario no
+      // tiene por qué adivinar en qué conversación aterrizó el correo.
+      toast.success(
+        `${data.adjuntos} comprobante${data.adjuntos === 1 ? '' : 's'} enviado${data.adjuntos === 1 ? '' : 's'} en un correo`,
+        { description: `Para ${data.destinatarios.join(', ')} · hilo en la conversación de ${data.ancla.razonSocial}` },
+      )
+      avisarSiCreoContacto(data.ancla)
+    },
+    onError: (err) => toast.error('No se pudo enviar el lote', { description: getErrorMessage(err) }),
   })
 }
 

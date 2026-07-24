@@ -563,6 +563,12 @@ model EnvioComprobante {
   destino           String?
   ghlMessageId      String?
   ghlConversationId String?
+  // Agrupa las N filas que salieron en el MISMO correo (envío en lote). Un
+  // correo con 5 facturas deja 5 filas —cada factura conserva su propio
+  // "enviada el X"— unidas por este id. No se agrupa por `ghlMessageId`: es
+  // nullable y no existe en las filas FALLIDO, que son las que más importa
+  // poder leer juntas. Null en los envíos individuales.
+  loteId            String?
   // Motivo cuando estado = FALLIDO. Se persiste el fallo, no sólo el éxito: un
   // envío que no salió tiene que ser visible y auditable.
   error             String?
@@ -573,5 +579,6 @@ model EnvioComprobante {
 
   @@index([tenantId, comprobanteId])
   @@index([comprobanteId, createdAt])
+  @@index([tenantId, loteId])
   @@map("envios_comprobante")
 }

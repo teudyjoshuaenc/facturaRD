@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Download,
   Send,
+  RotateCw,
   Copy,
   FileText,
   Clock,
@@ -53,6 +54,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
   const [downloading, setDownloading] = useState(false)
   const [isReenviarOpen, setIsReenviarOpen] = useState(false)
   const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
+  const [showConfirmReintentar, setShowConfirmReintentar] = useState(false)
   const [emitting, setEmitting] = useState(false)
 
   // Envío al cliente por GoHighLevel (post-emisión, no toca el estado DGII).
@@ -354,7 +356,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
             <span>Descargar PDF</span>
           </Button>
         )}
-        {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+        {comprobante.estado === 'DRAFT' ? (
           <>
             <Button
               variant="secondary"
@@ -380,6 +382,17 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
               <span>Emitir comprobante</span>
             </Button>
           </>
+        ) : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+          /* Reintentar: el e-CF rechazado/con error NO se re-emite (su e-NCF
+             quedó quemado). Se crea una factura NUEVA con los mismos datos. */
+          <Button
+            variant="secondary"
+            onClick={() => setShowConfirmReintentar(true)}
+            className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#0379d5]/30 bg-white text-[#0379d5] hover:bg-blue-50 text-[12px] font-semibold leading-[19.5px] gap-[7px] flex items-center transition-all cursor-pointer"
+          >
+            <RotateCw size={14} className="shrink-0 text-[#0379d5]" />
+            <span>Reintentar</span>
+          </Button>
         ) : (
           <>
             <Button
@@ -780,7 +793,10 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
         isOpen={isReenviarOpen}
         onClose={() => setIsReenviarOpen(false)}
         title="Enviar factura"
-        destinatario={comprobante.datos?.receptor?.email || ''}
+        comprobantes={[comprobante]}
+        // Correo del Contacto local resuelto por el backend, no el fantasma
+        // `datos.receptor.email` (que nadie escribe y siempre era undefined).
+        destinatarioFijo={comprobante.contactoEmail || ''}
         onSend={async ({ asunto, mensaje }) => {
           // Llamada REAL. El toast de éxito/error lo emite el hook a partir de
           // la respuesta del backend; aquí no se asume nada.
@@ -795,10 +811,21 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
 
       <ConfirmReemitirModal
         open={showConfirmReemitir}
+        mode="emitir"
         onClose={() => setShowConfirmReemitir(false)}
         onConfirm={() => {
           setShowConfirmReemitir(false)
           handleEmitir()
+        }}
+      />
+
+      <ConfirmReemitirModal
+        open={showConfirmReintentar}
+        mode="reintentar"
+        onClose={() => setShowConfirmReintentar(false)}
+        onConfirm={() => {
+          setShowConfirmReintentar(false)
+          router.push(`/nueva-factura?cloneId=${id}`)
         }}
       />
     </div>

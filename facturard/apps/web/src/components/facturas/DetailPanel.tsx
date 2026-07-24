@@ -7,7 +7,7 @@ import {
   X,
   FileText,
   Download,
-  Send,
+  RotateCw,
   CheckCircle2,
   XCircle,
   RefreshCw,
@@ -37,7 +37,8 @@ interface DetailPanelProps {
   onDownload: (c: Comprobante) => void
   downloading: boolean
   onReenviar?: (c: Comprobante) => void
-  onEmitir?: (c: Comprobante) => void
+  /** Reintento de un e-CF rechazado/con error: clona a una factura nueva. */
+  onReintentar?: (c: Comprobante) => void
 }
 
 // Convert ISO date (YYYY-MM-DD or full timestamp) to DD/MM/YYYY HH:MM
@@ -61,7 +62,7 @@ export function DetailPanel({
   onDownload,
   downloading,
   onReenviar,
-  onEmitir,
+  onReintentar,
 }: DetailPanelProps): JSX.Element | null {
   const router = useRouter()
   const [shouldRender, setShouldRender] = useState(open)
@@ -364,14 +365,27 @@ export function DetailPanel({
               </button>
             )}
 
-            {comprobante.estado === 'DRAFT' || comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+            {comprobante.estado === 'DRAFT' ? (
+              /* Un borrador puede estar incompleto: se abre el editor para
+                 completarlo y emitir desde ahí (no se emite a ciegas desde aquí). */
               <button
                 type="button"
-                onClick={() => onEmitir && onEmitir(comprobante)}
+                onClick={() => router.push(`/nueva-factura?id=${comprobante.id}`)}
                 className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#0379d5] hover:bg-blue-50 flex items-center justify-center gap-[4px] text-[12px] font-semibold leading-[19.5px] transition-all"
               >
-                <Send size={12} />
-                <span>Emitir</span>
+                <Pencil size={12} />
+                <span>Editar</span>
+              </button>
+            ) : comprobante.estado === 'RECHAZADO' || comprobante.estado === 'ERROR' ? (
+              /* Reintentar: un e-CF rechazado/con error no se re-emite (e-NCF
+                 quemado). El reintento real es crear uno nuevo con estos datos. */
+              <button
+                type="button"
+                onClick={() => onReintentar && onReintentar(comprobante)}
+                className="flex-1 min-w-0 h-[40px] border border-[#e2e8f0] rounded-[10px] bg-white text-[#0379d5] hover:bg-blue-50 flex items-center justify-center gap-[4px] text-[12px] font-semibold leading-[19.5px] transition-all"
+              >
+                <RotateCw size={12} />
+                <span>Reintentar</span>
               </button>
             ) : (
               <button

@@ -185,6 +185,91 @@ APP_URL=http://localhost:3000
     **aislamiento fiscal: reporte 607 idéntico antes/después**). **133 e2e + 118 ecf-engine, build 0.
     DMAIA fiscal intacto.**
 
+- ✅ **Envío EN LOTE + UX de selección múltiple — Sprint 14.** UN SOLO correo con los PDFs de varias
+  facturas adjuntos (el cliente que pide las facturas del mes, el contador que necesita el lote). NO es
+  un correo por factura. Post-emisión y NO fiscal, igual que el envío individual.
+  - **Límite real de GHL (verificado contra la doc oficial):** `/conversations/messages/upload` acepta
+    **5 archivos por request y 5 MB por archivo**; el composer de email admite **20 MB** de adjuntos en
+    total. El cap de `attachments[]` al enviar el mensaje **NO está documentado** → no se apuesta a él:
+    **máximo 5 comprobantes por correo**, el único techo sostenible. Constantes en `enviar-lote.dto.ts`.
+    (Para lotes grandes, la salida futura es un ZIP —tipo permitido por GHL—; anotado como v2, no hecho.)
+  - **Backend:** `POST /comprobantes/enviar-lote` (ruta literal declarada ANTES de las rutas `:id`).
+    Body `{ canal:'email', comprobanteIds[1..5], destinatarios[1..5], asunto?, mensaje? }`. Reutiliza el
+    flujo ya verificado (`regenerarPdfBuffer` → `subirPdf` → `enviarEmail`), sin cliente HTTP paralelo.
+    **Todo-o-nada:** primero resuelve los comprobantes (404 si alguno es de otro tenant) y genera TODOS
+    los PDFs; si uno falla → **400 nombrando cuál y por qué, sin subir ni enviar nada y sin escribir
+    filas**. Después sube (N uploads secuenciales) y manda **un único** `POST /conversations/messages`
+    con las N URLs → no existe "medio enviado". Nunca `ENVIADO` sin 2xx de GHL.
+  - **Destinatarios:** GHL admite un solo `emailTo` → el primero va en Para y el resto en `emailCc`.
+    Validación de formato y máximo 5 en el DTO (`MAX_DESTINATARIOS`), no sólo en la UI.
+  - **Contacto ancla:** GHL exige un `contactId` y un lote puede mezclar clientes. Prioridad: contacto
+    del **primer destinatario** si existe sincronizado (el hilo queda en la conversación de quien pidió
+    las facturas); si no, el contacto de la **primera factura**. Se devuelve explícito en la respuesta
+    (`ancla.origen = 'destinatario' | 'primerComprobante'`) y se nombra en el toast — no es magia invisible.
+  - **Registro:** migración aditiva `20260722120000_add_envio_lote_id` (`EnvioComprobante.loteId String?`
+    + índice). **Una fila POR COMPROBANTE** compartiendo `loteId`, `ghlMessageId` y `ghlConversationId`:
+    cada factura conserva su propio "enviada el X" y `GET :id/envios` sigue igual. No se agrupa por
+    `ghlMessageId` (es nullable y no existe en las filas FALLIDO).
+  - **Frontend — la selección dejó de estar escondida.** Se eliminó el "modo selección" detrás del botón
+    de lápiz: **checkboxes siempre visibles** + "seleccionar todo" en el header con **estado
+    indeterminado**; el click en la fila siempre abre el detalle. Nueva `BulkActionBar` al **pie de la
+    tabla** (lista de acciones extensible, sin el contenedor animado de `w-[497px]` del header), visible
+    sólo con selección: "N seleccionadas" + *Enviar por correo* + *Exportar* + *Descargar* + *Limpiar*.
+    Con más de 5 seleccionadas **no se bloquea la selección**, se apaga *Enviar* **con el motivo escrito**
+    ("Máximo 5 facturas por correo · tienes 7"); igual si alguna es RECHAZADO/ERROR (sin PDF posible).
+    La selección **se limpia al cambiar de página o de filtros** (antes lo seleccionado en otra página se
+    descartaba en silencio). **`handleBulkDownload` ya no simula éxito**: apagado con "próximamente"
+    (misma regla que se aplicó a Reenviar).
+  - **Un solo modal, un solo componente de chips:** `ReenviarModal` toma `comprobantes: Comprobante[]`
+    (individual = array de 1) y lista los adjuntos cuando son varios. Los destinatarios se escriben con
+    `DestinatariosInput` (`components/ui/destinatarios-input.tsx`, chips + validación + máx 5), **pensado
+    para que el cambio de chips del envío individual lo consuma**. El envío individual conserva su
+    destinatario fijo de solo lectura hasta que ese cambio aterrice: no se pinta un campo editable que el
+    backend individual todavía ignora.
+  - **Tests:** `envio-lote.e2e-spec.ts` (28 casos: aislamiento fiscal 606/607 + no encola, un solo mensaje
+    con N adjuntos, Para/Cc, registro con `loteId` compartido, ancla por destinatario/por factura/
+    case-insensitive, límites 5 comprobantes y 5 destinatarios, emails inválidos, todo-o-nada con PDF
+    roto, 404 de otro tenant, fallo del 2º upload sin enviar correo, 5xx→503 con filas FALLIDO).
+- ✅ **Cascada del contacto ancla — Sprint 14b.** La API v2 de GHL es **contact-first**: enviar EXIGE un
+  `contactId`, no se puede mandar a quien no exista como contacto (la v1 sí lo permitía). Sólo el ANCLA
+  tiene esa restricción — `emailCc`/`emailBcc` aceptan direcciones cualesquiera. **Aplica a los dos
+  flujos (individual y lote) con el mismo código**, `resolverAncla()`.
+  - **Cascada, de menos a más invasiva:** (1) algún destinatario ya es Contacto local sincronizado
+    (0 llamadas) → (2) algún destinatario existe en GHL (`GET /contacts/search/duplicate`, **lectura**,
+    scope `contacts.readonly` que ya teníamos) → (3) contacto del primer comprobante (0 llamadas) →
+    (4) **crear** un contacto mínimo (`POST /contacts/`, scope **`contacts.write`**). El paso 3 va ANTES
+    de crear a propósito: si hay alternativa NO se escribe en el CRM del cliente, aunque el hilo quede
+    en una conversación subóptima (el destinatario lo recibe igual por Cc).
+  - **⚠️ Cruza una línea: hasta aquí la integración era SÓLO LECTURA sobre el CRM.** Por eso la escritura
+    está acotada: **sólo el email** (no se inventa nombre, teléfono ni ningún dato de la persona), con
+    `tags: ['facturard-envio']` y `source: 'FacturaRD'` — dos vías para auditar y limpiar lo que creamos.
+    **NUNCA actualiza un contacto existente**: por eso se descartó `POST /contacts/upsert`, que resolvería
+    todo en una llamada pero puede modificar datos ajenos. Se busca SIEMPRE antes de crear (la DB local
+    puede estar desincronizada; GHL es la autoridad) y un fallo de la búsqueda no se traga — se prefiere
+    fallar antes que duplicar a ciegas. `logger.warn` (no `log`) en cada creación.
+  - **Errores de scope por llamada:** `pedirAGhl` recibe el permiso que hay que nombrar, así un 401/403
+    al crear dice "falta **contacts.write**" y no el scope equivocado. El ancla se resuelve ANTES de subir
+    PDFs y de enviar: sin ancla no se toca nada y no queda un lote a medias.
+  - **Se reporta, no es invisible:** `ancla { ghlContactId, razonSocial, origen, email, creado }` en la
+    respuesta de AMBOS endpoints (`origen ∈ contactoLocal|contactoGhl|primerComprobante|creado`) + toast
+    aparte en la UI cuando `creado`.
+  - **Efecto colateral bueno:** un contacto sin `ghlContactId` dejó de ser un callejón sin salida (antes
+    400 "no está sincronizado"). Si no hay Contacto local **ninguno**, sigue siendo 400 —no hay correo de
+    dónde sacar el destinatario— pero ahora el mensaje dice qué hacer; eso lo cierra del todo el cambio
+    de chips del envío individual (pendiente).
+  - **🐞 Fix — campo fantasma `datos.receptor.email`.** La UI leía el correo del comprador de un campo que
+    **nadie escribe** (no existe en `CreateComprobanteDto`): siempre `undefined` → el modal decía "este
+    cliente no tiene correo" y apagaba *Enviar* aunque el Contacto sí lo tuviera. Ahora el backend resuelve
+    `contactoEmail` desde el Contacto local (misma regla que el envío: `contactoId` → RNC) en
+    `GET /comprobantes` y `GET /comprobantes/:id`, con UNA consulta por página. `orderBy: createdAt asc`
+    explícito en ambos lados para que la UI y el envío elijan el MISMO contacto cuando hay varios por RNC.
+  - **Tests:** `envio-ancla.e2e-spec.ts` (14 casos: los 4 pasos de la cascada, que basta con que UNO de los
+    destinatarios sea contacto, que se busca ANTES de crear, que el payload de creación es exactamente
+    email+tag+source **sin nombre ni teléfono**, que el 2º envío al mismo destinatario NO crea un segundo
+    contacto, 403→contacts.write sin subir PDFs, 401→contacts.readonly, 5xx sin crear duplicado, sin
+    location vinculada → 400, y que el flujo individual usa la misma cascada) + 3 casos de regresión de
+    `contactoEmail`. **212 e2e + 118 ecf-engine, build API y web en 0.**
+
 ---
 
 ## 8. PRÓXIMOS PASOS (en orden de prioridad)
@@ -205,6 +290,21 @@ van vacíos (nunca se inventan); ver `reportes.catalogo.ts` para los códigos po
 ---
 
 ## 8bis. FIXES DE CUMPLIMIENTO DGII (auditoría normativa)
+
+- ✅ **FIX 7 — NombreItem > 80 caracteres quemaba el e-NCF.** En prod, la factura E310000000012 de
+  DMAIA quedó en `ERROR`: un nombre de artículo de 96 caracteres (" Dmaia 360 Instalación Incluye:
+  1) CRM, 2) Pagina Web, 3) Posicionamiento SEO, 4) Redes Sociales") generó un XML que NO valida contra
+  el XSD (`NombreItem` es `AlfNum80Type`, máx **80**, en E31/E32/E33/E34). La falla aparecía en el worker
+  —en `generateXml`, ANTES de firmar y de contactar la DGII— pero DESPUÉS de haber consumido el e-NCF, que
+  quedó quemado. Ahora se valida ANTES de consumir la secuencia y se **rechaza con 400** (no se trunca: el
+  nombre es contenido fiscal). Helper `assertNombresItemValidos` (`comprobantes.service.ts`), llamado en los
+  DOS caminos que consumen e-NCF: `resolverDto` (crear/crear+emitir, cubre el nombre ad-hoc Y el del
+  snapshot de producto — el catálogo no limita el largo) y `emitir` (borrador ya guardado, por si vino sin
+  la validación). Constante `MAX_NOMBRE_ITEM=80`; también `@MaxLength(80)` en `CreateItemDto.nombreItem`
+  como primera línea. **La E310000000012 nunca llegó a la DGII** (falló en validación local), pero el e-NCF
+  12 quedó consumido: DMAIA re-crea con el nombre acortado → E310000000013. Tests: 6 casos en
+  `comprobantes-draft.e2e-spec.ts` (81/96/snapshot/borrador-viejo → 400 sin encolar; 80 → 201). **218 e2e.**
+
 
 - ✅ **FIX 2 — EXENTO → IndicadorFacturacion 4 (ya correcto).** Verificado end-to-end: producto `EXENTO`
   → string interno `'E'` en `datos` → `mapIndicador('E')` = **4** en el XML; el `'E'` nunca llega al XML

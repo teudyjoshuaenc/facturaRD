@@ -3,13 +3,12 @@ import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Download,
-  Send,
+  RotateCw,
   CheckCircle2,
   XCircle,
   RefreshCw,
   AlertTriangle,
   AlertCircle,
-  FileText,
   FileSignature,
   Pencil,
   Mail,
@@ -34,9 +33,9 @@ interface Props {
   onViewDetail: (id: string) => void
   selected?: boolean
   onReenviar?: (c: Comprobante) => void
-  onEmitir?: (c: Comprobante) => void
+  /** Reintento de un e-CF rechazado/con error: clona a una factura nueva. */
+  onReintentar?: (c: Comprobante) => void
   onDelete?: (c: Comprobante) => void
-  isSelectionMode?: boolean
   isSelectedInBulk?: boolean
   onToggleSelectInBulk?: () => void
 }
@@ -90,43 +89,18 @@ function EstadoDgiiCell({ estado }: { estado: ComprobanteEstado }): JSX.Element 
 }
 
 /**
- * Columna "Tipo / Clase": QUÉ ES el documento — tipo e-CF legible para los
- * fiscales, "Borrador" o "Nota de venta" para los que no van a la DGII.
+ * Columna "Tipo / Clase": QUÉ ES el documento — SIEMPRE el tipo. "Nota de venta"
+ * para lo no fiscal, o el tipo de e-CF (E31, etc.) para lo fiscal. Que sea un
+ * borrador ya lo dice la columna del e-NCF, así que aquí no se rotula "Borrador".
  *
- * "Borrador" se decide SIEMPRE por `estado === 'DRAFT'` (vía `claseDocumento`),
- * nunca por tener o no e-NCF: un borrador de nota de crédito (E34) tampoco
- * tiene e-NCF y debe verse igual que un borrador de factura.
- *
- * El borrador va en ROJO (convención tipo Gmail). No se confunde con
- * "Rechazado": viven en columnas distintas y con íconos distintos
- * (Borrador = documento, Rechazado = ✕ en Estado DGII).
+ * Texto plano en negrita, sin pill ni color de fondo (ni el gris de la nota):
+ * el tipo es información, no un estado que necesite tono.
  */
 function TipoClaseCell({ comprobante }: { comprobante: Comprobante }): JSX.Element {
-  const { label, clase, titulo } = tipoClaseBadge(comprobante)
-
-  if (clase === 'fiscal') {
-    return (
-      <span className="block truncate text-[12px] font-normal text-[#333] font-sans" title={titulo}>
-        {label}
-      </span>
-    )
-  }
-
-  const estilo =
-    clase === 'borrador'
-      ? 'bg-[rgba(180,35,24,0.1)] text-[#b42318]'
-      : 'bg-[rgba(100,116,139,0.12)] text-[#475569]'
-
+  const { label, titulo } = tipoClaseBadge(comprobante)
   return (
-    <span
-      title={titulo}
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-[10px] px-[10px] py-[5px] text-[12px] font-semibold font-sans max-w-full',
-        estilo,
-      )}
-    >
-      <FileText size={14} className="flex-shrink-0" />
-      <span className="truncate">{label}</span>
+    <span className="block truncate text-[12px] font-bold text-[#333] font-sans" title={titulo}>
+      {label}
     </span>
   )
 }
@@ -138,9 +112,8 @@ const FacturaRow = React.memo(function FacturaRow({
   onViewDetail,
   selected = false,
   onReenviar,
-  onEmitir,
+  onReintentar,
   onDelete,
-  isSelectionMode = false,
   isSelectedInBulk = false,
   onToggleSelectInBulk,
 }: Props): JSX.Element {
@@ -155,24 +128,20 @@ const FacturaRow = React.memo(function FacturaRow({
       : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
     : '—'
 
-  const handleCellClick = () => {
-    if (isSelectionMode) {
-      onToggleSelectInBulk?.()
-    } else {
-      onViewDetail(c.id)
-    }
-  }
+  // El click en la fila SIEMPRE abre el detalle: ya no hay un "modo selección"
+  // que le cambie el significado. Seleccionar es marcar el checkbox.
+  const handleCellClick = () => onViewDetail(c.id)
 
   return (
     <tr className={`border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc] transition-colors h-[52px] ${isSelectedInBulk ? 'bg-[rgba(3,121,213,0.05)] hover:bg-[rgba(3,121,213,0.08)]' : selected ? 'bg-[rgba(3,121,213,0.02)] hover:bg-[rgba(3,121,213,0.04)]' : 'bg-white'
       }`}>
-      <td className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#f1f5f9]", isSelectionMode ? "w-10" : "w-0")} onClick={(e) => e.stopPropagation()}>
-        <div className={cn(
-          "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[52px] pl-4 origin-left",
-          isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
-        )}>
+      {/* Checkbox SIEMPRE visible: que se pueden seleccionar varias filas tiene
+          que verse de entrada, sin descubrir antes ningún botón de "modo". */}
+      <td className="w-10 p-0 text-center align-middle border-b border-[#f1f5f9]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-[52px] w-10 items-center justify-center pl-4">
           <input
             type="checkbox"
+            aria-label={`Seleccionar ${c.eNCF || c.folioInterno || 'comprobante'}`}
             className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
             checked={isSelectedInBulk}
             onChange={() => onToggleSelectInBulk?.()}
@@ -188,14 +157,14 @@ const FacturaRow = React.memo(function FacturaRow({
         <div className="flex items-center gap-1">
           {/* Sólo identificadores REALES. Un borrador (fiscal o de nota de
               venta) todavía no tiene ninguno: e-NCF se asigna al emitir y el
-              folio NV- al finalizar la nota. Antes se pintaba un "NV" literal
-              que parecía un identificador y no lo era. */}
+              folio NV- al finalizar la nota. Sin identificador se rotula
+              "Borrador" (cursiva + rojo) en vez de dejar la celda con un guion. */}
           <span className="truncate">
             {c.eNCF
               ? c.eNCF
               : c.folioInterno
                 ? <span className="text-[#475569] font-semibold">{c.folioInterno}</span>
-                : <span className="text-[#cbd5e1] font-normal">—</span>}
+                : <span className="italic font-normal text-[#e11d48]">Borrador</span>}
           </span>
           {/* Procedencia (no es estado ni tipo): marca discreta, nunca sustituye nada. */}
           {c.cotizacionId && (
@@ -273,50 +242,45 @@ const FacturaRow = React.memo(function FacturaRow({
             </button>
           )}
 
-          {esNota ? (
+          {/* Un BORRADOR (fiscal o nota) y una nota de venta comparten acciones:
+              Editar + Eliminar. No se ofrece "Emitir" desde la fila: un borrador
+              puede estar incompleto; se emite desde el editor tras revisarlo. Un
+              draft fiscal no consumió e-NCF, así que es descartable igual que una nota. */}
+          {esNota || c.estado === 'DRAFT' ? (
             <>
-              {/* Editar nota de venta */}
+              {/* Editar */}
               <button
                 type="button"
-                title="Editar nota de venta"
+                title={esNota ? 'Editar nota de venta' : 'Editar borrador'}
                 onClick={() => router.push(`/nueva-factura?id=${c.id}`)}
                 className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
               >
                 <Pencil size={14} />
               </button>
 
-              {/* Eliminar nota de venta (soft delete) */}
+              {/* Eliminar (soft delete) */}
               <button
                 type="button"
-                title="Eliminar nota de venta"
+                title={esNota ? 'Eliminar nota de venta' : 'Eliminar borrador'}
                 onClick={() => onDelete && onDelete(c)}
                 className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#b42318] hover:bg-red-50 transition-colors focus:outline-none flex-shrink-0"
               >
                 <Trash2 size={14} />
               </button>
             </>
-          ) : c.estado === 'DRAFT' || c.estado === 'RECHAZADO' || c.estado === 'ERROR' ? (
-            <>
-              {/* Edit button */}
-              <button
-                type="button"
-                title="Editar borrador"
-                onClick={() => router.push(`/nueva-factura?id=${c.id}`)}
-                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
-              >
-                <Pencil size={14} />
-              </button>
-
-              {/* Emit button (Plane icon) */}
-              <button
-                type="button"
-                title="Emitir comprobante"
-                onClick={() => onEmitir && onEmitir(c)}
-                className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#0379d5] hover:bg-blue-50 transition-colors focus:outline-none flex-shrink-0"
-              >
-                <Send size={14} />
-              </button>
-            </>
+          ) : c.estado === 'RECHAZADO' || c.estado === 'ERROR' ? (
+            /* Reintentar: un e-CF rechazado/con error NO se re-emite (el e-NCF
+               quedó quemado). El único reintento real es crear uno NUEVO con los
+               mismos datos → clona. Antes había Editar + Emitir aquí, y AMBOS
+               fallaban con 409 (el backend solo edita/emite borradores). */
+            <button
+              type="button"
+              title="Reintentar (crea una factura nueva con estos datos)"
+              onClick={() => onReintentar && onReintentar(c)}
+              className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#0379d5] hover:bg-blue-50 transition-colors focus:outline-none flex-shrink-0"
+            >
+              <RotateCw size={14} />
+            </button>
           ) : (
             /* Reenviar button (Mail icon) */
             <button
@@ -329,15 +293,19 @@ const FacturaRow = React.memo(function FacturaRow({
             </button>
           )}
 
-          {/* Clonar / Facturar formalmente (prefill del form fiscal vía cloneId) */}
-          <button
-            type="button"
-            title={esNota ? 'Facturar formalmente (crear e-CF)' : 'Clonar comprobante'}
-            onClick={() => router.push(`/nueva-factura?cloneId=${c.id}`)}
-            className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
-          >
-            <Copy size={14} />
-          </button>
+          {/* Clonar / Facturar formalmente (prefill del form fiscal vía cloneId).
+              Se oculta en RECHAZADO/ERROR: ahí "Reintentar" ya clona (evita dos
+              botones que hacen lo mismo). */}
+          {c.estado !== 'RECHAZADO' && c.estado !== 'ERROR' && (
+            <button
+              type="button"
+              title={esNota ? 'Facturar formalmente (crear e-CF)' : 'Clonar comprobante'}
+              onClick={() => router.push(`/nueva-factura?cloneId=${c.id}`)}
+              className="flex items-center justify-center w-[28px] h-[28px] rounded-[4px] text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#333] transition-colors focus:outline-none flex-shrink-0"
+            >
+              <Copy size={14} />
+            </button>
+          )}
         </div>
       </td>
     </tr>

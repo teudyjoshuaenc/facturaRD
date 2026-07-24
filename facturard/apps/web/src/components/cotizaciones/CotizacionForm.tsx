@@ -29,6 +29,7 @@ import { useProductos } from '@/hooks/useProductos'
 import type { Producto, NuevoProductoData } from '@/hooks/useProductos'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { NuevoProductoModal } from '@/components/nueva-factura/NuevoProductoModal'
+import { ConfirmLeaveDraftModal } from '@/components/ui/confirm-leave-draft-modal'
 import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -323,6 +324,29 @@ export function CotizacionForm(): JSX.Element {
     }
   }
 
+  // ─── Volver: guardar como borrador antes de salir ──────────────────────────
+  // Con contenido (cliente o una línea empezada) se pregunta; sin nada, la
+  // flecha de volver solo navega (no se crean borradores vacíos).
+  const hayContenido =
+    selectedContacto !== null ||
+    clienteNombre.trim() !== '' ||
+    items.some((i) => i.nombreItem.trim() !== '' || i.precioUnitarioItem > 0)
+
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+
+  function handleBack(): void {
+    if (submitting) return
+    if (hayContenido) setShowLeaveConfirm(true)
+    else router.push('/cotizaciones')
+  }
+
+  async function guardarYSalir(): Promise<void> {
+    setShowLeaveConfirm(false)
+    // handleSaveQuote guarda como borrador y navega a /cotizaciones si sale bien;
+    // si falta el nombre del cliente muestra el error y se queda en el formulario.
+    await handleSaveQuote()
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center bg-white rounded-xl border border-neutral-200">
@@ -337,8 +361,9 @@ export function CotizacionForm(): JSX.Element {
       <div className="flex items-center gap-4 border-b border-neutral-100 pb-5 shrink-0 select-none">
         <button
           type="button"
-          onClick={() => router.push('/cotizaciones')}
-          className="flex items-center justify-center w-10 h-10 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors shrink-0 focus:outline-none"
+          onClick={handleBack}
+          disabled={submitting}
+          className="flex items-center justify-center w-10 h-10 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors shrink-0 focus:outline-none disabled:opacity-50"
         >
           <ArrowLeft size={16} className="text-[#64748b]" />
         </button>
@@ -919,24 +944,18 @@ export function CotizacionForm(): JSX.Element {
                     </>
                   )}
                 </button>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveQuote()}
-                    disabled={submitting}
-                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center gap-1.5 hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
-                  >
-                    <Save size={15} className="text-[#64748B]" />
-                    <span>Borrador</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/cotizaciones')}
-                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer"
-                  >
-                    <span>Cancelar</span>
-                  </button>
-                </div>
+                {/* Una cotización SIEMPRE se guarda como borrador (ver nota
+                    abajo), así que el botón primario de arriba ya es "el guardar":
+                    un segundo "Guardar borrador" con el mismo handler sobraba.
+                    Queda solo "Cancelar" como acción fantasma (sin borde), para
+                    que no compita visualmente con el guardar. */}
+                <button
+                  type="button"
+                  onClick={() => router.push('/cotizaciones')}
+                  className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
+                >
+                  <span>Cancelar</span>
+                </button>
               </div>
 
               {/* Info text */}
@@ -959,6 +978,19 @@ export function CotizacionForm(): JSX.Element {
         open={showNuevoProducto}
         onClose={() => setShowNuevoProducto(false)}
         onSave={handleSaveNuevoProducto}
+      />
+
+      {/* Salir con cambios sin guardar → guardar borrador / descartar / seguir */}
+      <ConfirmLeaveDraftModal
+        open={showLeaveConfirm}
+        documento="cotización"
+        saving={submitting}
+        onSeguir={() => setShowLeaveConfirm(false)}
+        onDescartar={() => {
+          setShowLeaveConfirm(false)
+          router.push('/cotizaciones')
+        }}
+        onGuardar={() => void guardarYSalir()}
       />
     </div>
   )

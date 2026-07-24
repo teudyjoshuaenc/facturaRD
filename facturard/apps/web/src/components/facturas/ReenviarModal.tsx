@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import { X, Mail, Paperclip, AlertCircle } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup } from '@/components/ui/toggle-group'
+import { DestinatariosInput } from '@/components/ui/destinatarios-input'
+import { type Comprobante, referenciaComprobante, formatCurrency } from '@/lib/comprobantes'
 
 const CANAL_OPTIONS = [
   { value: 'correo' as const, label: 'Correo', icon: Mail },
@@ -23,42 +25,58 @@ const CANAL_OPTIONS = [
 interface ReenviarModalProps {
   isOpen: boolean
   onClose: () => void
-  /** Correo del contacto que el backend usará. Sólo informativo: no se envía. */
-  destinatario?: string
   title?: string
-  onSend: (data: { asunto: string; mensaje: string }) => Promise<void>
+  /**
+   * Comprobantes que viajan en el correo. Uno = envío individual; varios = envío
+   * en lote, que es UN SOLO correo con todos los PDFs adjuntos (no uno por factura).
+   */
+  comprobantes: Comprobante[]
+  /**
+   * Envío INDIVIDUAL: destinatario resuelto por el backend desde el contacto del
+   * comprobante. Sólo se MUESTRA — no es editable, para que una factura no pueda
+   * dirigirse al correo de un tercero.
+   *
+   * Si se omite (envío en lote), los destinatarios se escriben como chips.
+   */
+  destinatarioFijo?: string
+  onSend: (data: { asunto: string; mensaje: string; destinatarios: string[] }) => Promise<void>
 }
 
 /**
- * Envío de un comprobante al cliente por correo.
+ * Envío de comprobantes al cliente por correo — individual y en lote.
  *
- * El destinatario NO es editable a propósito: lo resuelve el backend desde el
- * contacto del comprobante. Permitir un correo arbitrario dejaría mandar la
- * factura de un cliente a cualquier dirección — un hueco de privacidad sobre
- * datos fiscales. Aquí sólo se MUESTRA a dónde va a salir.
+ * Es el MISMO modal para los dos casos a propósito: mismas validaciones, mismo
+ * componente de destinatarios y un solo sitio donde arreglar las cosas.
  */
 export function ReenviarModal({
   isOpen,
   onClose,
-  destinatario = '',
-  title = 'Enviar comprobante',
+  title,
+  comprobantes,
+  destinatarioFijo,
   onSend
 }: ReenviarModalProps) {
   const [canal, setCanal] = useState<'correo' | 'whatsapp'>('correo')
   const [asunto, setAsunto] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [destinatarios, setDestinatarios] = useState<string[]>([])
   const [sending, setSending] = useState(false)
 
   if (!isOpen) return null
 
-  const sinDestinatario = !destinatario.trim()
+  const esLote = destinatarioFijo === undefined
+  const cantidad = comprobantes.length
+  const encabezado = title ?? (cantidad > 1 ? `Enviar ${cantidad} comprobantes` : 'Enviar comprobante')
+
+  // Individual: falta el correo del contacto. Lote: todavía no escribió ninguno.
+  const sinDestinatario = esLote ? destinatarios.length === 0 : !destinatarioFijo.trim()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (sinDestinatario) return
+    if (sinDestinatario || sending) return
     setSending(true)
     try {
-      await onSend({ asunto, mensaje })
+      await onSend({ asunto, mensaje, destinatarios })
       onClose()
     } catch {
       // El error ya se le muestra al usuario como toast en el hook de envío;
@@ -70,12 +88,15 @@ export function ReenviarModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 select-none animate-fade-in font-sans">
-      {/* Modal Container */}
-      <div className="bg-white rounded-[24px] w-full max-w-[520px] shadow-xl overflow-hidden flex flex-col border border-[#e2e8f0]">
-        
+      {/* Modal Container — nunca más alto que la pantalla (el padding p-4 del
+          overlay son los 32px que se restan). Lo que sobra scrollea DENTRO del
+          cuerpo, con el header y el footer siempre visibles: en una laptop el
+          botón Enviar tiene que estar a la vista sin hacer scroll de página. */}
+      <div className="bg-white rounded-[24px] w-full max-w-[520px] max-h-[calc(100vh-32px)] shadow-xl overflow-hidden flex flex-col border border-[#e2e8f0]">
+
         {/* Header */}
-        <div className="flex items-center justify-between px-[24px] py-[20px] border-b border-[#f1f5f9]">
-          <h2 className="text-[18px] font-semibold text-[#333] capitalize">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between px-[24px] py-[20px] border-b border-[#f1f5f9]">
+          <h2 className="text-[18px] font-semibold text-[#333]">{encabezado}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -85,9 +106,10 @@ export function ReenviarModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-[24px] flex flex-col gap-[20px] text-left">
-          
+        {/* Form Body — el <form> es el flex container; sólo el bloque de campos scrollea. */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col text-left">
+          <div className="flex min-h-0 flex-1 flex-col gap-[20px] overflow-y-auto p-[24px]">
+
           {/* Canal Selector — WhatsApp visible pero deshabilitado (sin backend aún) */}
           <div className="flex flex-col gap-[8px]">
             <label className="text-[12px] font-semibold text-[#333] leading-[19.5px]">
@@ -104,11 +126,14 @@ export function ReenviarModal({
             </span>
           </div>
 
-          {/* Destinatario — SOLO LECTURA. Lo resuelve el backend desde el contacto
-              del comprobante; mostrarlo evita dirigir una factura a un tercero. */}
+          {/* Destinatarios */}
           <div className="flex flex-col gap-[8px]">
-            <label className="text-[12px] font-semibold text-[#333] leading-[19.5px]">Para</label>
-            {sinDestinatario ? (
+            <label className="text-[12px] font-semibold text-[#333] leading-[19.5px]">
+              Para {esLote && <span className="text-[#d92d20]">*</span>}
+            </label>
+            {esLote ? (
+              <DestinatariosInput value={destinatarios} onChange={setDestinatarios} disabled={sending} />
+            ) : sinDestinatario ? (
               <div className="flex items-start gap-[8px] rounded-[10px] border border-[#fecdca] bg-[#fffbfa] px-[16px] py-[10px]">
                 <AlertCircle size={14} className="mt-[3px] shrink-0 text-[#d92d20]" />
                 <span className="text-[12px] leading-[18px] text-[#b42318]">
@@ -117,15 +142,42 @@ export function ReenviarModal({
                 </span>
               </div>
             ) : (
-              <div className="flex h-[40px] items-center gap-[8px] rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] px-[16px]">
-                <Mail size={14} className="shrink-0 text-[#94a3b8]" />
-                <span className="truncate text-[12px] leading-[19px] text-[#333]">{destinatario}</span>
-              </div>
+              <>
+                <div className="flex h-[40px] items-center gap-[8px] rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] px-[16px]">
+                  <Mail size={14} className="shrink-0 text-[#94a3b8]" />
+                  <span className="truncate text-[12px] leading-[19px] text-[#333]">{destinatarioFijo}</span>
+                </div>
+                <span className="text-[11px] leading-[16px] text-[#64748b]">
+                  Se envía al correo registrado del cliente.
+                </span>
+              </>
             )}
-            <span className="text-[11px] leading-[16px] text-[#64748b]">
-              Se envía al correo registrado del cliente.
-            </span>
           </div>
+
+          {/* Qué se adjunta. En lote se listan los comprobantes: el usuario tiene
+              que ver EXACTAMENTE qué va dentro del correo antes de mandarlo. */}
+          {cantidad > 1 && (
+            <div className="flex flex-col gap-[8px]">
+              <label className="text-[12px] font-semibold text-[#333] leading-[19.5px]">
+                Adjuntos ({cantidad})
+              </label>
+              {/* Sin scroll propio: son 5 como máximo y dos barras de scroll
+                  anidadas son peores que una. La del cuerpo se encarga. */}
+              <ul className="flex flex-col divide-y divide-[#f1f5f9] rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc]">
+                {comprobantes.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-[12px] px-[16px] py-[8px]">
+                    <span className="truncate text-[12px] leading-[19px] text-[#333]">
+                      <span className="font-semibold">{referenciaComprobante(c)}</span>
+                      <span className="text-[#64748b]"> · {c.razonSocial}</span>
+                    </span>
+                    <span className="shrink-0 text-[12px] leading-[19px] text-[#64748b]">
+                      {formatCurrency(c.montoTotal)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Asunto (opcional) */}
           <div className="flex flex-col gap-[8px]">
@@ -159,13 +211,19 @@ export function ReenviarModal({
               checkbox. (Antes había uno de XML firmado que no tenía backend.) */}
           <div className="flex items-center gap-[8px] text-[12px] leading-[18px] text-[#64748b]">
             <Paperclip size={14} className="shrink-0" />
-            <span>El PDF del comprobante se adjunta automáticamente.</span>
+            <span>
+              {cantidad > 1
+                ? `Los ${cantidad} PDFs se adjuntan en un solo correo.`
+                : 'El PDF del comprobante se adjunta automáticamente.'}
+            </span>
           </div>
 
-          {/* Footer Controls */}
-          <div className="flex items-center justify-between border-t border-[#f1f5f9] pt-[20px] mt-[4px]">
+          </div>
+
+          {/* Footer Controls — fuera del área con scroll: siempre visible. */}
+          <div className="flex shrink-0 items-center justify-between gap-[12px] border-t border-[#f1f5f9] bg-white px-[24px] py-[16px]">
             <span className="text-[11px] text-[#64748b] leading-[18px]">
-              El envío no modifica el estado fiscal del comprobante.
+              El envío no modifica el estado fiscal {cantidad > 1 ? 'de los comprobantes' : 'del comprobante'}.
             </span>
             <div className="flex gap-[12px]">
               <button

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { Select } from '@/components/ui/select'
-import { formatCurrency } from '@/lib/comprobantes'
+import { formatCurrency, MAX_NOMBRE_ITEM } from '@/lib/comprobantes'
 
 interface Producto {
   id: string
@@ -250,12 +250,17 @@ export function EditarProductoModal({
               placeholder="Ej: Salami Induveca 1lb"
               leftIcon={<Package size={16} className="text-[#64748B]" />}
               value={nombre}
+              // Tope duro: la DGII limita el nombre del artículo a 80 caracteres.
+              maxLength={MAX_NOMBRE_ITEM}
               onChange={(e) => {
                 setNombre(e.target.value)
                 setNombreTouched(true)
               }}
               onBlur={() => setNombreTouched(true)}
               {...(showNombreError ? { error: "Campo Requerido" } : {})}
+              {...(!showNombreError && nombre.length >= MAX_NOMBRE_ITEM - 15
+                ? { helperText: `${nombre.length}/${MAX_NOMBRE_ITEM} caracteres (máximo de la DGII)` }
+                : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
           </div>

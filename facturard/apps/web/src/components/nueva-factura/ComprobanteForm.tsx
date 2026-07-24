@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState, useMemo, useRef } from 'react'
 import type { JSX } from 'react'
 import Link from 'next/link'
-import { Calendar, FileText, User, ChevronDown, ChevronRight, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { Calendar, FileText, User, ChevronDown, ChevronRight, RefreshCw, Banknote, CreditCard, ArrowLeftRight, Clock, Search, X, Check, Building2, Eye, Save, Send, FilePlus, AlertTriangle, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { StepWizard } from './StepWizard'
 import { StepCliente } from './StepCliente'
 import { StepDetalle } from './StepDetalle'
@@ -20,6 +20,7 @@ import { Select } from '@/components/ui/select'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
+import { ConfirmLeaveDraftModal } from '@/components/ui/confirm-leave-draft-modal'
 import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 
 const WIZARD_STEPS = [
@@ -407,6 +408,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     await executeSubmit(emitConCF)
   }
 
+  // ─── Volver: guardar como borrador antes de salir ──────────────────────────
+  // "Hay algo que valga la pena guardar" = al menos una línea empezada o un
+  // cliente elegido. Sin eso, volver es solo navegar (no se crean borradores
+  // vacíos). Con contenido, se pregunta antes de salir (guardar / descartar).
+  const hayContenido =
+    selectedCliente !== null ||
+    items.some((i) => i.nombreItem.trim() !== '' || i.precioUnitarioItem > 0)
+
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+
+  function handleBack(): void {
+    if (submitting) return
+    if (hayContenido) {
+      setShowLeaveConfirm(true)
+    } else {
+      router.push('/facturas')
+    }
+  }
+
+  async function guardarYSalir(): Promise<void> {
+    setShowLeaveConfirm(false)
+    // handleSubmit(false) guarda como borrador y, si sale bien, ya navega a
+    // /facturas (lo hace el onSubmit de la página). Si falla, muestra el error y
+    // se queda en el formulario — igual que el botón "Guardar borrador".
+    await handleSubmit(false)
+  }
+
   const tiposConTipoIngresos: TipoECF[] = ['E31', 'E32', 'E33', 'E34', 'E44', 'E45', 'E46']
   const isTipoIngresoRequired = tiposConTipoIngresos.includes(tipoECF)
   const isTipoIngresoValid = !isTipoIngresoRequired || tipoIngreso !== ''
@@ -475,6 +503,22 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] flex flex-col pb-6">
+      {/* Volver: si hay contenido, ofrece guardar como borrador antes de salir. */}
+      <div className={cn(
+        "mx-auto mb-3 w-full text-left",
+        facturacionMode === 'estandar' ? "lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0" : ""
+      )}>
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={submitting}
+          className="inline-flex items-center gap-1.5 h-9 -ml-1 px-2 rounded-[8px] text-[13px] font-medium text-[#64748B] hover:text-[#334155] hover:bg-neutral-100 transition-colors focus:outline-none disabled:opacity-50 cursor-pointer select-none"
+        >
+          <ArrowLeft size={16} />
+          <span>Volver a Facturas</span>
+        </button>
+      </div>
+
       {/* Selector de clase de documento (Fase 2) */}
       <div className={cn(
         "mx-auto mb-4 w-full text-left",
@@ -1039,8 +1083,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </button>
                 )}
 
-                {/* Secondary Actions: Borrador & Cancelar */}
-                <div className="grid grid-cols-2 gap-2 mt-1">
+                {/* Acciones secundarias, apiladas por jerarquía descendente:
+                    Emitir (primaria, rellena) › Guardar borrador (con borde) ›
+                    Cancelar (fantasma, sin borde). Antes iban en 2 columnas con
+                    el MISMO estilo, así que "guardar" y "cancelar" —que son cosas
+                    muy distintas— pesaban visualmente igual. */}
+                <div className="flex flex-col gap-1.5 mt-1">
                   <button
                     type="button"
                     onClick={() => handleSubmit(false)}
@@ -1048,12 +1096,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center gap-1.5 hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
                   >
                     <Save size={15} className="text-[#64748B]" />
-                    <span>Borrador</span>
+                    <span>Guardar borrador</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push('/facturas')}
-                    className="w-full h-[40px] rounded-[10px] border border-neutral-200 bg-white text-text-primary text-[14px] font-semibold flex items-center justify-center hover:bg-neutral-50 transition-colors focus:outline-none cursor-pointer"
+                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
                   >
                     <span>Cancelar</span>
                   </button>
@@ -1075,7 +1123,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                       className="flex items-center justify-center gap-1.5 h-10 border border-neutral-200 text-text-primary hover:bg-neutral-50 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FileText size={15} className="text-text-secondary" />
-                      Borrador
+                      Guardar borrador
                     </Button>
                   )}
                   <Button
@@ -1124,6 +1172,19 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           setShowConfirmReemitir(false)
           executeSubmit(true)
         }}
+      />
+
+      {/* Salir con cambios sin guardar → guardar borrador / descartar / seguir */}
+      <ConfirmLeaveDraftModal
+        open={showLeaveConfirm}
+        documento={esFiscal ? 'factura' : 'nota de venta'}
+        saving={submitting}
+        onSeguir={() => setShowLeaveConfirm(false)}
+        onDescartar={() => {
+          setShowLeaveConfirm(false)
+          router.push('/facturas')
+        }}
+        onGuardar={() => void guardarYSalir()}
       />
     </div>
   )

@@ -4,6 +4,7 @@ import type { Response } from 'express'
 import { ComprobantesService } from './comprobantes.service'
 import { EnvioComprobanteService } from './envio-comprobante.service'
 import { EnviarComprobanteDto } from './dto/enviar-comprobante.dto'
+import { EnviarLoteDto } from './dto/enviar-lote.dto'
 import { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import { CrearNotaDto } from './dto/crear-nota.dto'
@@ -31,6 +32,19 @@ export class ComprobantesController {
   })
   crear(@CurrentTenant() tenantId: string, @Body() dto: CreateComprobanteDto) {
     return this.service.crear(tenantId, dto)
+  }
+
+  // Ruta literal declarada ANTES de las rutas con :id para que ningún patrón
+  // paramétrico pueda capturarla.
+  @Post('enviar-lote')
+  @ApiOperation({
+    summary:
+      'Envía UN SOLO correo con los PDFs de varios comprobantes adjuntos (máximo 5, límite de GoHighLevel). ' +
+      'No es un correo por comprobante. Post-emisión: NO cambia el estado DGII de ninguno. ' +
+      'Todo-o-nada: si un PDF no se puede generar, no se envía nada.',
+  })
+  enviarLote(@CurrentTenant() tenantId: string, @Body() dto: EnviarLoteDto) {
+    return this.envios.enviarLote(tenantId, dto)
   }
 
   @Patch(':id')
@@ -90,9 +104,9 @@ export class ComprobantesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalle de un comprobante con su estado actual' })
+  @ApiOperation({ summary: 'Detalle de un comprobante con su estado actual y el correo del comprador' })
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
-    return this.service.findOne(tenantId, id)
+    return this.service.findOneDetalle(tenantId, id)
   }
 
   @Post(':id/enviar')

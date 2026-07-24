@@ -1,30 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Download, Send, ChevronLeft, ChevronRight, RotateCw, Mail, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { FacturaFilters } from '@/components/facturas/FacturaFilters'
 import { FacturaRow } from '@/components/facturas/FacturaRow'
 import { DetailPanel } from '@/components/facturas/DetailPanel'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
+import { BulkActionBar, ICONOS_BULK, type BulkAccion } from '@/components/facturas/BulkActionBar'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
 import { ConfirmDeleteModal } from '@/components/ui/confirm-delete-modal'
 import { Comprobante } from '@/lib/comprobantes'
-import { useComprobantes, useEnviarComprobante } from '@/hooks/useComprobantes'
+import {
+  useComprobantes,
+  useEnviarComprobante,
+  useEnviarLote,
+  MAX_COMPROBANTES_POR_CORREO,
+} from '@/hooks/useComprobantes'
 import { api, getErrorMessage } from '@/lib/api'
 import { toast } from 'sonner'
-import { EditActionButton, RefreshActionButton, ExportActionButton } from '@/components/ui/table-actions'
-import { cn } from '@/lib/utils'
-import { useEmissionStatus } from '@/hooks/useEmissionStatus'
+import { RefreshActionButton } from '@/components/ui/table-actions'
 import {
   estadoDgiiBadge,
   tipoClaseBadge,
   formatCurrency,
   formatDate,
+  tienePdfEnviable,
 } from '@/lib/comprobantes'
 
 export default function FacturasPage(): JSX.Element {
@@ -63,18 +66,48 @@ export default function FacturasPage(): JSX.Element {
     refetch,
   } = useComprobantes()
 
-  const { blockingReason } = useEmissionStatus()
-
-  const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const toggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode)
-    setSelectedIds(new Set())
+  // La selección vive sobre las filas VISIBLES. Al cambiar de página o de
+  // filtros se limpia: antes se conservaba en el Set pero las acciones filtraban
+  // sobre la página actual, así que lo seleccionado en otra página se descartaba
+  // en silencio — el usuario creía estar actuando sobre más de lo que actuaba.
+  const filtrosKey = JSON.stringify([
+    page, estadoFilter, search, tipoFilter, claseFilter, origenFilter,
+    startDate, endDate, minAmount, maxAmount,
+  ])
+  const filtrosKeyPrevia = useRef(filtrosKey)
+  useEffect(() => {
+    if (filtrosKeyPrevia.current !== filtrosKey) {
+      filtrosKeyPrevia.current = filtrosKey
+      setSelectedIds(new Set())
+    }
+  }, [filtrosKey])
+
+  const seleccionadas = comprobantes.filter((c) => selectedIds.has(c.id))
+  const todasSeleccionadas = comprobantes.length > 0 && comprobantes.every((c) => selectedIds.has(c.id))
+  const algunaSeleccionada = seleccionadas.length > 0 && !todasSeleccionadas
+
+  const toggleSeleccion = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSeleccionarTodo = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (todasSeleccionadas) comprobantes.forEach((c) => next.delete(c.id))
+      else comprobantes.forEach((c) => next.add(c.id))
+      return next
+    })
   }
 
   const handleBulkExport = () => {
-    const selectedList = comprobantes.filter(c => selectedIds.has(c.id))
+    const selectedList = seleccionadas
     if (selectedList.length === 0) return
 
     const printWindow = window.open('', '_blank')
@@ -153,37 +186,58 @@ export default function FacturasPage(): JSX.Element {
     printWindow.document.close()
   }
 
-  const handleBulkDownload = () => {
-    toast.success(`Descargando ${selectedIds.size} facturas seleccionadas...`)
-  }
-
   const [reenviarComprobante, setReenviarComprobante] = useState<Comprobante | null>(null)
+  const [enviarLoteAbierto, setEnviarLoteAbierto] = useState(false)
   const enviarComprobante = useEnviarComprobante()
-  const [comprobanteToEmit, setComprobanteToEmit] = useState<Comprobante | null>(null)
-  const [emittingId, setEmittingId] = useState<string | null>(null)
+  const enviarLote = useEnviarLote()
 
-  async function executeEmit(c: Comprobante) {
-    setEmittingId(c.id)
-    try {
-      await api.post(`/comprobantes/${c.id}/emitir`)
-      toast.success('Comprobante emitido exitosamente')
-      refetch()
-      setSelectedId(null)
-    } catch (err) {
-      toast.error('Error al emitir comprobante', { description: getErrorMessage(err) })
-    } finally {
-      setEmittingId(null)
-      setComprobanteToEmit(null)
-    }
-  }
+  // Motivo por el que el envío en lote no se puede hacer AHORA. Se calcula para
+  // poder escribirlo en pantalla: un botón apagado sin explicación no sirve.
+  // La regla la sostiene el backend igual (400 si se salta la UI).
+  const sinPdf = seleccionadas.filter((c) => !tienePdfEnviable(c))
+  const motivoBloqueoEnvio =
+    seleccionadas.length > MAX_COMPROBANTES_POR_CORREO
+      ? `Máximo ${MAX_COMPROBANTES_POR_CORREO} facturas por correo · tienes ${seleccionadas.length}`
+      : sinPdf.length > 0
+        ? `${sinPdf.length} de las seleccionadas no tiene PDF (rechazada o con error)`
+        : undefined
 
-  async function handleEmitir(c: Comprobante) {
-    if (emittingId) return
-    if (blockingReason) {
-      toast.error('Emisión bloqueada', { description: blockingReason })
-      return
-    }
-    setComprobanteToEmit(c)
+  const accionesBulk: BulkAccion[] = [
+    {
+      key: 'enviar',
+      label: 'Enviar por correo',
+      icon: ICONOS_BULK.correo,
+      destacada: true,
+      onClick: () => setEnviarLoteAbierto(true),
+      ...(motivoBloqueoEnvio ? { motivoBloqueo: motivoBloqueoEnvio } : {}),
+    },
+    {
+      key: 'exportar',
+      label: 'Exportar',
+      icon: ICONOS_BULK.exportar,
+      onClick: handleBulkExport,
+    },
+    {
+      // Descargar en lote todavía no existe. Antes mostraba un toast de éxito
+      // sin descargar nada: apagado hasta que tenga implementación real.
+      key: 'descargar',
+      label: 'Descargar',
+      icon: ICONOS_BULK.descargar,
+      onClick: () => undefined,
+      motivoBloqueo: 'Próximamente: la descarga en lote aún no está disponible',
+    },
+  ]
+  // La emisión ya no ocurre desde la lista: un borrador se completa y emite
+  // desde el editor ("Emitir e-CF"), y los estados no-borrador no se emiten en
+  // sitio (rechazado/error → Reintentar; aceptado → Reenviar).
+
+  // Reintento de un e-CF rechazado/con error. NO se re-emite in-place: el e-NCF
+  // quedó quemado (el backend solo emite borradores). El reintento real es crear
+  // una factura NUEVA con los mismos datos → clona vía ?cloneId=, tras confirmar.
+  const [comprobanteToReintentar, setComprobanteToReintentar] = useState<Comprobante | null>(null)
+
+  function handleReintentar(c: Comprobante) {
+    setComprobanteToReintentar(c)
   }
 
   // Borrado de nota de venta: confirma con el modal compartido de la app
@@ -197,7 +251,9 @@ export default function FacturasPage(): JSX.Element {
   async function executeDelete(c: Comprobante) {
     try {
       await api.delete(`/comprobantes/${c.id}`)
-      toast.success('Nota de venta eliminada')
+      // Un fiscal en DRAFT es un borrador; lo no-fiscal es una nota de venta.
+      const esBorradorFiscal = c.esFiscal !== false && c.estado === 'DRAFT'
+      toast.success(esBorradorFiscal ? 'Borrador eliminado' : 'Nota de venta eliminada')
       if (selectedId === c.id) setSelectedId(null)
       refetch()
     } catch (err) {
@@ -219,79 +275,21 @@ export default function FacturasPage(): JSX.Element {
             {paginationData ? `${paginationData.total} facturas` : `${comprobantes.length} facturas`} · {comprobantes.length} visibles
           </p>
         </div>
+        {/* El header ya no esconde la selección detrás de un "modo": los
+            checkboxes están siempre en la tabla y las acciones en lote aparecen
+            al pie, junto a las filas. */}
         <div className="flex items-center gap-[8px]">
-          {/* EDIT/PENCIL BUTTON - visible only in normal mode */}
-          <div className={cn(
-            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
-            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-[8px]" : "w-[48px] opacity-100 translate-x-0 scale-100"
-          )}>
-            <EditActionButton
-              onClick={toggleSelectionMode}
-              title="Activar selección"
-            />
-          </div>
-
-          {/* REFRESH/RELOAD BUTTON - always visible */}
           <RefreshActionButton onClick={() => refetch()} isLoading={isFetching} />
 
-          {/* SELECTION ACTIONS CONTAINER */}
-          <div className={cn(
-            "transition-all duration-300 ease-in-out origin-right flex items-center gap-[8px] overflow-hidden h-[52px] -my-1 -mx-0.5 px-0.5",
-            isSelectionMode ? "w-[497px] opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 translate-x-4 scale-0 -mr-[8px]"
-          )}>
-            <ExportActionButton
-              onClick={handleBulkExport}
-              disabled={selectedIds.size === 0}
-              title="Exportar comprobantes"
-              className="w-[114px] justify-center"
-            />
-            {/* Envío masivo: PENDIENTE de backend (el endpoint es 1 comprobante
-                por llamada). Se deja visible pero deshabilitado — antes simulaba
-                un envío exitoso que nunca ocurría. */}
-            <button
-              type="button"
-              disabled
-              title="Próximamente: el envío en lote aún no está disponible"
-              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] text-[#64748b] opacity-50 cursor-not-allowed transition-all focus:outline-none shrink-0 bg-white w-[110px] font-sans font-normal text-[14px] leading-[21px]"
-            >
-              <Mail size={14} className="text-[#64748b] shrink-0" />
-              <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-                Reenviar
-              </span>
-            </button>
-            <button
-              onClick={handleBulkDownload}
-              disabled={selectedIds.size === 0}
-              className="h-[44px] px-[17px] flex items-center justify-center gap-[9px] border border-[#d0d5dd] rounded-[10px] hover:bg-neutral-50 text-[#64748b] disabled:opacity-50 transition-all focus:outline-none shrink-0 bg-white w-[135px] font-sans font-normal text-[14px] leading-[21px]"
-            >
-              <Download size={14} className="text-[#64748b] shrink-0" />
-              <span className="font-normal text-[#64748b] text-[14px] leading-[21px] whitespace-nowrap">
-                Descargar
-              </span>
-            </button>
-            <button
-              onClick={toggleSelectionMode}
-              className="h-[44px] px-[17px] flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-semibold rounded-[10px] transition-all focus:outline-none shrink-0 w-[110px] font-sans text-[14px] border-none"
-            >
-              Cancelar
-            </button>
-          </div>
-
-          {/* CREAR FACTURA BUTTON - visible only in normal mode, slides/collapses left-to-right (origin-left) */}
-          <div className={cn(
-            "transition-all duration-300 ease-in-out origin-left flex items-center justify-center overflow-hidden h-[52px] -my-1 -mx-0.5",
-            isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0" : "w-[144px] opacity-100 translate-x-0 scale-100"
-          )}>
-            <button
-              onClick={() => router.push('/nueva-factura')}
-              className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2 transition-all focus:outline-none shrink-0 w-[140px] justify-center"
-            >
-              <Plus size={16} className="text-white shrink-0" />
-              <span className="font-semibold text-[14px] text-white whitespace-nowrap">
-                Crear factura
-              </span>
-            </button>
-          </div>
+          <button
+            onClick={() => router.push('/nueva-factura')}
+            className="bg-[#0379d5] hover:bg-[#0262ad] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)] h-11 px-4 rounded-[10px] flex items-center gap-2 transition-all focus:outline-none shrink-0 w-[140px] justify-center"
+          >
+            <Plus size={16} className="text-white shrink-0" />
+            <span className="font-semibold text-[14px] text-white whitespace-nowrap">
+              Crear factura
+            </span>
+          </button>
         </div>
       </div>
 
@@ -334,31 +332,20 @@ export default function FacturasPage(): JSX.Element {
                 <table className="w-full min-w-[1200px] text-left border-collapse table-fixed">
                   <thead>
                     <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[12px] font-normal text-[#64748b] h-[40px] select-none">
-                      <th className={cn("p-0 text-center align-middle transition-all duration-300 ease-in-out border-b border-[#e2e8f0] bg-[#f8fafc]", isSelectionMode ? "w-10" : "w-0")}>
-                        <div className={cn(
-                          "transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-center h-[40px] pl-4 origin-left",
-                          isSelectionMode ? "w-10 opacity-100 translate-x-0 scale-100" : "w-0 opacity-0 -translate-x-4 scale-0"
-                        )}>
+                      <th className="w-10 p-0 text-center align-middle border-b border-[#e2e8f0] bg-[#f8fafc]">
+                        <div className="flex h-[40px] w-10 items-center justify-center pl-4">
+                          {/* Estado indeterminado cuando hay selección parcial:
+                              comunica "algunas, no todas" sin texto. */}
                           <input
                             type="checkbox"
+                            aria-label="Seleccionar todas las filas visibles"
+                            title="Seleccionar todas las filas visibles"
                             className="h-4 w-4 rounded border-neutral-300 text-[#0379d5] focus:ring-[#0379d5] cursor-pointer"
-                            checked={comprobantes.length > 0 && comprobantes.every(c => selectedIds.has(c.id))}
-                            onChange={() => {
-                              const allSelected = comprobantes.every(c => selectedIds.has(c.id))
-                              if (allSelected) {
-                                setSelectedIds(prev => {
-                                  const next = new Set(prev)
-                                  comprobantes.forEach(c => next.delete(c.id))
-                                  return next
-                                })
-                              } else {
-                                setSelectedIds(prev => {
-                                  const next = new Set(prev)
-                                  comprobantes.forEach(c => next.add(c.id))
-                                  return next
-                                })
-                              }
+                            checked={todasSeleccionadas}
+                            ref={(el) => {
+                              if (el) el.indeterminate = algunaSeleccionada
                             }}
+                            onChange={toggleSeleccionarTodo}
                           />
                         </div>
                       </th>
@@ -383,27 +370,23 @@ export default function FacturasPage(): JSX.Element {
                         onViewDetail={setSelectedId}
                         selected={selectedId === c.id}
                         onReenviar={setReenviarComprobante}
-                        onEmitir={handleEmitir}
+                        onReintentar={handleReintentar}
                         onDelete={handleDelete}
-                        isSelectionMode={isSelectionMode}
                         isSelectedInBulk={selectedIds.has(c.id)}
-                        onToggleSelectInBulk={() => {
-                          setSelectedIds(prev => {
-                            const next = new Set(prev)
-                            if (next.has(c.id)) {
-                              next.delete(c.id)
-                            } else {
-                              next.add(c.id)
-                            }
-                            return next
-                          })
-                        }}
+                        onToggleSelectInBulk={() => toggleSeleccion(c.id)}
                       />
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+
+            {/* Acciones en lote: al pie de la tabla y sólo cuando hay selección. */}
+            <BulkActionBar
+              seleccionadas={seleccionadas.length}
+              acciones={accionesBulk}
+              onLimpiar={() => setSelectedIds(new Set())}
+            />
 
             {/* Custom Pagination styled exactly like Figma */}
             <div className="border-[#f1f5f9] border-t flex h-[57px] items-center justify-between px-[20px] bg-white select-none">
@@ -449,7 +432,7 @@ export default function FacturasPage(): JSX.Element {
             onDownload={handleDownload}
             downloading={!!downloadingId}
             onReenviar={setReenviarComprobante}
-            onEmitir={handleEmitir}
+            onReintentar={handleReintentar}
           />
         </div>
       </div>
@@ -459,7 +442,12 @@ export default function FacturasPage(): JSX.Element {
           isOpen={!!reenviarComprobante}
           onClose={() => setReenviarComprobante(null)}
           title="Enviar factura"
-          destinatario={reenviarComprobante.datos?.receptor?.email || ''}
+          comprobantes={[reenviarComprobante]}
+          // El correo sale del Contacto local (lo resuelve el backend). Antes se
+          // leía `datos.receptor.email`, un campo que NADIE escribe: siempre era
+          // undefined y el modal decía "no tiene correo" con el botón apagado
+          // aunque el contacto sí lo tuviera.
+          destinatarioFijo={reenviarComprobante.contactoEmail || ''}
           onSend={async ({ asunto, mensaje }) => {
             await enviarComprobante.mutateAsync({
               comprobanteId: reenviarComprobante.id,
@@ -471,11 +459,29 @@ export default function FacturasPage(): JSX.Element {
         />
       )}
 
+      {/* Envío en lote: UN SOLO correo con los PDFs de las seleccionadas. */}
+      {enviarLoteAbierto && (
+        <ReenviarModal
+          isOpen={enviarLoteAbierto}
+          onClose={() => setEnviarLoteAbierto(false)}
+          comprobantes={seleccionadas}
+          onSend={async ({ asunto, mensaje, destinatarios }) => {
+            await enviarLote.mutateAsync({
+              comprobanteIds: seleccionadas.map((c) => c.id),
+              destinatarios,
+              ...(asunto.trim() ? { asunto: asunto.trim() } : {}),
+              ...(mensaje.trim() ? { mensaje: mensaje.trim() } : {}),
+            })
+            setSelectedIds(new Set())
+          }}
+        />
+      )}
+
       <ConfirmDeleteModal
         open={comprobanteToDelete !== null}
-        title="Eliminar nota de venta"
+        title={comprobanteToDelete?.esFiscal !== false && comprobanteToDelete?.estado === 'DRAFT' ? 'Eliminar borrador' : 'Eliminar nota de venta'}
         itemName={comprobanteToDelete?.folioInterno ?? null}
-        fallbackName="esta nota de venta"
+        fallbackName={comprobanteToDelete?.esFiscal !== false && comprobanteToDelete?.estado === 'DRAFT' ? 'este borrador' : 'esta nota de venta'}
         onClose={() => setComprobanteToDelete(null)}
         onConfirm={() => {
           if (comprobanteToDelete) {
@@ -485,11 +491,13 @@ export default function FacturasPage(): JSX.Element {
       />
 
       <ConfirmReemitirModal
-        open={comprobanteToEmit !== null}
-        onClose={() => setComprobanteToEmit(null)}
+        open={comprobanteToReintentar !== null}
+        mode="reintentar"
+        onClose={() => setComprobanteToReintentar(null)}
         onConfirm={() => {
-          if (comprobanteToEmit) {
-            executeEmit(comprobanteToEmit)
+          if (comprobanteToReintentar) {
+            router.push(`/nueva-factura?cloneId=${comprobanteToReintentar.id}`)
+            setComprobanteToReintentar(null)
           }
         }}
       />

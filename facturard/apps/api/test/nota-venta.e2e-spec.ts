@@ -165,6 +165,22 @@ describe('Notas de venta internas (esFiscal=false) — e2e', () => {
     expect(row?.eliminado).toBe(true)
   })
 
+  it('un BORRADOR fiscal (DRAFT, sin e-NCF) SÍ es eliminable (soft delete)', async () => {
+    // Un draft fiscal no consumió e-NCF ni tocó la DGII: descartarlo es seguro.
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA)).send({ ...fiscalBody, emitir: false }).expect(201)
+    expect(created.body.estado).toBe('DRAFT')
+    expect(created.body.eNCF).toBeNull()
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/comprobantes/${created.body.id}`).set(auth(tenantA)).expect(200)
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/comprobantes/${created.body.id}`).set(auth(tenantA)).expect(404)
+    const row = await prisma.comprobante.findUnique({ where: { id: created.body.id } })
+    expect(row?.eliminado).toBe(true)
+  })
+
   it('el filtro ?clase=nota devuelve solo notas de venta (esFiscal=false)', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/comprobantes?clase=nota').set(auth(tenantA)).expect(200)

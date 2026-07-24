@@ -256,6 +256,39 @@ describe('Envío de comprobantes por GHL (e2e)', () => {
   })
 
   // ─── RESOLUCIÓN DE CONTACTO ───────────────────────────────────────────────
+  // El comprobante NO guarda el correo del comprador. La UI necesita saber a
+  // dónde va a salir el envío, y antes lo leía de `datos.receptor.email`: un
+  // campo que NADIE escribe, siempre undefined — el modal decía "este cliente no
+  // tiene correo" y apagaba el botón aunque el Contacto sí lo tuviera.
+  describe('contactoEmail expuesto para la UI', () => {
+    it('GET :id devuelve el correo del Contacto local (resuelto por contactoId)', async () => {
+      const t = await tenantConGhl()
+      const contacto = await mkContacto(t, { email: 'porid@correo.do' })
+      const c = await mkComprobante(t, { contactoId: contacto.id })
+
+      const res = await request(srv()).get(`/api/v1/comprobantes/${c.id}`).set(auth(t)).expect(200)
+      expect((res.body.data ?? res.body).contactoEmail).toBe('porid@correo.do')
+    })
+
+    it('GET (lista) lo resuelve por RNC cuando no hay contactoId', async () => {
+      const t = await tenantConGhl()
+      await mkContacto(t, { rnc: '131880681', email: 'porrnc@correo.do' })
+      await mkComprobante(t, { rnc: '131880681' })
+
+      const res = await request(srv()).get('/api/v1/comprobantes').set(auth(t)).expect(200)
+      const filas = res.body.data ?? res.body
+      expect(filas[0].contactoEmail).toBe('porrnc@correo.do')
+    })
+
+    it('es null (no undefined) cuando el comprador no está en Contactos', async () => {
+      const t = await tenantConGhl()
+      const c = await mkComprobante(t, { rnc: '000000000' })
+
+      const res = await request(srv()).get(`/api/v1/comprobantes/${c.id}`).set(auth(t)).expect(200)
+      expect((res.body.data ?? res.body).contactoEmail).toBeNull()
+    })
+  })
+
   describe('Resolución del contacto', () => {
     it('resuelve por comprobante.contactoId cuando existe', async () => {
       const t = await tenantConGhl()
@@ -287,14 +320,27 @@ describe('Envío de comprobantes por GHL (e2e)', () => {
       expect((upload![1] as RequestInit & { body: FormData }).body.get('contactId')).toBe(GHL_CONTACT_ID)
     })
 
-    it('400 accionable si el contacto no tiene ghlContactId (no sincronizado)', async () => {
+    // Un contacto sin sincronizar YA NO es un callejón sin salida: la cascada del
+    // ancla lo busca en GHL por su correo y, si tampoco está, crea uno mínimo.
+    // El detalle de la cascada se prueba en envio-ancla.e2e-spec.ts.
+    it('el contacto sin ghlContactId ya no bloquea: se resuelve el ancla contra GHL', async () => {
       const t = await tenantConGhl()
+      await prisma.ghlLocation.create({ data: { tenantId: t.tenant.id, locationId: 'loc-123' } })
       await mkContacto(t, { ghlContactId: null })
       const c = await mkComprobante(t)
+      fetchSpy.mockImplementation((input: string | URL | Request) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('contacts/search/duplicate')) {
+          return Promise.resolve(jsonRes({ contact: { id: 'ghl-encontrado' } }, 200))
+        }
+        if (url.includes(UPLOAD_URL)) return Promise.resolve(jsonRes({ uploadedFiles: { 'f.pdf': PDF_URL } }, 201))
+        return Promise.resolve(jsonRes({ messageId: 'msg-abc', conversationId: 'conv-xyz' }, 201))
+      })
 
-      const res = await request(srv()).post(`/api/v1/comprobantes/${c.id}/enviar`).set(auth(t)).send({ canal: 'email' }).expect(400)
-      expect(JSON.stringify(res.body)).toContain('no está sincronizado con GoHighLevel')
-      expect(fetchSpy).not.toHaveBeenCalled() // ni siquiera se intentó llamar a GHL
+      const res = await request(srv())
+        .post(`/api/v1/comprobantes/${c.id}/enviar`).set(auth(t)).send({ canal: 'email' }).expect(201)
+
+      expect((res.body.data ?? res.body).ancla).toMatchObject({ ghlContactId: 'ghl-encontrado', origen: 'contactoGhl', creado: false })
     })
 
     it('400 accionable si no existe el contacto', async () => {
@@ -302,7 +348,13 @@ describe('Envío de comprobantes por GHL (e2e)', () => {
       const c = await mkComprobante(t, { rnc: '000000000' })
 
       const res = await request(srv()).post(`/api/v1/comprobantes/${c.id}/enviar`).set(auth(t)).send({ canal: 'email' }).expect(400)
-      expect(JSON.stringify(res.body)).toContain('No encontramos al cliente')
+      const texto = JSON.stringify(res.body)
+      expect(texto).toContain('No encontramos al cliente')
+      // Sin contacto local no hay NINGÚN correo del comprador: el error tiene que
+      // decir qué hacer, no dejar un callejón sin salida.
+      expect(texto).toContain('no sabemos a qué correo')
+      expect(texto).toContain('Créalo en Contactos')
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
 
     it('400 accionable si el contacto no tiene correo', async () => {

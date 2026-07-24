@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common'
 import request from 'supertest'
+import { prisma } from '@facturard/database'
 import { createTestApp, TestContext } from './helpers/test-app'
 import { createTenant, initSequences, uploadCert, generateP12, TestTenant } from './helpers/factory'
 
@@ -113,6 +114,93 @@ describe('Comprobantes — draft + emisión (e2e)', () => {
     // 1000 gravado + 180 ITBIS + 500 exento = 1680
     expect(Number(res.body.montoTotal)).toBe(1680)
     expect(res.body.estado).toBe('DRAFT')
+  })
+
+  // ── Regresión prod: E310000000012 de DMAIA quedó en ERROR porque un NombreItem
+  //    de 96 caracteres no valida contra el XSD (AlfNum80Type, máx 80) — la falla
+  //    apareció en el worker DESPUÉS de quemar el e-NCF. Ahora se rechaza al crear,
+  //    antes de consumir la secuencia. ──
+  describe('NombreItem: límite de 80 caracteres (DGII AlfNum80Type)', () => {
+    const nombre81 = 'X'.repeat(81)
+    const nombre80 = 'Y'.repeat(80)
+
+    const cuerpo = (nombreItem: string, emitir: boolean) => ({
+      tipoECF: 'E31', emitir, fechaEmision: '01-07-2026', fechaVencimiento: '31-12-2028',
+      rncComprador: '131880681', razonSocialComprador: 'CLIENTE TEST SRL',
+      items: [{ numeroLinea: 1, indicadorFacturacion: 'I1', nombreItem, indicadorBienoServicio: 2, cantidad: 1, precioUnitarioItem: 1000 }],
+    })
+
+    it('rechaza un nombre de 81 caracteres al EMITIR, con 400 y SIN quemar e-NCF', async () => {
+      ctx.queueAdd.mockClear()
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA)).send(cuerpo(nombre81, true)).expect(400)
+
+      expect(JSON.stringify(res.body)).toContain('80')
+      // El guard corre ANTES de siguienteENCF: no se consumió secuencia ni se encoló.
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+    })
+
+    it('rechaza también al guardar como borrador (no crea una trampa inemitible)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA)).send(cuerpo(nombre81, false)).expect(400)
+    })
+
+    it('acepta exactamente 80 caracteres', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA)).send(cuerpo(nombre80, false)).expect(201)
+      expect(res.body.estado).toBe('DRAFT')
+    })
+
+    it('reproduce el caso real: 96 caracteres → 400 (no ERROR silencioso en el worker)', async () => {
+      ctx.queueAdd.mockClear()
+      const real = ' Dmaia 360 Instalación Incluye: 1) CRM, 2) Pagina Web, 3) Posicionamiento SEO, 4) Redes Sociales'
+      expect(real.length).toBeGreaterThan(80)
+      await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA)).send(cuerpo(real, true)).expect(400)
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+    })
+
+    it('un borrador con nombre largo se atrapa al EMITIR, sin quemar e-NCF', async () => {
+      // Simula un draft guardado ANTES de esta validación: se inyecta en DB con
+      // un nombre >80 saltándose el endpoint de creación, y luego se emite.
+      const draft = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA)).send(cuerpo(nombre80, false)).expect(201)
+      await prisma.comprobante.update({
+        where: { id: draft.body.id },
+        data: { datos: { ...cuerpo(nombre81, false) } },
+      })
+
+      ctx.queueAdd.mockClear()
+      await request(app.getHttpServer())
+        .post(`/api/v1/comprobantes/${draft.body.id}/emitir`).set(auth(tenantA)).expect(400)
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+
+      // El e-NCF NO se asignó: sigue siendo un borrador emitible tras corregir.
+      const enDb = await prisma.comprobante.findUniqueOrThrow({ where: { id: draft.body.id } })
+      expect(enDb.eNCF).toBeNull()
+      expect(enDb.estado).toBe('DRAFT')
+    })
+
+    it('también atrapa el nombre que viene del SNAPSHOT de producto (>80), no solo el ad-hoc', async () => {
+      // El catálogo NO limita el largo del nombre → el snapshot puede exceder 80.
+      // Este nombre pasa el DTO (el ítem no trae nombreItem) y lo atrapa el servicio.
+      const prod = await request(app.getHttpServer())
+        .post('/api/v1/productos').set(auth(tenantA))
+        .send({ tipo: 'SERVICIO', nombre: 'Z'.repeat(90), precioUnitario: 1000, tratamientoITBIS: 'I1' }).expect(201)
+
+      ctx.queueAdd.mockClear()
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(tenantA))
+        .send({
+          tipoECF: 'E31', emitir: true, fechaEmision: '01-07-2026', fechaVencimiento: '31-12-2028',
+          rncComprador: '131880681', razonSocialComprador: 'CLIENTE TEST SRL',
+          items: [{ numeroLinea: 1, productoId: prod.body.id, cantidad: 1 }],
+        })
+        .expect(400)
+
+      expect(JSON.stringify(res.body)).toContain('80')
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+    })
   })
 
   it('emite un borrador: asigna e-NCF, encola una vez', async () => {

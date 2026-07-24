@@ -18,6 +18,12 @@ import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { DocumentoFolioService } from './documento-folio.service'
 
+/**
+ * Comprobante + el correo del comprador resuelto desde el Contacto local.
+ * `contactoEmail` NO es una columna: se resuelve al leer (ver `conContactoEmail`).
+ */
+export type ComprobanteConContacto = Comprobante & { contactoEmail: string | null }
+
 // fechaDesde/fechaHasta son fechas calendario en hora de RD (UTC-4 fijo, sin DST).
 // Se anclan explícitamente a ese offset — usar setHours() dependería de la zona
 // horaria del proceso (en Railway corre en UTC, no UTC-4), excluyendo facturas
@@ -53,6 +59,14 @@ function mapTratamientoITBIS(t: string): string {
 // Norma General 10-18 + Formato e-CF v1.0: en E32 de consumo, la identificación
 // del comprador (RNC/Cédula) es obligatoria cuando el monto total >= RD$250,000.
 export const UMBRAL_IDENTIFICACION_E32 = 250_000
+
+// `NombreItem` es `AlfNum80Type` (maxLength 80) en los XSD de la DGII para
+// E31/E32/E33/E34. Un nombre más largo genera un XML que NO valida contra el
+// XSD y la emisión falla en el worker — DESPUÉS de haber quemado el e-NCF.
+// Se valida ANTES de consumir la secuencia para no quemar un comprobante por un
+// nombre demasiado largo (el catálogo de productos no limita el largo del
+// nombre, así que el snapshot también puede exceder 80).
+export const MAX_NOMBRE_ITEM = 80
 
 /** Lanza 400 si un E32 >= umbral no trae identificación del comprador. */
 function validarIdentificacionE32(dto: CreateComprobanteDto, montoTotal: number): void {
@@ -288,6 +302,29 @@ export class ComprobantesService {
    *  - `contactoId` copia identidad del comprador. CONSUMIDOR_FINAL o sin contacto
    *    conserva el flujo sin comprador (E32).
    */
+  /**
+   * `NombreItem` es AlfNum80Type en los XSD de la DGII: un nombre >80 genera un
+   * XML que NO valida y la emisión falla en el worker DESPUÉS de quemar el e-NCF.
+   * Se rechaza aquí (antes de consumir la secuencia) y NO se trunca — el nombre
+   * es contenido fiscal, no se altera en silencio.
+   *
+   * Se llama en los DOS caminos que pueden consumir un e-NCF: al crear+emitir
+   * (`resolverDto`) y al emitir un borrador ya guardado (`emitir`), porque un
+   * draft pudo guardarse sin esta validación.
+   */
+  private assertNombresItemValidos(items: readonly CreateItemDto[]): void {
+    for (const it of items) {
+      const nombre = (it.nombreItem ?? '').trim()
+      if (nombre.length > MAX_NOMBRE_ITEM) {
+        throw new BadRequestException(
+            `El nombre del artículo en la línea ${it.numeroLinea} tiene ${nombre.length} caracteres y la DGII ` +
+            `permite máximo ${MAX_NOMBRE_ITEM}. Acórtalo ${nombre.length - MAX_NOMBRE_ITEM} caracteres ` +
+            `(artículo: "${nombre.slice(0, 40)}…").`,
+        )
+      }
+    }
+  }
+
   private async resolverDto(tenantId: string, dto: CreateComprobanteDto): Promise<CreateComprobanteDto> {
     const items = await Promise.all(dto.items.map((item) => this.resolverItem(tenantId, item)))
     for (const it of items) {
@@ -302,6 +339,7 @@ export class ComprobantesService {
         )
       }
     }
+    this.assertNombresItemValidos(items)
 
     let resolved: CreateComprobanteDto = { ...dto, items }
 
@@ -403,9 +441,13 @@ export class ComprobantesService {
    */
   async eliminar(tenantId: string, id: string): Promise<{ id: string; eliminado: true }> {
     const comprobante = await this.findOne(tenantId, id)
-    if (comprobante.esFiscal) {
+    // Un e-CF fiscal YA EMITIDO consumió un e-NCF y es parte del historial fiscal:
+    // inmutable, no se elimina. Pero un BORRADOR (DRAFT) no consumió e-NCF ni tocó
+    // la DGII, y una nota de venta interna es no fiscal → ambos se pueden descartar
+    // (soft-delete). La barrera es "ya emitido", no "es fiscal".
+    if (comprobante.esFiscal && comprobante.estado !== 'DRAFT') {
       throw new ConflictException(
-          'No se puede eliminar un comprobante fiscal. Sólo las notas de venta internas son eliminables.',
+          'No se puede eliminar un comprobante fiscal ya emitido. Sólo los borradores y las notas de venta internas son eliminables.',
       )
     }
     await prisma.comprobante.update({ where: { id }, data: { eliminado: true } })
@@ -441,6 +483,9 @@ export class ComprobantesService {
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(datos, Number(comprobante.montoTotal))
+    // Un borrador guardado antes de esta validación (o por otro camino) podría
+    // traer un NombreItem >80: se atrapa aquí, antes de quemar el e-NCF.
+    this.assertNombresItemValidos(datos.items ?? [])
 
     // Resolver FechaVencimientoSecuencia antes de consumir la secuencia.
     const secuenciaFecha = await this.secuenciasService.getFechaVencimiento(tenantId, comprobante.tipoECF)
@@ -537,7 +582,7 @@ export class ComprobantesService {
     return avisoITBIS ? { ...actualizado, avisoITBIS } : actualizado
   }
 
-  async findAll(tenantId: string, query: ListComprobantesDto): Promise<PaginatedResponse<Comprobante>> {
+  async findAll(tenantId: string, query: ListComprobantesDto): Promise<PaginatedResponse<ComprobanteConContacto>> {
     const page = query.page ?? 1
     const limit = Math.min(query.limit ?? 20, 100)
     const skip = (page - 1) * limit
@@ -586,13 +631,64 @@ export class ComprobantesService {
       prisma.comprobante.count({ where }),
     ])
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+    return {
+      data: await this.conContactoEmail(tenantId, data),
+      total, page, limit, totalPages: Math.ceil(total / limit),
+    }
   }
 
   async findOne(tenantId: string, id: string): Promise<Comprobante> {
     const comprobante = await prisma.comprobante.findFirst({ where: { id, tenantId, eliminado: false } })
     if (!comprobante) throw new NotFoundException(`Comprobante ${id} no encontrado`)
     return comprobante
+  }
+
+  /** Detalle para la UI: el comprobante + el correo del comprador ya resuelto. */
+  async findOneDetalle(tenantId: string, id: string): Promise<ComprobanteConContacto> {
+    const comprobante = await this.findOne(tenantId, id)
+    return (await this.conContactoEmail(tenantId, [comprobante]))[0]!
+  }
+
+  /**
+   * Adjunta `contactoEmail`: el correo del comprador según el Contacto local.
+   *
+   * El comprobante NO guarda correo (el snapshot fiscal es rnc/razón social/
+   * dirección), así que la única fuente es el Contacto. La UI lo necesita para
+   * mostrar a dónde va a salir el envío; sin esto el modal creía que el cliente
+   * no tenía correo aunque el backend sí lo resolvía.
+   *
+   * Misma regla que el envío (`contactoId` primero, RNC después) y UNA sola
+   * consulta para toda la página.
+   */
+  private async conContactoEmail<T extends Comprobante>(tenantId: string, comprobantes: T[]): Promise<(T & { contactoEmail: string | null })[]> {
+    const ids = comprobantes.map((c) => c.contactoId).filter((v): v is string => !!v)
+    const rncs = comprobantes.filter((c) => !c.contactoId).map((c) => c.rnc).filter((v): v is string => !!v)
+
+    const contactos =
+      ids.length === 0 && rncs.length === 0
+        ? []
+        : await prisma.contacto.findMany({
+            where: {
+              tenantId,
+              OR: [
+                ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+                ...(rncs.length > 0 ? [{ rnc: { in: rncs }, activo: true }] : []),
+              ],
+            },
+            select: { id: true, rnc: true, email: true },
+            orderBy: { createdAt: 'asc' },
+          })
+
+    const porId = new Map(contactos.map((c) => [c.id, c.email]))
+    const porRnc = new Map<string, string | null>()
+    for (const c of contactos) {
+      if (c.rnc && !porRnc.has(c.rnc)) porRnc.set(c.rnc, c.email) // el más antiguo gana, como en el envío
+    }
+
+    return comprobantes.map((c) => ({
+      ...c,
+      contactoEmail: (c.contactoId ? porId.get(c.contactoId) : c.rnc ? porRnc.get(c.rnc) : null) ?? null,
+    }))
   }
 
   /**

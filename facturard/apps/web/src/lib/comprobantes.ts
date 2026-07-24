@@ -30,6 +30,12 @@ export interface Comprobante {
   // Fase 2: discriminador y folio interno de Nota de venta.
   esFiscal?: boolean
   folioInterno?: string | null
+  /**
+   * Correo del comprador, resuelto por el backend desde el Contacto local. NO
+   * es una columna del comprobante: el snapshot fiscal no guarda correo.
+   * Es la ÚNICA fuente válida para mostrar a dónde sale el envío.
+   */
+  contactoEmail?: string | null
 }
 
 // Clase de documento derivada (para badge/filtro en la lista).
@@ -71,6 +77,33 @@ export const CLASE_LABELS: Record<ClaseDocumento, string> = {
 
 /** Estados transitorios del ciclo DGII: el comprobante sigue viajando. */
 export const ESTADOS_EN_PROCESO: readonly ComprobanteEstado[] = ['PENDIENTE', 'EN_COLA', 'ENVIANDO']
+
+/**
+ * Máximo de caracteres del nombre de un artículo. La DGII lo limita a 80
+ * (`NombreItem` es `AlfNum80Type` en los XSD e-CF 31/32/33/34). El backend lo
+ * rechaza con 400; el front lo tope-a aquí para no dejar teclear de más y evitar
+ * el viaje ida y vuelta. El nombre del producto es la fuente del snapshot, así
+ * que el tope va sobre el nombre del producto.
+ */
+export const MAX_NOMBRE_ITEM = 80
+
+/**
+ * Identificador visible del documento: e-NCF si es fiscal, folio NV- si es nota
+ * de venta. Espejo de `EnvioComprobanteService.referencia()` en el backend.
+ */
+export function referenciaComprobante(c: Pick<Comprobante, 'eNCF' | 'folioInterno'>): string {
+  return c.eNCF || c.folioInterno || '—'
+}
+
+/**
+ * Si el comprobante tiene un PDF que se pueda adjuntar a un correo. Rechazado y
+ * error NO llegaron a representar nada válido: el backend responde 404 al pedir
+ * su PDF y aborta el lote completo. Se comprueba en el front sólo para no
+ * ofrecer un envío que ya sabemos que va a fallar — la regla la sostiene el backend.
+ */
+export function tienePdfEnviable(c: Pick<Comprobante, 'estado'>): boolean {
+  return c.estado !== 'RECHAZADO' && c.estado !== 'ERROR'
+}
 
 /** Estados que NO pertenecen al ciclo DGII (el documento nunca se envía). */
 export const ESTADOS_SIN_DGII: readonly ComprobanteEstado[] = ['DRAFT', 'INTERNO']
@@ -136,7 +169,7 @@ export function estadoDgiiBadge(estado: ComprobanteEstado): EstadoDgiiBadge {
 }
 
 export interface TipoClaseBadge {
-  /** Qué ES el documento: tipo e-CF legible, "Borrador" o "Nota de venta". */
+  /** El TIPO del documento: tipo de e-CF legible o "Nota de venta". Nunca "Borrador". */
   label: string
   clase: ClaseDocumento
   /** Tooltip: en borradores conserva el tipo e-CF que se emitiría. */
@@ -149,21 +182,15 @@ export function tipoClaseBadge(
 ): TipoClaseBadge {
   const clase = claseDocumento(c)
   const tipoLabel = TIPO_ECF_LABELS[c.tipoECF] ?? c.tipoECF
-  if (clase === 'nota') {
+  // La columna SIEMPRE muestra el TIPO del documento: "Nota de venta" para lo no
+  // fiscal, o el tipo de e-CF para lo fiscal. Que sea un borrador ya lo dice la
+  // columna del e-NCF, así que aquí NO se rotula "Borrador".
+  if (c.esFiscal === false) {
     return { label: 'Nota de venta', clase, titulo: 'Documento interno sin valor fiscal (no es un e-CF)' }
   }
-  if (clase === 'borrador') {
-    // Un borrador de nota de venta no "sería" un e-CF: no anunciar un tipo fiscal.
-    return {
-      label: 'Borrador',
-      clase,
-      titulo:
-        c.esFiscal === false
-          ? 'Borrador de nota de venta — aún sin folio NV'
-          : `Borrador de ${tipoLabel} — aún no emitido`,
-    }
-  }
-  return { label: tipoLabel, clase, titulo: tipoLabel }
+  // Fiscal (emitido o borrador): su tipo de e-CF.
+  const titulo = clase === 'borrador' ? `Borrador de ${tipoLabel} — aún no emitido` : tipoLabel
+  return { label: tipoLabel, clase, titulo }
 }
 
 export interface PaginatedResponse<T> {

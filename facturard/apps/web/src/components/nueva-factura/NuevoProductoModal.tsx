@@ -10,6 +10,7 @@ import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { NuevoProductoData } from '@/hooks/useProductos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { Select } from '@/components/ui/select'
+import { MAX_NOMBRE_ITEM } from '@/lib/comprobantes'
 import { formatCurrency } from '@/lib/comprobantes'
 
 interface NuevoProductoModalProps {
@@ -222,12 +223,17 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
               placeholder="Ej: Salami Induveca 1lb"
               leftIcon={<Package size={16} className="text-[#64748B]" />}
               value={nombre}
+              // Tope duro: la DGII limita el nombre del artículo a 80 caracteres.
+              maxLength={MAX_NOMBRE_ITEM}
               onChange={(e) => {
                 setNombre(e.target.value)
                 setNombreTouched(true)
               }}
               onBlur={() => setNombreTouched(true)}
               {...(showNombreError ? { error: "Campo Requerido" } : {})}
+              {...(!showNombreError && nombre.length >= MAX_NOMBRE_ITEM - 15
+                ? { helperText: `${nombre.length}/${MAX_NOMBRE_ITEM} caracteres (máximo de la DGII)` }
+                : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
           </div>

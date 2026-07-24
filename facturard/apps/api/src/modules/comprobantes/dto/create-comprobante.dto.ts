@@ -10,6 +10,7 @@ import {
   Min,
   IsIn,
   Matches,
+  MaxLength,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -33,9 +34,12 @@ export class CreateItemDto {
   @IsIn(['I1', 'I2', 'I3', 'I4', 'E'])
   indicadorFacturacion?: string
 
-  @ApiPropertyOptional({ example: 'Servicio de facturación electrónica' })
+  @ApiPropertyOptional({ example: 'Servicio de facturación electrónica', maxLength: 80 })
   @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
   @IsString()
+  // La DGII limita NombreItem a 80 (AlfNum80Type). Se valida también en el
+  // servicio para cubrir el nombre que viene del snapshot de producto.
+  @MaxLength(80, { message: 'El nombre del artículo no puede exceder 80 caracteres (límite de la DGII).' })
   nombreItem?: string
 
   @ApiPropertyOptional({ enum: [1, 2], description: '1=Bien, 2=Servicio' })
