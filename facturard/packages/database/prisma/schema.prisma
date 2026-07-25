@@ -119,7 +119,13 @@ model Tenant {
   ghlAccessToken  String?
   ghlRncFieldKey  String?
   // Branding para la representación impresa (Sprint 6).
+  // logoUrl: URL http(s) pública del logo. Puede ser (a) un enlace externo pegado
+  // por el usuario o (b) la secure URL de Cloudinary (derivada f_png) tras subir un
+  // archivo. logoPublicId sólo se setea en el caso (b) — es el public_id fijo
+  // `facturard/<tenantId>/logo` que permite reemplazar sin huérfanos y derivar la
+  // variante f_auto para la UI. Escribir un logoUrl manual limpia logoPublicId.
   logoUrl         String?
+  logoPublicId    String?
   colorPrimario   String?
   colorSecundario String?
   createdAt       DateTime     @default(now())
