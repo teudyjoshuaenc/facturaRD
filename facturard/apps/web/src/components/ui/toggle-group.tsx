@@ -32,7 +32,7 @@ export function ToggleGroup<T extends string>({
   return (
     <div className={cn(
       isModal 
-        ? 'inline-flex rounded-[10px] bg-[#0379D5]/[0.05] p-1 w-full h-[47.5px] items-center'
+        ? 'inline-flex rounded-[10px] bg-brand-500/[0.05] p-1 w-full h-[47.5px] items-center'
         : 'inline-flex rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 w-full',
       className
     )}>
@@ -52,18 +52,18 @@ export function ToggleGroup<T extends string>({
                 : 'flex-1 flex items-center justify-center gap-2 rounded-md py-2 text-ui-sm font-semibold transition-all active:scale-[0.98] duration-150',
               opt.disabled && 'opacity-40 cursor-not-allowed active:scale-100 pointer-events-none',
               isSelected
-                ? isModal 
-                  ? 'bg-white text-[#0379D5] shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]'
+                ? isModal
+                  ? 'bg-brand-500 text-white shadow-[0px_1px_3px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]'
                   : 'bg-white border border-neutral-200/60 text-brand-500 shadow-sm'
                 : isModal
-                  ? 'text-[#64748B] hover:text-[#0379D5]'
+                  ? 'text-[#64748B] hover:text-brand-500'
                   : 'text-text-secondary hover:text-text-primary',
             )}
           >
             {Icon && (
               <Icon
                 size={isModal ? 20 : 16}
-                className={isSelected ? 'text-[#0379D5]' : 'text-[#64748B]'}
+                className={isSelected ? 'text-white' : 'text-[#64748B]'}
               />
             )}
             <span>{opt.label}</span>

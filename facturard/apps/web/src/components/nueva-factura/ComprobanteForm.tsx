@@ -200,6 +200,23 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
           // Save draft data for client matching
           setDraftData(c)
+
+          // Retomar el borrador donde se quedó, no siempre desde el paso 1.
+          // Se calcula sobre los datos crudos de la respuesta (no sobre el estado
+          // de React, que todavía no se actualizó en este mismo tick).
+          if (draftId && facturacionMode === 'estandar') {
+            const hasClienteInfo =
+              c.esFiscal === false ||
+              Boolean(c.datos?.rncComprador || c.rnc || c.datos?.razonSocialComprador || c.razonSocialComprador)
+            const hasValidItems =
+              mappedItems.length > 0 &&
+              mappedItems.every((i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0)
+            if (hasValidItems) {
+              setCurrentStep(3)
+            } else if (hasClienteInfo) {
+              setCurrentStep(2)
+            }
+          }
         })
         .catch((err) => {
           console.error('Error loading draft details:', err)
@@ -1100,8 +1117,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push('/facturas')}
-                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
+                    onClick={handleBack}
+                    disabled={submitting}
+                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
                   >
                     <span>Cancelar</span>
                   </button>

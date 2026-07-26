@@ -101,7 +101,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
       <aside
         className={cn(
           // Base & Styles matching Figma
-          'flex flex-shrink-0 flex-col justify-between border-r border-[rgba(10,10,10,0.08)] bg-[#FAFAFA] transition-all duration-300 ease-in-out',
+          'flex flex-shrink-0 flex-col justify-between border-r border-white/10 bg-brand-500 transition-all duration-300 ease-in-out',
           // Mobile: fixed drawer
           'fixed inset-y-0 left-0 z-50 w-64 md:static md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
@@ -111,7 +111,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
       >
         {/* Top Header Section (Logo + Chevron Toggle) */}
         <div className={cn(
-          "w-full h-[68px] border-b border-[rgba(10,10,10,0.08)] flex items-center shrink-0 select-none transition-all duration-300",
+          "w-full h-[68px] border-b border-white/10 flex items-center shrink-0 select-none transition-all duration-300",
           isEffectiveCollapsed ? "justify-center px-0" : "justify-between px-[18px]"
         )}>
           {/* Show Figma Logo when expanded */}
@@ -129,7 +129,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="hidden md:flex items-center justify-center w-[25px] h-[25px] rounded-[4px] text-[#0379D5] hover:bg-neutral-100/50 transition-colors shrink-0"
+            className="hidden md:flex items-center justify-center w-[25px] h-[25px] rounded-[4px] text-white hover:bg-white/10 transition-colors shrink-0"
             title={collapsed ? "Expandir" : "Contraer"}
           >
             <div
@@ -152,7 +152,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
-            className="ml-auto rounded-lg p-1 text-[#64748B] hover:bg-neutral-50 md:hidden"
+            className="ml-auto rounded-lg p-1 text-white hover:bg-white/10 md:hidden"
             aria-label="Cerrar menú"
           >
             <X size={20} />
@@ -167,7 +167,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           {/* Navigation group: OPERACION */}
           <div className="flex flex-col gap-2 w-full">
             {!isEffectiveCollapsed && (
-              <span className="px-3 text-[10px] font-bold text-[#667085] tracking-[0.8px] uppercase font-sans">
+              <span className="px-3 text-[10px] font-bold text-white/70 tracking-[0.8px] uppercase font-sans">
                 Operación
               </span>
             )}
@@ -194,6 +194,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
                 backgroundImage: `url(/assets/5c3514977249558745a380e88c122e2edd077b0b.svg)`,
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: 'center',
+                filter: 'invert(1)',
               }}
             />
           )}
@@ -201,7 +202,7 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           {/* Navigation group: SISTEMA */}
           <div className="flex flex-col gap-2 w-full">
             {!isEffectiveCollapsed && (
-              <span className="px-3 text-[10px] font-bold text-[#667085] tracking-[0.8px] uppercase font-sans">
+              <span className="px-3 text-[10px] font-bold text-white/70 tracking-[0.8px] uppercase font-sans">
                 Sistema
               </span>
             )}
