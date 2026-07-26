@@ -435,6 +435,22 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
 
+  // El botón "Volver"/"Cancelar" ya preguntan; el botón ATRÁS del navegador no
+  // pasaba por ahí (popstate no lo intercepta nadie) y salía directo sin avisar.
+  // Con contenido sin guardar, se agrega un estado de historial "de repuesto":
+  // al presionar atrás, en vez de salir, se re-empuja ese estado (la URL no
+  // cambia) y se abre el mismo modal de siempre.
+  useEffect(() => {
+    if (!hayContenido) return
+    window.history.pushState(null, '', window.location.href)
+    function onPopState(): void {
+      window.history.pushState(null, '', window.location.href)
+      setShowLeaveConfirm(true)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [hayContenido])
+
   function handleBack(): void {
     if (submitting) return
     if (hayContenido) {
