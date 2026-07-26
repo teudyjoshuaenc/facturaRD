@@ -37,7 +37,7 @@ export function GhlContactosCard(): JSX.Element {
         ...(token.trim() ? { ghlAccessToken: token.trim() } : {}),
         ghlRncFieldKey: fieldKey,
       })
-      toast.success('Conexión con GoHighLevel guardada')
+      toast.success('Conexión con Dmaia CRM guardada')
       setToken('')
       setReplacing(false)
     } catch (err) {
@@ -50,8 +50,8 @@ export function GhlContactosCard(): JSX.Element {
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <CardTitle>Integración con GoHighLevel</CardTitle>
-            <CardDescription>Importa tus contactos desde GoHighLevel a FacturaRD (en una sola dirección).</CardDescription>
+            <CardTitle>Integración con Dmaia CRM</CardTitle>
+            <CardDescription>Importa tus contactos desde Dmaia CRM a FacturaRD (en una sola dirección).</CardDescription>
           </div>
           <Badge variant={conectado ? 'success' : 'neutral'}>
             <Plug size={13} />
@@ -66,7 +66,7 @@ export function GhlContactosCard(): JSX.Element {
           <Input
             label="Private Integration Token"
             type="password"
-            placeholder="Pega aquí tu token de GoHighLevel"
+            placeholder="Pega aquí tu token de Dmaia CRM"
             value={token}
             onChange={(e) => setToken(e.target.value)}
             helperText="Se guarda cifrado; nunca se muestra en claro."
@@ -86,7 +86,7 @@ export function GhlContactosCard(): JSX.Element {
 
         {/* Custom field del RNC */}
         <Input
-          label="Campo del RNC en GoHighLevel"
+          label="Campo del RNC en Dmaia CRM"
           placeholder="Ej. rnc, cedula_rnc, custom_rnc"
           value={fieldKey}
           onChange={(e) => setFieldKey(e.target.value)}
@@ -100,7 +100,7 @@ export function GhlContactosCard(): JSX.Element {
             <span className="font-medium">Cómo obtener el token</span>
           </div>
           <p>
-            Para conectar, genera un Private Integration Token en GoHighLevel: Settings → Private
+            Para conectar, genera un Private Integration Token en Dmaia CRM: Settings → Private
             Integrations → crea una integración con permisos de Contactos, copia el token y pégalo aquí.
             (Si no ves esa opción, actívala en Labs.) El campo de RNC es el nombre del campo
             personalizado donde guardas el RNC de cada contacto en tu CRM.
