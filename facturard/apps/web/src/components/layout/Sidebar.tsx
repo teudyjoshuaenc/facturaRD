@@ -112,15 +112,15 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
         {/* Top Header Section (Logo + Chevron Toggle) */}
         <div className={cn(
           "w-full h-[68px] border-b border-white/10 flex items-center shrink-0 select-none transition-all duration-300",
-          isEffectiveCollapsed ? "justify-center px-0" : "justify-between px-[18px]"
+          isEffectiveCollapsed ? "justify-center px-0" : "justify-between pl-[28px] pr-[12px]"
         )}>
           {/* Show Figma Logo when expanded */}
           {!isEffectiveCollapsed && (
             <div className="flex-1 truncate pr-2">
               <img
-                src="/assets/22b4dc8b6ae6de4c06772d04d2c2aa7596c38f4a.svg"
+                src="/icons/logo_dmaia.png"
                 alt="Logo"
-                className="h-[20px] w-[90px] shrink-0"
+                className="h-[26px] w-auto max-w-full shrink-0 object-contain"
               />
             </div>
           )}

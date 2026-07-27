@@ -1047,7 +1047,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                         "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
                         disabled
                           ? "opacity-20 cursor-not-allowed"
-                          : "hover:bg-[#0379D5]/90 cursor-pointer"
+                          : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                       )}
                     >
                       {submitting ? (
@@ -1102,7 +1102,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                       "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
                       ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason)
                         ? "opacity-20 cursor-not-allowed"
-                        : "hover:bg-[#0379D5]/90 cursor-pointer"
+                        : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                     )}
                   >
                     {submitting ? (
