@@ -135,7 +135,7 @@ export default function ConfiguracionPage(): JSX.Element {
       {/* 3. Integración GoHighLevel */}
       <Card>
         <CardHeader>
-          <CardTitle>Integración GoHighLevel</CardTitle>
+          <CardTitle>Integración Dmaia CRM</CardTitle>
           <CardDescription>Configura el webhook receptor en tu subcuenta de GHL</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -205,10 +205,10 @@ export default function ConfiguracionPage(): JSX.Element {
               <div className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-background-canvas p-4 text-body-sm text-text-secondary">
                 <div className="flex items-center gap-2 text-text-primary">
                   <ShieldCheck size={16} />
-                  <span className="font-medium">Cómo configurarlo en GoHighLevel</span>
+                  <span className="font-medium">Cómo configurarlo en Dmaia CRM</span>
                 </div>
                 <ol className="list-decimal pl-5">
-                  <li>Ve a Configuración → Webhooks dentro de tu subcuenta de GoHighLevel.</li>
+                  <li>Ve a Configuración → Webhooks dentro de tu subcuenta de Dmaia CRM.</li>
                   <li>Crea un nuevo webhook y pega la URL anterior como destino.</li>
                   <li>Agrega el secreto HMAC en el encabezado de firma del webhook.</li>
                   <li>

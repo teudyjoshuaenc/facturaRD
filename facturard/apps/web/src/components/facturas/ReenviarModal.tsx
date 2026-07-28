@@ -138,7 +138,7 @@ export function ReenviarModal({
                 <AlertCircle size={14} className="mt-[3px] shrink-0 text-[#d92d20]" />
                 <span className="text-[12px] leading-[18px] text-[#b42318]">
                   Este cliente no tiene correo registrado. Agrégalo en Contactos o sincroniza con
-                  GoHighLevel para poder enviarle el comprobante.
+                  Dmaia CRM para poder enviarle el comprobante.
                 </span>
               </div>
             ) : (

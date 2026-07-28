@@ -5,6 +5,11 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
   body {
     @apply bg-background-canvas text-text-primary font-sans text-body-base;
   }

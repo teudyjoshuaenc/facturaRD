@@ -200,6 +200,23 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
           // Save draft data for client matching
           setDraftData(c)
+
+          // Retomar el borrador donde se quedó, no siempre desde el paso 1.
+          // Se calcula sobre los datos crudos de la respuesta (no sobre el estado
+          // de React, que todavía no se actualizó en este mismo tick).
+          if (draftId && facturacionMode === 'estandar') {
+            const hasClienteInfo =
+              c.esFiscal === false ||
+              Boolean(c.datos?.rncComprador || c.rnc || c.datos?.razonSocialComprador || c.razonSocialComprador)
+            const hasValidItems =
+              mappedItems.length > 0 &&
+              mappedItems.every((i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0)
+            if (hasValidItems) {
+              setCurrentStep(3)
+            } else if (hasClienteInfo) {
+              setCurrentStep(2)
+            }
+          }
         })
         .catch((err) => {
           console.error('Error loading draft details:', err)
@@ -417,6 +434,22 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     items.some((i) => i.nombreItem.trim() !== '' || i.precioUnitarioItem > 0)
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+
+  // El botón "Volver"/"Cancelar" ya preguntan; el botón ATRÁS del navegador no
+  // pasaba por ahí (popstate no lo intercepta nadie) y salía directo sin avisar.
+  // Con contenido sin guardar, se agrega un estado de historial "de repuesto":
+  // al presionar atrás, en vez de salir, se re-empuja ese estado (la URL no
+  // cambia) y se abre el mismo modal de siempre.
+  useEffect(() => {
+    if (!hayContenido) return
+    window.history.pushState(null, '', window.location.href)
+    function onPopState(): void {
+      window.history.pushState(null, '', window.location.href)
+      setShowLeaveConfirm(true)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [hayContenido])
 
   function handleBack(): void {
     if (submitting) return
@@ -1014,7 +1047,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                         "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
                         disabled
                           ? "opacity-20 cursor-not-allowed"
-                          : "hover:bg-[#0379D5]/90 cursor-pointer"
+                          : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                       )}
                     >
                       {submitting ? (
@@ -1069,7 +1102,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                       "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
                       ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason)
                         ? "opacity-20 cursor-not-allowed"
-                        : "hover:bg-[#0379D5]/90 cursor-pointer"
+                        : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                     )}
                   >
                     {submitting ? (
@@ -1100,8 +1133,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </button>
                   <button
                     type="button"
-                    onClick={() => router.push('/facturas')}
-                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
+                    onClick={handleBack}
+                    disabled={submitting}
+                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer disabled:opacity-50"
                   >
                     <span>Cancelar</span>
                   </button>

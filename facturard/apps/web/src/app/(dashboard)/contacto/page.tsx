@@ -266,6 +266,10 @@ export default function ContactosPage(): JSX.Element {
       })
     }
 
+    if (origenFilter !== 'todos') {
+      list = list.filter((c) => (c.origen === 'GHL' ? 'GHL' : 'MANUAL') === origenFilter)
+    }
+
     if (startDate) {
       list = list.filter((c) => {
         const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
@@ -280,7 +284,7 @@ export default function ContactosPage(): JSX.Element {
     }
 
     return list
-  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, startDate, endDate])
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter, startDate, endDate])
 
   function handleAbrirSincronizarGhl(): void {
     if (!conectado) {
@@ -488,7 +492,7 @@ export default function ContactosPage(): JSX.Element {
             <div className="flex items-center justify-between gap-3 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
               <span className="flex items-center gap-2">
                 <AlertTriangle size={18} className="shrink-0" />
-                Primero conecta tu cuenta de GoHighLevel en Configuración.
+                Primero conecta tu cuenta de Dmaia CRM en Configuración.
               </span>
               <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
                 Ir a Configuración
@@ -650,9 +654,9 @@ export default function ContactosPage(): JSX.Element {
               <EmptyState
                 title=""
                 description={
-                  activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || startDate || endDate || soloSinRnc
+                  activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || origenFilter !== 'todos' || startDate || endDate || soloSinRnc
                     ? 'No hay contactos que coincidan con los filtros.'
-                    : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
+                    : 'Aún no tienes contactos. Crea uno o sincroniza desde Dmaia CRM'
                 }
               />
             ) : (
@@ -694,7 +698,6 @@ export default function ContactosPage(): JSX.Element {
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Identificacion</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Validación</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[95px]">e-CF sugerido</th>
-                      <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[85px]">Origen</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] w-[110px]">Ultima actividad</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-center w-[100px]">Estado</th>
                       <th className="px-4 py-3 font-medium text-[12px] text-[#64748b] text-right pr-6 w-[110px]">Acciones</th>
@@ -839,17 +842,6 @@ export default function ContactosPage(): JSX.Element {
                               {suggestedEcf}
                             </span>
                           </td>
-                          <td className="px-4 py-3 w-[85px]">
-                            {c.origen === 'GHL' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]">
-                                GHL
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] text-[11px] font-semibold border bg-neutral-50 text-neutral-800 border-neutral-200">
-                                Manual
-                              </span>
-                            )}
-                          </td>
                           <td className="px-4 py-3 w-[110px] text-text-secondary">
                             {formattedActivity}
                           </td>
@@ -924,27 +916,28 @@ export default function ContactosPage(): JSX.Element {
               </div>
             )}
 
-            {/* Paginación (server-side) */}
+            {/* Paginación (server-side) — mismo estilo que /facturas */}
             {!isLoading && !isError && visibles.length > 0 && (
-              <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3.5 bg-white">
-                <p className="text-ui-sm text-text-secondary">{total} resultados</p>
-                <div className="flex items-center gap-1.5">
+              <div className="border-[#f1f5f9] border-t flex h-[57px] items-center justify-between px-[20px] bg-white select-none">
+                <p className="text-[13px] font-sans font-normal text-[#64748b]">{total} resultados</p>
+
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+                    className="flex h-8 w-8 items-center justify-center text-[#64748b] hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none rounded-[4px]"
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-brand-500 px-2 text-ui-sm font-bold text-white">
-                    {page} / {totalPages}
+                  <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#0379d5] text-[13px] font-normal text-white font-sans">
+                    {page}
                   </span>
                   <button
                     type="button"
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-text-secondary hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none"
+                    className="flex h-8 w-8 items-center justify-center text-[#64748b] hover:bg-neutral-50 disabled:opacity-50 transition-colors focus:outline-none rounded-[4px]"
                   >
                     <ChevronRight size={16} />
                   </button>
