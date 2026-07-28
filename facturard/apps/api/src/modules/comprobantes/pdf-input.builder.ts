@@ -11,6 +11,12 @@ function calcularMontoItem(item: CreateItemDto): number {
   return r2(bruto - r2(bruto * ((item.descuentoPorcentaje ?? 0) / 100)))
 }
 
+function itbisRateFor(item: CreateItemDto): number {
+  if (item.indicadorFacturacion === 'I1') return 0.18
+  if (item.indicadorFacturacion === 'I2') return 0.16
+  return 0
+}
+
 /**
  * CodigoSeguridad DGII = primeros 6 caracteres del SignatureValue del XML firmado
  * (sin whitespace; la firma RSA base64 no lo tiene). Es OBLIGATORIO en la URL del
@@ -42,20 +48,19 @@ export function buildEcfPdfInput(
   ambiente: DgiiAmbiente,
   xmlFirmado?: string,
 ): EcfPdfInput {
-  const items = datos.items.map((item) => ({
-    descripcion: item.nombreItem ?? '',
-    cantidad: item.cantidad,
-    precioUnitario: item.precioUnitarioItem ?? 0,
-    valor: calcularMontoItem(item),
-  }))
+  const items = datos.items.map((item) => {
+    const valor = calcularMontoItem(item)
+    return {
+      descripcion: item.nombreItem ?? '',
+      cantidad: item.cantidad,
+      precioUnitario: item.precioUnitarioItem ?? 0,
+      valor,
+      itbis: r2(valor * itbisRateFor(item)),
+    }
+  })
 
   const montoTotal = items.reduce((s, i) => s + i.valor, 0)
-  const itbisTotal = datos.items.reduce((s, item) => {
-    const monto = calcularMontoItem(item)
-    if (item.indicadorFacturacion === 'I1') return s + r2(monto * 0.18)
-    if (item.indicadorFacturacion === 'I2') return s + r2(monto * 0.16)
-    return s
-  }, 0)
+  const itbisTotal = r2(items.reduce((s, i) => s + i.itbis, 0))
 
   const codigoSeguridad = xmlFirmado ? extraerCodigoSeguridad(xmlFirmado) : undefined
   const fechaHoraFirma = xmlFirmado ? extraerFechaHoraFirma(xmlFirmado) : undefined

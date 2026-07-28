@@ -12,6 +12,7 @@ import { DashboardHero } from '@/components/dashboard/DashboardHero'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useDashboardComprobantes, useMonthMetrics, useCumplimiento } from '@/hooks/useComprobantes'
+import { VentasPorProvinciaMap } from '@/components/dashboard/VentasPorProvinciaMap'
 import { useFinanzasResumen, useFinanzasFlujo, useTransacciones, CATEGORIA_LABELS } from '@/hooks/useFinanzas'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
@@ -361,6 +362,11 @@ export default function DashboardPage(): JSX.Element {
               )}
             </Card>
           </div>
+        </div>
+
+        {/* Ventas por provincia */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+          <VentasPorProvinciaMap fechaDesde={fechaDesde} fechaHasta={fechaHasta} />
         </div>
 
         {/* Facturas recientes */}

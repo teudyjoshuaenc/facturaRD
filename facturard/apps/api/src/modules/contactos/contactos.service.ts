@@ -32,6 +32,8 @@ export class ContactosService {
       ...(dto.identificadorExtranjero !== undefined && { identificadorExtranjero: dto.identificadorExtranjero }),
       ...(dto.paisExtranjero !== undefined && { paisExtranjero: dto.paisExtranjero }),
       ...(dto.direccion !== undefined && { direccion: dto.direccion }),
+      ...(dto.provincia !== undefined && { provincia: dto.provincia }),
+      ...(dto.municipio !== undefined && { municipio: dto.municipio }),
       ...(dto.telefono !== undefined && { telefono: dto.telefono }),
       ...(dto.email !== undefined && { email: dto.email }),
     }
@@ -124,6 +126,8 @@ export class ContactosService {
         ...(dto.identificadorExtranjero !== undefined && { identificadorExtranjero: dto.identificadorExtranjero }),
         ...(dto.paisExtranjero !== undefined && { paisExtranjero: dto.paisExtranjero }),
         ...(dto.direccion !== undefined && { direccion: dto.direccion }),
+        ...(dto.provincia !== undefined && { provincia: dto.provincia }),
+        ...(dto.municipio !== undefined && { municipio: dto.municipio }),
         ...(dto.telefono !== undefined && { telefono: dto.telefono }),
         ...(dto.email !== undefined && { email: dto.email }),
         ...(dto.activo !== undefined && { activo: dto.activo }),

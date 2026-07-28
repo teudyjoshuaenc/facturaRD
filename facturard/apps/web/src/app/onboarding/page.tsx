@@ -12,14 +12,15 @@ import { CertificacionChoiceStep } from '@/components/onboarding/CertificacionCh
 import { CertificadoStep } from '@/components/onboarding/CertificadoStep'
 import { CrearCuentaStep } from '@/components/onboarding/CrearCuentaStep'
 import { SecuenciasStep } from '@/components/onboarding/SecuenciasStep'
+import { FinanzasStep } from '@/components/onboarding/FinanzasStep'
 import { SuccessStep } from '@/components/onboarding/SuccessStep'
 import { cn } from '@/lib/utils'
 import type { TenantInfo } from '@/lib/session'
 
 // Pasos internos del wizard. El indicador superior los agrupa en 3 fases:
 // Identifícate · Certificación · Listo (la fase "Certificación" cubre la elección
-// y, si aplica, subir el .p12 y configurar secuencias).
-type Step = 'ident' | 'choice' | 'cert' | 'cuenta' | 'secuencias' | 'exito'
+// y, si aplica, subir el .p12, configurar secuencias y activar Finanzas).
+type Step = 'ident' | 'choice' | 'cert' | 'cuenta' | 'secuencias' | 'finanzas' | 'exito'
 
 const FASES = [
   { fase: 1, label: 'Identifícate' },
@@ -157,14 +158,16 @@ function OnboardingContent(): JSX.Element {
                 passphrase={passphrase}
                 onCreated={(t) => {
                   setTenant(t)
-                  // Con certificado → configurar secuencias; sin certificado → directo a éxito.
-                  setStep(certificando ? 'secuencias' : 'exito')
+                  // Con certificado → configurar secuencias primero; ambos caminos pasan por Finanzas.
+                  setStep(certificando ? 'secuencias' : 'finanzas')
                 }}
                 onBack={() => setStep(certificando ? 'cert' : 'choice')}
               />
             )}
 
-            {step === 'secuencias' && <SecuenciasStep onDone={() => setStep('exito')} />}
+            {step === 'secuencias' && <SecuenciasStep onDone={() => setStep('finanzas')} />}
+
+            {step === 'finanzas' && <FinanzasStep onDone={() => setStep('exito')} />}
 
             {enExito && tenant && (
               <SuccessStep

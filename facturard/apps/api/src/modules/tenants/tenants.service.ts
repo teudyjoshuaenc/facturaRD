@@ -15,18 +15,20 @@ import { CloudinaryService } from '../../common/services/cloudinary.service'
 export type SafeTenant = Omit<Tenant, 'ghlAccessToken'> & {
   ghlConectado: boolean
   logoPreviewUrl: string | null
+  finanzasHabilitado: boolean
 } & EmisionStatus
 
 @Injectable()
 export class TenantsService {
   constructor(private readonly cloudinary: CloudinaryService) {}
 
-  private toSafeTenant(t: Tenant, emision: EmisionStatus): SafeTenant {
+  private toSafeTenant(t: Tenant, emision: EmisionStatus, finanzasHabilitado: boolean): SafeTenant {
     const { ghlAccessToken: _ghlAccessToken, ...rest } = t
     return {
       ...rest,
       ghlConectado: Boolean(_ghlAccessToken),
       logoPreviewUrl: t.logoPublicId ? this.cloudinary.previewUrl(t.logoPublicId) : null,
+      finanzasHabilitado,
       ...emision,
     }
   }
@@ -58,10 +60,27 @@ export class TenantsService {
     )
   }
 
+  /**
+   * "Finanzas habilitado" se deriva de si el tenant ya configuró su Capital
+   * inicial (onboarding o /configuracion) — sin columna nueva en Tenant.
+   */
+  private async finanzasHabilitadoMap(tenantIds: string[]): Promise<Map<string, boolean>> {
+    if (tenantIds.length === 0) return new Map()
+    const capitales = await prisma.capitalInicial.findMany({
+      where: { tenantId: { in: tenantIds } },
+      select: { tenantId: true },
+    })
+    const conCapital = new Set(capitales.map((c) => c.tenantId))
+    return new Map(tenantIds.map((id) => [id, conCapital.has(id)]))
+  }
+
   async create(dto: CreateTenantDto): Promise<SafeTenant> {
     const tenant = await prisma.tenant.create({ data: dto })
-    const emision = await this.emisionStatusMap([tenant.id])
-    return this.toSafeTenant(tenant, emision.get(tenant.id)!)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
   }
 
   async findAll(callerTenantId: string, callerRole: string): Promise<SafeTenant[]> {
@@ -70,8 +89,12 @@ export class TenantsService {
         ? await prisma.tenant.findMany({ orderBy: { createdAt: 'desc' } })
         : await prisma.tenant.findUnique({ where: { id: callerTenantId } }).then((t) => (t ? [t] : []))
 
-    const emision = await this.emisionStatusMap(tenants.map((t) => t.id))
-    return tenants.map((t) => this.toSafeTenant(t, emision.get(t.id)!))
+    const tenantIds = tenants.map((t) => t.id)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap(tenantIds),
+      this.finanzasHabilitadoMap(tenantIds),
+    ])
+    return tenants.map((t) => this.toSafeTenant(t, emision.get(t.id)!, finanzas.get(t.id)!))
   }
 
   async updateBranding(tenantId: string, dto: BrandingDto): Promise<SafeTenant> {
@@ -85,8 +108,11 @@ export class TenantsService {
         ...(dto.colorSecundario !== undefined && { colorSecundario: dto.colorSecundario }),
       },
     })
-    const emision = await this.emisionStatusMap([tenant.id])
-    return this.toSafeTenant(tenant, emision.get(tenant.id)!)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
   }
 
   /**
@@ -107,8 +133,11 @@ export class TenantsService {
         ...(dto.logoUrl !== undefined && { logoUrl: norm(dto.logoUrl), logoPublicId: null }),
       },
     })
-    const emision = await this.emisionStatusMap([tenant.id])
-    return this.toSafeTenant(tenant, emision.get(tenant.id)!)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
   }
 
   /**
@@ -123,8 +152,11 @@ export class TenantsService {
       where: { id: tenantId },
       data: { logoUrl: secureUrl, logoPublicId: publicId },
     })
-    const emision = await this.emisionStatusMap([tenant.id])
-    return this.toSafeTenant(tenant, emision.get(tenant.id)!)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
   }
 
   async findOne(id: string, callerTenantId: string, callerRole: string): Promise<SafeTenant> {
@@ -133,7 +165,10 @@ export class TenantsService {
     }
     const tenant = await prisma.tenant.findUnique({ where: { id } })
     if (!tenant) throw new NotFoundException(`Tenant ${id} no encontrado`)
-    const emision = await this.emisionStatusMap([tenant.id])
-    return this.toSafeTenant(tenant, emision.get(tenant.id)!)
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
   }
 }

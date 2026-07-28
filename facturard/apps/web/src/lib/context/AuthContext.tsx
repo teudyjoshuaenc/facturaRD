@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { JSX, ReactNode } from 'react'
 import { clearSession, getToken, getTenant, saveSession, type TenantInfo } from '@/lib/session'
+import { api } from '@/lib/api'
 
 interface AuthState {
   token: string | null
@@ -10,6 +11,7 @@ interface AuthState {
   isReady: boolean
   setAuth: (token: string, tenant: TenantInfo) => void
   clearAuth: () => void
+  refreshTenant: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -37,8 +39,18 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     setTenant(null)
   }, [])
 
+  const refreshTenant = useCallback(async () => {
+    const current = getToken()
+    if (!current) return
+    const res = await api.get<TenantInfo[]>('/tenants')
+    const fresh = res.data[0]
+    if (!fresh) return
+    saveSession(current, fresh)
+    setTenant(fresh)
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ token, tenant, isReady, setAuth, clearAuth }}>
+    <AuthContext.Provider value={{ token, tenant, isReady, setAuth, clearAuth, refreshTenant }}>
       {children}
     </AuthContext.Provider>
   )

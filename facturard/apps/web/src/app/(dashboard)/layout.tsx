@@ -62,7 +62,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
 export default function DashboardLayout({ children }: { children: ReactNode }): JSX.Element {
   const router = useRouter()
   const pathname = usePathname()
-  const { token, tenant, isReady } = useAuth()
+  const { token, tenant, isReady, refreshTenant } = useAuth()
   const { setSidebarOpen } = useUI()
   const { diasParaVencer } = useCertificadoStatus()
 
@@ -87,6 +87,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
       router.replace('/')
     }
   }, [isReady, token, router])
+
+  useEffect(() => {
+    if (isReady && token) {
+      refreshTenant()
+    }
+  }, [isReady, token, refreshTenant])
 
   useEffect(() => {
     setSidebarOpen(false)

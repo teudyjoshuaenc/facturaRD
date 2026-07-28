@@ -352,6 +352,8 @@ export default function ContactosPage(): JSX.Element {
           email: data.email || undefined,
           telefono: cleanPhone || undefined,
           direccion: data.direccion || undefined,
+          provincia: data.provincia || undefined,
+          municipio: data.municipio || undefined,
           identificadorExtranjero: data.idExtranjero || undefined,
         }
       })
@@ -365,6 +367,8 @@ export default function ContactosPage(): JSX.Element {
           email: data.email || null,
           telefono: cleanPhone || null,
           direccion: data.direccion || null,
+          provincia: data.provincia || null,
+          municipio: data.municipio || null,
           identificadorExtranjero: data.idExtranjero || null,
         }))
       }

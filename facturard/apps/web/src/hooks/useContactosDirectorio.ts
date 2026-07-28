@@ -20,6 +20,9 @@ export interface ContactoDir {
   createdAt?: string
   updatedAt?: string
   identificadorExtranjero?: string | null
+  direccion?: string | null
+  provincia?: string | null
+  municipio?: string | null
 }
 
 export interface ContactosDirParams {

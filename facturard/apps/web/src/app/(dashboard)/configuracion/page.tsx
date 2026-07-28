@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { GhlContactosCard } from '@/components/configuracion/GhlContactosCard'
 import { CertificacionFiscalCard } from '@/components/configuracion/CertificacionFiscalCard'
+import { ActivarFinanzasCard } from '@/components/configuracion/ActivarFinanzasCard'
 import { api } from '@/lib/api'
 
 interface TenantFull {
@@ -127,6 +128,9 @@ export default function ConfiguracionPage(): JSX.Element {
 
       {/* 2. Certificación fiscal (certificado + secuencias) */}
       <CertificacionFiscalCard />
+
+      {/* 2b. Activar Finanzas (flujo de caja + presupuesto) */}
+      <ActivarFinanzasCard />
 
       {/* 3. Integración GoHighLevel */}
       <Card>

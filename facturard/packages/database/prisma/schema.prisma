@@ -249,6 +249,8 @@ model Contacto {
   identificadorExtranjero String?
   paisExtranjero          String?
   direccion               String?
+  provincia               String?
+  municipio               String?
   telefono                String?
   email                   String?
   origen                  String   @default("MANUAL") // MANUAL|GHL
@@ -263,6 +265,7 @@ model Contacto {
   @@unique([tenantId, rnc])
   @@unique([tenantId, ghlContactId])
   @@index([tenantId, tipo, activo])
+  @@index([tenantId, provincia])
   @@map("contactos")
 }
 

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState, type JSX } from 'react'
-import { Plus, Download, TrendingUp } from 'lucide-react'
+import { Plus, Download, TrendingUp, Wallet } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
@@ -200,6 +201,23 @@ export default function FinanzasPage(): JSX.Element {
     } finally {
       setExporting(false)
     }
+  }
+
+  if (!tenant?.finanzasHabilitado) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-subtle bg-background-canvas p-12 text-center">
+        <Wallet size={32} className="text-text-tertiary" />
+        <div className="flex flex-col gap-1">
+          <h2 className="text-h5 font-bold text-text-primary">Finanzas no está activado</h2>
+          <p className="max-w-md text-body-sm text-text-secondary">
+            Activa el flujo de caja y presupuesto desde Configuración para ver tu panel financiero.
+          </p>
+        </div>
+        <Link href="/configuracion#activar-finanzas">
+          <Button variant="primary">Ir a Configuración</Button>
+        </Link>
+      </div>
+    )
   }
 
   return (

@@ -10,6 +10,7 @@ import { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import { CrearNotaDto } from './dto/crear-nota.dto'
 import { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
+import { VentasPorProvinciaDto } from './dto/ventas-por-provincia.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { PlanActivoGuard } from '../../common/guards/plan-activo.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
@@ -101,6 +102,15 @@ export class ComprobantesController {
   @ApiQuery({ name: 'fechaHasta', required: false })
   resumen(@CurrentTenant() tenantId: string, @Query() query: ResumenComprobantesDto) {
     return this.service.resumen(tenantId, query)
+  }
+
+  @Get('ventas-por-provincia')
+  @ApiOperation({ summary: 'Ventas agregadas por provincia del comprador (para el mapa del dashboard)' })
+  @ApiQuery({ name: 'fechaDesde', required: false })
+  @ApiQuery({ name: 'fechaHasta', required: false })
+  @ApiQuery({ name: 'clase', enum: ['fiscal', 'nota', 'todas'], required: false })
+  ventasPorProvincia(@CurrentTenant() tenantId: string, @Query() query: VentasPorProvinciaDto) {
+    return this.service.ventasPorProvincia(tenantId, query)
   }
 
   @Get(':id')
