@@ -2,12 +2,13 @@
 
 import type { JSX } from 'react'
 import { useState } from 'react'
-import { CheckCircle2, RotateCcw } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Building2, User, UserCheck } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { useRncValidation } from '@/hooks/useRncValidation'
+import { cn } from '@/lib/utils'
 
 export type TipoIdentificacion = 'RNC' | 'CEDULA'
 
@@ -54,21 +55,30 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
   const puedeContinuar = status === 'valid' || (permiteManual && nombreManual.trim() !== '')
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-h6 text-text-primary">Identifícate</h2>
-        <p className="text-body-sm text-text-secondary">
-          Empresa con RNC o persona física con cédula. Lo validamos con la DGII y confirmamos tu
-          nombre.
-        </p>
+    <div className="animate-fade-in-up flex flex-col gap-6">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-ui-xs font-bold uppercase tracking-wide text-brand-600">Paso 1</span>
+        <div className="flex items-start gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-lg shadow-brand-500/30">
+            <UserCheck size={21} />
+          </span>
+          <div className="flex flex-col gap-1 pt-1">
+            <h2 className="text-h6 font-bold leading-tight text-text-primary">Identifícate</h2>
+            <p className="text-body-sm text-text-secondary">
+              Empresa con RNC o persona física con cédula. Lo validamos con la DGII y confirmamos tu
+              nombre.
+            </p>
+          </div>
+        </div>
       </div>
 
       <ToggleGroup
+        variant="solid"
         value={tipo}
         onChange={(v) => cambiarTipo(v as TipoIdentificacion)}
         options={[
-          { value: 'RNC', label: 'Tengo RNC' },
-          { value: 'CEDULA', label: 'Tengo cédula' },
+          { value: 'RNC', label: 'Tengo RNC', icon: Building2 },
+          { value: 'CEDULA', label: 'Tengo cédula', icon: User },
         ]}
       />
 
@@ -95,8 +105,10 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
       </div>
 
       {status === 'valid' && (
-        <div className="flex items-center gap-2 rounded-lg border border-success-500/40 bg-success-500/10 px-4 py-3 text-body-sm text-success-700">
-          <CheckCircle2 size={18} className="shrink-0" />
+        <div className="animate-scale-in flex items-center gap-3 rounded-2xl border border-success-500/25 bg-gradient-to-br from-success-50 to-white px-4 py-3.5 text-body-sm font-semibold text-success-700">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-success-400 to-success-600 text-white shadow-sm shadow-success-500/30">
+            <CheckCircle2 size={16} />
+          </span>
           <span>{razonSocial}</span>
         </div>
       )}
@@ -129,7 +141,7 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
         size="lg"
         disabled={!puedeContinuar}
         onClick={continuar}
-        className="w-full"
+        className={cn('w-full transition-all duration-300', puedeContinuar && 'shadow-lg shadow-brand-500/30 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand-500/40')}
       >
         Continuar
       </Button>

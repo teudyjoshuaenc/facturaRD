@@ -147,6 +147,7 @@ model Tenant {
   movimientos          MovimientoFinanciero[]
   pagos                Pago[]
   capitalInicial       CapitalInicial?
+  presupuestoConfig    PresupuestoConfig?
   enviosComprobante    EnvioComprobante[]
 
   @@map("tenants")
@@ -546,6 +547,33 @@ model CapitalInicial {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@map("capital_inicial")
+}
+
+// Presupuesto/proyección de caja a 12 meses (NO fiscal, NO se toca desde el
+// ciclo DGII). Un registro por tenant — se edita entero con un PUT, como
+// CapitalInicial. `moneda` vive SOLO aquí: el motor fiscal es DOP-únicamente,
+// esta columna nunca debe leerse fuera de este módulo. `ingresos`/`costosFijos`
+// son listas simples que se reescriben completas (sin historial por línea) —
+// ver PROPUESTA_PRESUPUESTO.md §3.1 para por qué JSON y no tablas relacionales.
+model PresupuestoConfig {
+  id              String   @id @default(uuid())
+  tenantId        String   @unique
+  sector          String?
+  moneda          String   @default("DOP")
+  mesFiscalInicio Int      @default(0) // 0=enero … 11=diciembre
+  colchonMeses    Int      @default(3)
+  metaMargenPct   Decimal  @db.Decimal(5, 2) @default(20)
+  varPct          Decimal  @db.Decimal(5, 2) @default(0)
+  cxcInicial      Decimal  @db.Decimal(18, 2) @default(0)
+  cxpInicial      Decimal  @db.Decimal(18, 2) @default(0)
+  ingresos        Json     @default("[]") // [{ nombre, montoMensual, crecimientoPct }]
+  costosFijos     Json     @default("[]") // [{ nombre, categoria, montoMensual }]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("presupuesto_config")
 }
 
 // Registro de entregas de un comprobante al cliente a través de GoHighLevel

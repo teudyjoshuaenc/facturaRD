@@ -71,6 +71,21 @@ export default {
           900: '#7F1D1D',
           950: '#450A0A',
         },
+        // Acentos del módulo Presupuesto/Proyección (paleta "Dmaia Control").
+        // El azul de marca ya es brand-500 (#0379D5), casi idéntico al --brand
+        // del prototipo (#016CD3) — no se duplica. Solo se agregan los dos
+        // acentos que no existían: el naranja de atención/CTA y el morado de
+        // proyección/IA.
+        cta: {
+          50: '#FEF1E9',
+          500: '#F47A3C',
+          600: '#E5622A',
+        },
+        ia: {
+          50: '#EDEAFD',
+          500: '#4835EE',
+          600: '#3A2ACC',
+        },
         info: {
           50: '#EFF6FF',
           100: '#DBEAFE',

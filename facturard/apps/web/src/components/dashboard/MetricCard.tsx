@@ -4,21 +4,31 @@ import type { LucideIcon } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
+type Tone = 'brand' | 'success' | 'danger' | 'neutral'
+
 interface Props {
   title: string
   value: string | number
   icon: LucideIcon
   badge?: ReactNode
   subtitle?: string
+  tone?: Tone
 }
 
-const MetricCard = React.memo(function MetricCard({ title, value, icon: Icon, badge, subtitle }: Props): JSX.Element {
+const TONE_STYLES: Record<Tone, string> = {
+  brand: 'bg-brand-50 text-brand-600',
+  success: 'bg-success-50 text-success-600',
+  danger: 'bg-danger-50 text-danger-600',
+  neutral: 'bg-neutral-100 text-text-secondary',
+}
+
+const MetricCard = React.memo(function MetricCard({ title, value, icon: Icon, badge, subtitle, tone = 'neutral' }: Props): JSX.Element {
   const valStr = String(value)
   return (
-    <Card className="hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-1.5 p-4 sm:p-5 text-left min-w-0 overflow-hidden">
+    <Card className="rounded-[20px] hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-1.5 p-4 sm:p-5 text-left min-w-0 overflow-hidden">
       <div className="flex items-center justify-between text-text-secondary w-full min-w-0">
         <span className="text-ui-xs sm:text-ui-sm font-semibold text-text-secondary uppercase tracking-wider truncate">{title}</span>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-50 text-text-secondary shrink-0">
+        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl shrink-0', TONE_STYLES[tone])}>
           <Icon size={16} />
         </div>
       </div>

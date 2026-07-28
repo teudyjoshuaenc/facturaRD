@@ -137,6 +137,21 @@ export function useContactos() {
     },
   })
 
+  const eliminarContactoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/contactos/${id}`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactos'] })
+      toast.success('Contacto eliminado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al eliminar el contacto', { description: msg })
+    },
+  })
+
   return {
     contactos,
     frecuentes,
@@ -144,6 +159,7 @@ export function useContactos() {
     setSearchQuery,
     crearContacto,
     actualizarContacto: actualizarContactoMutation,
+    eliminarContacto: eliminarContactoMutation,
     isLoading,
   }
 }
