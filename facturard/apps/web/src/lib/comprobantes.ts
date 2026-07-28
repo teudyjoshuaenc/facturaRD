@@ -298,6 +298,15 @@ export const ORIGEN_FILTER_OPTIONS: { value: OrigenFiltro; label: string }[] = [
   { value: 'cotizacion', label: 'Desde cotización' },
 ]
 
+/**
+ * RNC (empresas/negocios) = 9 dígitos. Cédula (persona física) = 11 dígitos.
+ * Mismo criterio de largo que ya usan los modales de contacto (formatRncInput).
+ */
+export function etiquetaIdentificacion(valor: string | null | undefined): 'RNC' | 'Cédula' {
+  const limpio = (valor ?? '').replace(/\D/g, '')
+  return limpio.length === 11 ? 'Cédula' : 'RNC'
+}
+
 export function formatCurrency(value: string | number): string {
   const n = typeof value === 'string' ? Number(value) : value
   return new Intl.NumberFormat('es-DO', {

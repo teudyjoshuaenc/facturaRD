@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/lib/context/AuthContext'
 import { useUI } from '@/lib/context/UIContext'
 import { useCertificadoStatus } from '@/hooks/useCertificado'
+import { etiquetaIdentificacion } from '@/lib/comprobantes'
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Dashboard', subtitle: 'Resumen de tu operación del mes' },
@@ -115,7 +116,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   const meta = PAGE_META[pathname] ?? { title: 'FacturaRD', subtitle: '' }
   let pageSubtitle = meta.subtitle
   if (pathname === '/dashboard' && tenant) {
-    pageSubtitle = `${tenant.razonSocial} · RNC ${tenant.rnc}`
+    pageSubtitle = `${tenant.razonSocial} · ${etiquetaIdentificacion(tenant.rnc)} ${tenant.rnc}`
   }
 
   return (
