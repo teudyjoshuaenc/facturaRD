@@ -1,9 +1,10 @@
 import { useState, useMemo, useId, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronLeft, Package, Search, Wrench } from 'lucide-react'
+import { Plus, Trash2, Pencil, ChevronRight, ChevronLeft, Package, Search, Wrench } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { NuevoProductoModal } from './NuevoProductoModal'
+import { EditarProductoModal } from '@/components/producto/EditarProductoModal'
 import { useProductos } from '@/hooks/useProductos'
 import type { Producto, NuevoProductoData } from '@/hooks/useProductos'
 import { formatCurrency } from '@/lib/comprobantes'
@@ -53,6 +54,7 @@ export function StepDetalle({
   // Selector de emisión: sólo productos activos (no se factura con productos dados de baja).
   const { allProductos, crearProducto } = useProductos({ activo: true })
   const [showNuevoProducto, setShowNuevoProducto] = useState(false)
+  const [editingItemKey, setEditingItemKey] = useState<string | null>(null)
   const [productSearch, setProductSearch] = useState('')
   const [productFocused, setProductFocused] = useState(false)
 
@@ -123,6 +125,32 @@ export function StepDetalle({
 
   function removeItem(key: string): void {
     onItemsChange(items.filter((item) => item.key !== key))
+  }
+
+  // Mismo modal de edición de /producto: se le da forma de Producto al item de la
+  // factura (no hay llamada a la API, es sólo el estado local del formulario).
+  const editingItem = items.find((item) => item.key === editingItemKey) ?? null
+  const editingAsProducto = editingItem
+    ? {
+        id: editingItem.key,
+        nombre: editingItem.nombreItem,
+        tipo: (editingItem.indicadorBienoServicio === 1 ? 'BIEN' : 'SERVICIO') as 'BIEN' | 'SERVICIO',
+        codigo: '',
+        precio: editingItem.precioUnitarioItem,
+        indicadorFacturacion: editingItem.indicadorFacturacion,
+        precioFinal: editingItem.precioUnitarioItem,
+        estado: 'ACTIVO',
+      }
+    : null
+
+  function handleEditItem(key: string, data: any): void {
+    updateItem(key, {
+      nombreItem: data.nombre,
+      indicadorBienoServicio: data.tipo === 'BIEN' ? 1 : 2,
+      precioUnitarioItem: data.precio,
+      indicadorFacturacion: data.indicadorFacturacion,
+      ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida }),
+    })
   }
 
   async function handleNuevoProducto(data: NuevoProductoData): Promise<void> {
@@ -247,7 +275,7 @@ export function StepDetalle({
                   {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ITBIS Ret.</th>}
                   {!isQuickMode && <th className="py-3 px-4 font-semibold text-text-secondary text-right w-24">ISR Ret.</th>}
                   <th className="py-3 px-4 font-semibold text-text-secondary text-right w-32">Total</th>
-                  <th className="py-3 px-4 w-12" />
+                  <th className="py-3 px-4 w-20" />
                 </tr>
               </thead>
               <tbody>
@@ -365,13 +393,22 @@ export function StepDetalle({
                         {formatCurrency(totalRow)}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.key)}
-                          className="text-red-500 hover:text-red-700 transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditingItemKey(item.key)}
+                            className="text-text-secondary hover:text-brand-500 transition-colors"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.key)}
+                            className="text-red-500 hover:text-red-700 transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -429,6 +466,13 @@ export function StepDetalle({
         onClose={() => setShowNuevoProducto(false)}
         onSave={handleNuevoProducto}
         tipoECF={tipoECF}
+      />
+
+      <EditarProductoModal
+        open={editingItemKey !== null}
+        producto={editingAsProducto}
+        onClose={() => setEditingItemKey(null)}
+        onSave={handleEditItem}
       />
     </>
   )

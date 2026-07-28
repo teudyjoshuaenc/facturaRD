@@ -20,8 +20,8 @@ const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, act
           'flex items-center rounded-[10px] py-[10px] transition-all duration-200 gap-[10px] h-[44px]',
           collapsed ? 'justify-center px-[12px] w-full group-hover:rounded-r-none' : 'px-[12px] w-full justify-start',
           active
-            ? 'bg-[#e6f3fc] text-[#0379D5] font-semibold font-sans'
-            : 'text-[#64748B] hover:bg-neutral-100 hover:text-[#333333] font-sans',
+            ? 'bg-white text-brand-500 font-semibold font-sans shadow-[0px_1px_3px_rgba(0,0,0,0.15)]'
+            : 'text-white hover:bg-white/10 hover:text-white font-sans',
         )}
       >
         <div
@@ -51,8 +51,8 @@ const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, act
             "rounded-r-[10px] whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out",
             "opacity-0 max-w-0 -translate-x-3 group-hover:opacity-100 group-hover:max-w-[200px] group-hover:translate-x-0",
             active
-              ? "bg-[#e6f3fc] text-[#0379D5] font-semibold"
-              : "bg-neutral-100 text-[#333333] font-normal"
+              ? "bg-white text-brand-500 font-semibold"
+              : "bg-brand-600 text-white font-normal"
           )}
         >
           <span className="font-sans text-[14px] leading-5">{label}</span>
