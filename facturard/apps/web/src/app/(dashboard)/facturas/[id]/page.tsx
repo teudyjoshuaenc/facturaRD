@@ -780,7 +780,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
                   )
                 })}
                 <p className="text-[11px] leading-[16px] text-[#64748b]">
-                  &quot;Enviado&quot; significa que GoHighLevel aceptó el mensaje; la entrega al buzón
+                  &quot;Enviado&quot; significa que Dmaia CRM aceptó el mensaje; la entrega al buzón
                   del cliente puede tardar unos minutos.
                 </p>
               </div>

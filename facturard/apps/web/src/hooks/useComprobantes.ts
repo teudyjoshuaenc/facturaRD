@@ -353,8 +353,8 @@ export interface EnvioResultado {
  */
 function avisarSiCreoContacto(ancla: AnclaEnvio | undefined): void {
   if (!ancla?.creado) return
-  toast.info('Se creó un contacto en GoHighLevel', {
-    description: `${ancla.email ?? 'el destinatario'} no existía como contacto y GoHighLevel exige uno para enviar. Se creó con la etiqueta "facturard-envio".`,
+  toast.info('Se creó un contacto en Dmaia CRM', {
+    description: `${ancla.email ?? 'el destinatario'} no existía como contacto y Dmaia CRM exige uno para enviar. Se creó con la etiqueta "facturard-envio".`,
     duration: 8000,
   })
 }

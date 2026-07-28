@@ -297,7 +297,7 @@ export default function ContactosPage(): JSX.Element {
       setSyncResult(res)
       setPage(1)
     } catch (err) {
-      setSyncError(getErrorMessage(err, 'No pudimos sincronizar con GoHighLevel.'))
+      setSyncError(getErrorMessage(err, 'No pudimos sincronizar con Dmaia CRM.'))
     }
   }
 
@@ -427,8 +427,8 @@ export default function ContactosPage(): JSX.Element {
             <ImportActionButton
               onClick={handleSincronizarGhl}
               isLoading={sincronizar.isPending}
-              label="Sincronizar con GoHighLevel"
-              title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
+              label="Sincronizar con Dmaia CRM"
+              title={conectado ? 'Importar contactos desde Dmaia CRM' : 'Conecta Dmaia CRMl en Configuración'}
               className="h-10 w-[244px] justify-center border-neutral-200"
             />
           </div>
@@ -480,7 +480,7 @@ export default function ContactosPage(): JSX.Element {
             <div className="flex items-center justify-between gap-3 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
               <span className="flex items-center gap-2">
                 <AlertTriangle size={18} className="shrink-0" />
-                Primero conecta tu cuenta de GoHighLevel en Configuración.
+                Primero conecta tu cuenta de Dmaia CRM en Configuración.
               </span>
               <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
                 Ir a Configuración
@@ -669,7 +669,7 @@ export default function ContactosPage(): JSX.Element {
                 description={
                   activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || estadoFilter !== 'todos' || startDate || endDate || soloSinRnc
                     ? 'No hay contactos que coincidan con los filtros.'
-                    : 'Aún no tienes contactos. Crea uno o sincroniza desde GoHighLevel.'
+                    : 'Aún no tienes contactos. Crea uno o sincroniza desde Dmaia CRM'
                 }
               />
             ) : (
