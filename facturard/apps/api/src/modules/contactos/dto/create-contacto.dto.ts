@@ -36,6 +36,16 @@ export class CreateContactoDto {
   @IsOptional()
   direccion?: string
 
+  @ApiPropertyOptional({ description: 'Provincia de RD donde está el contacto' })
+  @IsString()
+  @IsOptional()
+  provincia?: string
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  municipio?: string
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()

@@ -51,6 +51,17 @@ export interface ResumenComprobantes {
   aceptadas: number
 }
 
+export interface VentaPorProvincia {
+  provincia: string
+  facturas: number
+  monto: number
+}
+
+export interface VentasPorProvincia {
+  provincias: VentaPorProvincia[]
+  sinAsignar: { facturas: number; monto: number }
+}
+
 export type Plan = 'BASICO' | 'PYME' | 'PRO'
 
 export type UserRole = 'ADMIN' | 'USUARIO' | 'CONTADOR'

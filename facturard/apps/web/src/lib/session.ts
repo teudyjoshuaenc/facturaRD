@@ -3,6 +3,7 @@ export interface TenantInfo {
   rnc: string
   razonSocial: string
   plan: string
+  finanzasHabilitado?: boolean
 }
 
 const TOKEN_KEY = 'frd_token'

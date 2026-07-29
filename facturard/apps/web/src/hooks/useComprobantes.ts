@@ -91,6 +91,44 @@ export function useMonthMetrics({ fechaDesde, fechaHasta }: UseMonthMetricsOptio
   return { ...metrics, isLoading }
 }
 
+// -- Dashboard: ventas por provincia (mapa) --
+
+export interface VentaPorProvincia {
+  provincia: string
+  facturas: number
+  monto: number
+}
+
+interface VentasPorProvinciaResponse {
+  provincias: VentaPorProvincia[]
+  sinAsignar: { facturas: number; monto: number }
+}
+
+export type ClaseVentasProvincia = 'fiscal' | 'nota' | 'todas'
+
+export function useVentasPorProvincia({
+  fechaDesde,
+  fechaHasta,
+  clase = 'fiscal',
+}: UseMonthMetricsOptions & { clase?: ClaseVentasProvincia }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['ventas-por-provincia', fechaDesde, fechaHasta, clase],
+    queryFn: () =>
+      api
+        .get<VentasPorProvinciaResponse>('/comprobantes/ventas-por-provincia', {
+          params: { fechaDesde, fechaHasta, clase },
+        })
+        .then((res) => res.data),
+    staleTime: 2 * 60 * 1000,
+  })
+
+  return {
+    provincias: data?.provincias ?? [],
+    sinAsignar: data?.sinAsignar ?? { facturas: 0, monto: 0 },
+    isLoading,
+  }
+}
+
 // -- Facturas page: paginated list with filters and client-side search --
 
 export function useComprobantes() {

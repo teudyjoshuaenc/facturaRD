@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState, type JSX } from 'react'
-import { Plus, Download } from 'lucide-react'
+import { Plus, Download, TrendingUp, Wallet } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
@@ -12,6 +13,10 @@ import { CategoriasBreakdown } from '@/components/finanzas/CategoriasBreakdown'
 import { CapitalCard } from '@/components/finanzas/CapitalCard'
 import { TransaccionesTable } from '@/components/finanzas/TransaccionesTable'
 import { MovimientoModal } from '@/components/finanzas/MovimientoModal'
+import { PresupuestoTab } from '@/components/presupuesto/PresupuestoTab'
+import { ProyeccionTab } from '@/components/presupuesto/ProyeccionTab'
+import { ConfiguracionPresupuestoTab } from '@/components/presupuesto/ConfiguracionPresupuestoTab'
+import { PresupuestoOnboardingWizard } from '@/components/presupuesto/PresupuestoOnboardingWizard'
 import { descargarTransaccionesCsv } from '@/lib/finanzas-export'
 import {
   useFinanzasResumen,
@@ -20,13 +25,18 @@ import {
   useMovimientos,
   useTransacciones,
   useEliminarMovimiento,
+  useCapital,
   fetchTransaccionesExport,
   type Vista,
   type MovimientoFinanciero,
   type Transaccion,
   type TransaccionOrigen,
 } from '@/hooks/useFinanzas'
+import { usePresupuestoConfig, useComparacion } from '@/hooks/usePresupuesto'
+import { useAuth } from '@/lib/context/AuthContext'
 import { toast } from 'sonner'
+
+type FinanzasTab = 'resumen' | 'presupuesto' | 'proyeccion' | 'configuracion'
 
 const monthOptions = [
   { value: '01', label: 'Enero' },
@@ -60,9 +70,37 @@ const origenOptions = [
   { value: 'NOTA_CREDITO', label: 'Notas de crédito' },
   { value: 'MOVIMIENTO', label: 'Manuales' },
 ]
+const MES_LABELS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 export default function FinanzasPage(): JSX.Element {
   const now = new Date()
+  const [tab, setTab] = useState<FinanzasTab>('resumen')
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [autoPrompted, setAutoPrompted] = useState(false)
+  const presupuestoConfig = usePresupuestoConfig()
+  const capital = useCapital()
+  const { tenant } = useAuth()
+
+  // Se persiste en localStorage (por tenant) — si el usuario cierra el wizard
+  // sin terminar, NO vuelve a aparecer solo en la próxima visita/recarga.
+  // Solo vuelve a abrirse con una acción explícita ("Configurar ahora" /
+  // "Rehacer preguntas iniciales").
+  const wizardDismissKey = `frd_presupuesto_wizard_dismissed_${tenant?.id ?? 'anon'}`
+
+  // Primera visita al módulo con el presupuesto sin configurar → dispara el
+  // wizard solo, sin esperar a que el usuario entre a la tab Presupuesto.
+  useEffect(() => {
+    if (autoPrompted || presupuestoConfig.isLoading || !presupuestoConfig.data) return
+    setAutoPrompted(true)
+    if (!presupuestoConfig.data.configurado && localStorage.getItem(wizardDismissKey) !== '1') {
+      setWizardOpen(true)
+    }
+  }, [autoPrompted, presupuestoConfig.isLoading, presupuestoConfig.data, wizardDismissKey])
+
+  function handleCloseWizard(): void {
+    setWizardOpen(false)
+    if (!presupuestoConfig.data?.configurado) localStorage.setItem(wizardDismissKey, '1')
+  }
   const [vista, setVista] = useState<Vista>('devengado')
   const [year, setYear] = useState(String(now.getFullYear()))
   const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'))
@@ -88,6 +126,7 @@ export default function FinanzasPage(): JSX.Element {
   useEffect(() => setTxPage(1), [month, year, vista, tipoFiltro, origenFiltro])
 
   const resumen = useFinanzasResumen({ desde: monthDesde, hasta: monthHasta })
+  const comparacion = useComparacion(`${year}-${month}`, tab === 'resumen' && !!presupuestoConfig.data?.configurado)
   const flujo = useFinanzasFlujo({ desde: yearDesde, hasta: yearHasta, agrupacion: 'mes', vista })
   const categorias = useFinanzasCategorias({ desde: monthDesde, hasta: monthHasta })
   const movimientos = useMovimientos({ desde: monthDesde, hasta: monthHasta, limit: 100 })
@@ -164,42 +203,91 @@ export default function FinanzasPage(): JSX.Element {
     }
   }
 
+  if (!tenant?.finanzasHabilitado) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border-subtle bg-background-canvas p-12 text-center">
+        <Wallet size={32} className="text-text-tertiary" />
+        <div className="flex flex-col gap-1">
+          <h2 className="text-h5 font-bold text-text-primary">Finanzas no está activado</h2>
+          <p className="max-w-md text-body-sm text-text-secondary">
+            Activa el flujo de caja y presupuesto desde Configuración para ver tu panel financiero.
+          </p>
+        </div>
+        <Link href="/configuracion#activar-finanzas">
+          <Button variant="primary">Ir a Configuración</Button>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 text-left">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-100 pb-5">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-h4 font-bold text-text-primary">Finanzas</h2>
-          <p className="text-body-sm text-text-secondary">Flujo de caja del negocio: ingresos, egresos y capital.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-[210px]">
-            <ToggleGroup<Vista>
-              value={vista}
-              onChange={setVista}
-              options={[
-                { value: 'devengado', label: 'Devengado' },
-                { value: 'cobrado', label: 'Cobrado' },
-              ]}
+        {tab === 'presupuesto' || tab === 'proyeccion' ? (
+          <div className="flex flex-col gap-1">
+            <h2 className="text-h4 font-bold text-text-primary">{tenant?.razonSocial ?? 'Mi empresa'}</h2>
+            <p className="text-body-sm text-text-secondary">
+              {presupuestoConfig.data?.sector ?? 'Sin sector'} · Ejercicio desde {MES_LABELS[presupuestoConfig.data?.mesFiscalInicio ?? 0]} · Moneda {presupuestoConfig.data?.moneda ?? 'DOP'}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <h2 className="text-h4 font-bold text-text-primary">Finanzas</h2>
+            <p className="text-body-sm text-text-secondary">Flujo de caja del negocio: ingresos, egresos y capital.</p>
+          </div>
+        )}
+        {(tab === 'presupuesto' || tab === 'proyeccion') && (
+          <Button variant="secondary" onClick={() => setTab('configuracion')} className="gap-1.5">
+            ⚙ Configuración
+          </Button>
+        )}
+        {tab === 'resumen' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-[210px]">
+              <ToggleGroup<Vista>
+                value={vista}
+                onChange={setVista}
+                options={[
+                  { value: 'devengado', label: 'Devengado' },
+                  { value: 'cobrado', label: 'Cobrado' },
+                ]}
+              />
+            </div>
+            <Select
+              value={month}
+              onChange={setMonth}
+              options={monthOptions}
+              className="w-36"
+              triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
+            />
+            <Select
+              value={year}
+              onChange={setYear}
+              options={yearOptions}
+              className="w-24"
+              triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
             />
           </div>
-          <Select
-            value={month}
-            onChange={setMonth}
-            options={monthOptions}
-            className="w-36"
-            triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
-          />
-          <Select
-            value={year}
-            onChange={setYear}
-            options={yearOptions}
-            className="w-24"
-            triggerClassName="h-10 border-neutral-200 bg-white font-semibold text-text-primary hover:bg-neutral-50"
-          />
-        </div>
+        )}
       </div>
 
+      {/* Tabs de sección */}
+      <div className="w-full max-w-[560px]">
+        <ToggleGroup<FinanzasTab>
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'resumen', label: 'Resumen' },
+            { value: 'presupuesto', label: 'Presupuesto' },
+            { value: 'proyeccion', label: 'Proyección' },
+            { value: 'configuracion', label: 'Configuración' },
+          ]}
+        />
+      </div>
+
+      {tab === 'resumen' && (
+      <>
       {/* KPIs */}
       <FinanzasMetrics
         ingresos={v?.ingresos ?? 0}
@@ -221,6 +309,42 @@ export default function FinanzasPage(): JSX.Element {
           <CategoriasBreakdown categorias={categorias.data?.categorias ?? []} isLoading={categorias.isLoading} />
         </div>
       </div>
+
+      {/* Real vs. presupuesto — solo si el tenant ya configuró su presupuesto. */}
+      {presupuestoConfig.data?.configurado && comparacion.data && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+          <h3 className="text-body-base font-bold text-text-primary">Real vs. presupuesto</h3>
+          <p className="mb-4 text-ui-xs text-text-secondary">{periodoLabel}</p>
+          <div className="flex flex-col gap-3">
+            {[
+              ['Entradas · presup.', comparacion.data.presupuestado.ingresos, 'bg-success-300'],
+              ['Entradas · real', comparacion.data.real.ingresos, 'bg-success-600'],
+              ['Salidas · presup.', comparacion.data.presupuestado.egresos, 'bg-cta-500/50'],
+              ['Salidas · real', comparacion.data.real.egresos, 'bg-cta-600'],
+            ].map(([label, valor, color]) => {
+              const max = Math.max(
+                comparacion.data!.presupuestado.ingresos,
+                comparacion.data!.real.ingresos,
+                comparacion.data!.presupuestado.egresos,
+                comparacion.data!.real.egresos,
+                1,
+              )
+              const v = Number(valor)
+              return (
+                <div key={label as string} className="grid grid-cols-[140px_1fr_110px] items-center gap-3 text-body-sm">
+                  <span className="text-text-secondary">{label as string}</span>
+                  <span className="h-2.5 overflow-hidden rounded-full bg-neutral-100">
+                    <span className={`block h-full rounded-full ${color as string}`} style={{ width: `${(v / max) * 100}%` }} />
+                  </span>
+                  <span className="text-right font-semibold text-text-primary">
+                    {'RD$ ' + Math.round(v).toLocaleString('es-DO')}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Transacciones — ancho completo (ya no comparte fila con el aside, así el
           "Origen" no se colapsa cuando el "Detalle" es largo). */}
@@ -324,6 +448,40 @@ export default function FinanzasPage(): JSX.Element {
           facturas y compras no se tocan.
         </p>
       </Modal>
+      </>
+      )}
+
+      {(tab === 'presupuesto' || tab === 'proyeccion') && !presupuestoConfig.isLoading && presupuestoConfig.data && !presupuestoConfig.data.configurado ? (
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+            <TrendingUp size={22} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-h6 font-bold text-text-primary">Aún no configuraste tu presupuesto</p>
+            <p className="max-w-[420px] text-body-sm text-text-secondary">
+              Respondé unas preguntas rápidas sobre tus ingresos, costos fijos y colchón de seguridad, y armamos tu
+              proyección de caja a 12 meses.
+            </p>
+          </div>
+          <Button variant="primary" onClick={() => setWizardOpen(true)}>Configurar ahora</Button>
+        </div>
+      ) : (
+        <>
+          {tab === 'presupuesto' && <PresupuestoTab />}
+          {tab === 'proyeccion' && <ProyeccionTab />}
+        </>
+      )}
+
+      {tab === 'configuracion' && (
+        <ConfiguracionPresupuestoTab onEditarEntradas={() => setTab('presupuesto')} onRehacer={() => setWizardOpen(true)} />
+      )}
+
+      <PresupuestoOnboardingWizard
+        open={wizardOpen}
+        onClose={handleCloseWizard}
+        config={presupuestoConfig.data}
+        saldoActual={capital.data ? Number(capital.data.monto) : 0}
+      />
     </div>
   )
 }

@@ -13,6 +13,20 @@ export interface SyncResultado {
   sinRnc: number
 }
 
+export interface GhlContactoResumen {
+  ghlContactId: string
+  nombre: string
+  email: string | null
+  telefono: string | null
+  rnc: string | null
+  yaImportado: boolean
+}
+
+export interface BuscarGhlResultado {
+  contactos: GhlContactoResumen[]
+  nextCursor: { id: string; date: string } | null
+}
+
 // Shape parcial de un contacto de GHL (v2). customFields puede venir como arreglo
 // customFields en la lista de contactos v2 llega como [{ id, value }] (keyed por
 // el id del campo, NO por el nombre visible). Se toleran variantes por robustez.
@@ -39,7 +53,7 @@ interface GhlContacto {
 
 interface GhlPage {
   contacts?: GhlContacto[]
-  meta?: { nextPageUrl?: string | null }
+  meta?: { nextPageUrl?: string | null; startAfterId?: string; startAfter?: number | string }
 }
 
 // Definición de custom field (GET /locations/{id}/customFields).
@@ -80,13 +94,17 @@ export class GhlContactosService {
     return { ok: true }
   }
 
-  async sincronizar(tenantId: string): Promise<SyncResultado> {
+  /**
+   * Setup compartido: token descifrado + location vinculado + resolución de
+   * los ids del custom field de RNC. Usado tanto por la sincronización (total
+   * o selectiva) como por la búsqueda en vivo del modal.
+   */
+  private async setup(tenantId: string): Promise<{ token: string; loc: { locationId: string }; rncFieldIds: Set<string> }> {
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     if (!tenant.ghlAccessToken) {
       throw new BadRequestException('GHL no está configurado. Guarda el access token con PATCH /contactos/configurar-ghl')
     }
     const token = this.crypto.decryptString(tenant.ghlAccessToken)
-    const rncFieldKey = tenant.ghlRncFieldKey ?? undefined
 
     // La API v2 de GHL EXIGE el locationId (?locationId=) para /contacts/.
     // Lo tomamos del vínculo GhlLocation del tenant (guardado en el onboarding),
@@ -99,9 +117,29 @@ export class GhlContactosService {
     // El customField del RNC en el contacto viene keyed por el id del campo.
     // El tenant configura el NOMBRE visible (p.ej. "RNC / Cedula"), así que
     // resolvemos nombre → id(s) contra la API de custom fields de GHL.
-    const rncFieldIds = await this.resolverRncFieldIds(loc.locationId, token, rncFieldKey)
+    const rncFieldIds = await this.resolverRncFieldIds(loc.locationId, token, tenant.ghlRncFieldKey ?? undefined)
 
+    return { token, loc, rncFieldIds }
+  }
+
+  /**
+   * Sincroniza contactos desde GHL. Sin `ghlContactIds` → recorre TODO el
+   * location (comportamiento histórico, botón "Importar todos"). Con
+   * `ghlContactIds` → solo esos, uno por uno (modal de importación selectiva).
+   */
+  async sincronizar(tenantId: string, ghlContactIds?: string[]): Promise<SyncResultado> {
+    const { token, loc, rncFieldIds } = await this.setup(tenantId)
     const resultado: SyncResultado = { importados: 0, actualizados: 0, sinRnc: 0 }
+
+    if (ghlContactIds && ghlContactIds.length > 0) {
+      await this.sincronizarSeleccionados(tenantId, ghlContactIds, token, rncFieldIds, resultado)
+      this.logger.log(
+        `[GHL] Sync selectivo tenant ${tenantId} (${ghlContactIds.length} ids): ${resultado.importados} importados, ` +
+          `${resultado.actualizados} actualizados, ${resultado.sinRnc} sin RNC`,
+      )
+      return resultado
+    }
+
     let url: string | null = `${GHL_CONTACTS_URL}?locationId=${encodeURIComponent(loc.locationId)}&limit=100`
 
     while (url) {
@@ -132,6 +170,90 @@ export class GhlContactosService {
     return resultado
   }
 
+  /** Trae cada contacto seleccionado por id (concurrencia acotada) y los aplica con upsertContacto. */
+  private async sincronizarSeleccionados(
+    tenantId: string,
+    ghlContactIds: string[],
+    token: string,
+    rncFieldIds: Set<string>,
+    resultado: SyncResultado,
+  ): Promise<void> {
+    const CONCURRENCIA = 10
+    for (let i = 0; i < ghlContactIds.length; i += CONCURRENCIA) {
+      const lote = ghlContactIds.slice(i, i + CONCURRENCIA)
+      const contactos = await Promise.all(
+        lote.map(async (id) => {
+          try {
+            const res = await this.fetchGhl(`${GHL_CONTACTS_URL}${encodeURIComponent(id)}`, token)
+            if (!res.ok) throw new Error(`GHL respondió ${res.status} para el contacto ${id}`)
+            const body = (await res.json()) as { contact?: GhlContacto }
+            return body.contact ?? null
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            throw new ServiceUnavailableException(
+              `Error al importar contacto ${id} de GHL (${msg}). Procesados: ${resultado.importados} importados, ` +
+                `${resultado.actualizados} actualizados, ${resultado.sinRnc} sin RNC.`,
+            )
+          }
+        }),
+      )
+      for (const c of contactos) {
+        if (c) await this.upsertContacto(tenantId, c, rncFieldIds, resultado)
+      }
+    }
+  }
+
+  /**
+   * Búsqueda en vivo sobre GHL para el modal de importación selectiva —
+   * NO escribe en la DB. `query` busca por nombre/email/teléfono (limitación
+   * de la API de GHL: no indexa custom fields, así que RNC no es buscable).
+   * Paginación por cursor (GHL no soporta offset/número de página).
+   */
+  async buscar(
+    tenantId: string,
+    params: { query?: string | undefined; cursorId?: string | undefined; cursorDate?: string | undefined; limit: number },
+  ): Promise<BuscarGhlResultado> {
+    const { token, loc, rncFieldIds } = await this.setup(tenantId)
+
+    const qs = new URLSearchParams({ locationId: loc.locationId, limit: String(params.limit) })
+    if (params.query?.trim()) qs.set('query', params.query.trim())
+    if (params.cursorId) qs.set('startAfterId', params.cursorId)
+    if (params.cursorDate) qs.set('startAfter', params.cursorDate)
+
+    let page: GhlPage
+    try {
+      const res = await this.fetchGhl(`${GHL_CONTACTS_URL}?${qs.toString()}`, token)
+      if (!res.ok) throw new Error(`GHL respondió ${res.status}`)
+      page = (await res.json()) as GhlPage
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      throw new ServiceUnavailableException(`Error al buscar contactos en GHL (${msg}).`)
+    }
+
+    const contactos = page.contacts ?? []
+    const ids = contactos.map((c) => c.id)
+    const yaImportados =
+      ids.length > 0
+        ? await prisma.contacto.findMany({ where: { tenantId, ghlContactId: { in: ids } }, select: { ghlContactId: true } })
+        : []
+    const importadosSet = new Set(yaImportados.map((c) => c.ghlContactId))
+
+    return {
+      contactos: contactos.map((c) => ({
+        ghlContactId: c.id,
+        nombre: this.nombreDeGhlContacto(c) ?? '(sin nombre)',
+        email: c.email ?? null,
+        telefono: c.phone ?? null,
+        rnc: this.extraerRnc(c, rncFieldIds) ?? null,
+        yaImportado: importadosSet.has(c.id),
+      })),
+      nextCursor:
+        page.meta?.startAfterId && page.meta?.startAfter !== undefined
+          ? { id: page.meta.startAfterId, date: String(page.meta.startAfter) }
+          : null,
+    }
+  }
+
   /**
    * Llama a GHL con el token. La lógica de auth (Bearer con fallback sin Bearer
    * ante 401/403 + header Version) vive en GhlHttpService, compartida con el
@@ -139,6 +261,16 @@ export class GhlContactosService {
    */
   private async fetchGhl(url: string, token: string): Promise<Response> {
     return this.ghlHttp.request(url, token)
+  }
+
+  /** Empresa → nombre completo (versión "Raw") → contactName → name. undefined si GHL no trae nada útil. */
+  private nombreDeGhlContacto(c: GhlContacto): string | undefined {
+    const nombreCompleto = [c.firstNameRaw ?? c.firstName, c.lastNameRaw ?? c.lastName]
+      .map((s) => s?.trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+    return c.companyName?.trim() || nombreCompleto || c.contactName?.trim() || c.name?.trim() || undefined
   }
 
   /**
@@ -162,15 +294,8 @@ export class GhlContactosService {
     // el RNC que llega de GHL, no un vacío.
     const rncValidado = rnc !== undefined ? await this.validarRnc(rnc) : false
 
-    // Nombre: empresa → nombre completo (versión "Raw" con mayúsculas) → contactName.
-    // undefined si GHL no trae nada útil (no forzamos '(sin nombre)' en el update).
-    const nombreCompleto = [c.firstNameRaw ?? c.firstName, c.lastNameRaw ?? c.lastName]
-      .map((s) => s?.trim())
-      .filter(Boolean)
-      .join(' ')
-      .trim()
-    const razonSocialGhl =
-      c.companyName?.trim() || nombreCompleto || c.contactName?.trim() || c.name?.trim() || undefined
+    // Nombre: undefined si GHL no trae nada útil (no forzamos '(sin nombre)' en el update).
+    const razonSocialGhl = this.nombreDeGhlContacto(c)
 
     const existing = await prisma.contacto.findFirst({ where: { tenantId, ghlContactId: c.id } })
 

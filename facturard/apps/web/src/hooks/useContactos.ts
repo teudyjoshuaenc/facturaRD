@@ -63,8 +63,8 @@ export function useContactos() {
         tipo: c.tipo === 'CONSUMIDOR_FINAL' ? 'PERSONA' : 'EMPRESA',
         idExtranjero: c.identificadorExtranjero || '',
         direccion: c.direccion || '',
-        provincia: '',
-        municipio: '',
+        provincia: c.provincia || '',
+        municipio: c.municipio || '',
         comentarios: '',
         validacion: c.rncValidado ? 'VALIDO' : 'NO_ENCONTRADO',
         totalFacturado: 0,
@@ -87,6 +87,8 @@ export function useContactos() {
         email: data.email || undefined,
         telefono: data.telefono.replace(/\D/g, '') || undefined,
         direccion: data.direccion || undefined,
+        provincia: data.provincia || undefined,
+        municipio: data.municipio || undefined,
         identificadorExtranjero: data.idExtranjero || undefined,
       }
 
@@ -115,8 +117,8 @@ export function useContactos() {
         tipo: result.tipo === 'CONSUMIDOR_FINAL' ? 'PERSONA' : 'EMPRESA',
         idExtranjero: result.identificadorExtranjero || '',
         direccion: result.direccion || '',
-        provincia: '',
-        municipio: '',
+        provincia: result.provincia || '',
+        municipio: result.municipio || '',
         comentarios: '',
         validacion: result.rncValidado ? 'VALIDO' : 'NO_ENCONTRADO',
         totalFacturado: 0,
@@ -137,6 +139,21 @@ export function useContactos() {
     },
   })
 
+  const eliminarContactoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/contactos/${id}`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactos'] })
+      toast.success('Contacto eliminado correctamente')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err)
+      toast.error('Error al eliminar el contacto', { description: msg })
+    },
+  })
+
   return {
     contactos,
     frecuentes,
@@ -144,6 +161,7 @@ export function useContactos() {
     setSearchQuery,
     crearContacto,
     actualizarContacto: actualizarContactoMutation,
+    eliminarContacto: eliminarContactoMutation,
     isLoading,
   }
 }

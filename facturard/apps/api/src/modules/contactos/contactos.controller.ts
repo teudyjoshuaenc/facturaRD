@@ -6,6 +6,8 @@ import { CreateContactoDto } from './dto/create-contacto.dto'
 import { UpdateContactoDto } from './dto/update-contacto.dto'
 import { ListContactosDto } from './dto/list-contactos.dto'
 import { ConfigurarGhlDto } from './dto/configurar-ghl.dto'
+import { SincronizarGhlDto } from './dto/sincronizar-ghl.dto'
+import { BuscarGhlDto } from './dto/buscar-ghl.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
@@ -26,9 +28,15 @@ export class ContactosController {
   }
 
   @Post('sincronizar-ghl')
-  @ApiOperation({ summary: 'Importa/actualiza contactos desde GoHighLevel' })
-  sincronizarGhl(@CurrentTenant() tenantId: string) {
-    return this.ghl.sincronizar(tenantId)
+  @ApiOperation({ summary: 'Importa/actualiza contactos desde GoHighLevel. Sin body → todo el location; con ghlContactIds → solo esos.' })
+  sincronizarGhl(@CurrentTenant() tenantId: string, @Body() dto: SincronizarGhlDto) {
+    return this.ghl.sincronizar(tenantId, dto.ghlContactIds)
+  }
+
+  @Get('ghl/buscar')
+  @ApiOperation({ summary: 'Busca contactos EN VIVO en GHL (nombre/email/teléfono) para el modal de importación selectiva. No escribe en la DB.' })
+  buscarGhl(@CurrentTenant() tenantId: string, @Query() dto: BuscarGhlDto) {
+    return this.ghl.buscar(tenantId, { query: dto.query, cursorId: dto.cursorId, cursorDate: dto.cursorDate, limit: dto.limit ?? 20 })
   }
 
   @Patch('configurar-ghl')

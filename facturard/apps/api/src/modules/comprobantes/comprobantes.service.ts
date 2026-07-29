@@ -14,7 +14,8 @@ import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import type { CrearNotaDto } from './dto/crear-nota.dto'
 import type { ListComprobantesDto } from './dto/list-comprobantes.dto'
 import type { ResumenComprobantesDto } from './dto/resumen-comprobantes.dto'
-import type { PaginatedResponse, ResumenComprobantes } from '@facturard/shared'
+import type { VentasPorProvinciaDto } from './dto/ventas-por-provincia.dto'
+import type { PaginatedResponse, ResumenComprobantes, VentasPorProvincia } from '@facturard/shared'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { DocumentoFolioService } from './documento-folio.service'
 
@@ -777,6 +778,73 @@ export class ComprobantesService {
       pendientes,
       rechazadas,
       aceptadas,
+    }
+  }
+
+  /**
+   * Ventas por provincia del comprador — no fiscal, solo lectura para el mapa
+   * del dashboard. 2 queries fijas (facturas del rango + contactos del
+   * tenant), se unen por RNC en memoria: nada de N+1 ni JOIN pesado.
+   * `clase`: fiscal (default, e-CF aceptados) | nota (notas de venta interna
+   * ya finalizadas, sin DGII) | todas. "Todas" además cuenta las notas que se
+   * quedaron en Borrador (bug conocido del form: manda emitir:false junto con
+   * esFiscal:false) — el usuario las creó, cuentan como venta aunque el
+   * estado quedara mal seteado. Fiscales sigue exigiendo ACEPTADO.
+   */
+  async ventasPorProvincia(tenantId: string, query: VentasPorProvinciaDto): Promise<VentasPorProvincia> {
+    const claseWhere: Prisma.ComprobanteWhereInput =
+        query.clase === 'nota' ? { esFiscal: false, estado: { not: 'DRAFT' } }
+      : query.clase === 'todas' ? {
+          OR: [
+            { esFiscal: true, estado: { in: ['ACEPTADO', 'ACEPTADO_CONDICIONAL'] } },
+            { esFiscal: false },
+          ],
+        }
+      : { esFiscal: true, estado: { in: ['ACEPTADO', 'ACEPTADO_CONDICIONAL'] } }
+
+    const where: Prisma.ComprobanteWhereInput = {
+      tenantId,
+      eliminado: false,
+      ...claseWhere,
+      ...rangoFechas(query.fechaDesde, query.fechaHasta),
+    }
+
+    const [facturas, contactos] = await Promise.all([
+      prisma.comprobante.findMany({ where, select: { rnc: true, montoTotal: true } }),
+      prisma.contacto.findMany({
+        where: { tenantId, provincia: { not: null } },
+        select: { rnc: true, provincia: true },
+      }),
+    ])
+
+    const provinciaPorRnc = new Map(
+      contactos.filter((c) => c.rnc !== null).map((c) => [c.rnc as string, c.provincia as string]),
+    )
+
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const acumPorProvincia = new Map<string, { facturas: number; monto: number }>()
+    let sinAsignarFacturas = 0
+    let sinAsignarMonto = 0
+
+    for (const f of facturas) {
+      const monto = Number(f.montoTotal)
+      const provincia = provinciaPorRnc.get(f.rnc)
+      if (!provincia) {
+        sinAsignarFacturas += 1
+        sinAsignarMonto += monto
+        continue
+      }
+      const actual = acumPorProvincia.get(provincia) ?? { facturas: 0, monto: 0 }
+      acumPorProvincia.set(provincia, { facturas: actual.facturas + 1, monto: actual.monto + monto })
+    }
+
+    return {
+      provincias: Array.from(acumPorProvincia.entries()).map(([provincia, v]) => ({
+        provincia,
+        facturas: v.facturas,
+        monto: r2(v.monto),
+      })),
+      sinAsignar: { facturas: sinAsignarFacturas, monto: r2(sinAsignarMonto) },
     }
   }
 }

@@ -39,8 +39,13 @@ export function useGhlSync() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tenant-info'] }),
   })
 
+  // Sin ids → sincroniza TODO el location (botón "Importar todos"). Con ids →
+  // solo esos contactos (selección hecha en el modal de importación).
   const sincronizar = useMutation({
-    mutationFn: () => api.post<SyncResultado>('/contactos/sincronizar-ghl').then((res) => res.data),
+    mutationFn: (ghlContactIds?: string[]) =>
+      api
+        .post<SyncResultado>('/contactos/sincronizar-ghl', ghlContactIds?.length ? { ghlContactIds } : {})
+        .then((res) => res.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contactos'] }),
   })
 

@@ -33,6 +33,7 @@ export type {
   MovimientoFinanciero,
   Pago,
   CapitalInicial,
+  PresupuestoConfig,
   EnvioComprobante,
 } from '@prisma/client'
 

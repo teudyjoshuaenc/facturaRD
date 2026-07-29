@@ -11,23 +11,13 @@ import type { NuevoContactoData } from '@/hooks/useContactos'
 import { Select } from '@/components/ui/select'
 import { useRncValidation } from '@/hooks/useRncValidation'
 import { Spinner } from '@/components/ui/spinner'
+import { PROVINCIAS_MUNICIPIOS } from '@/lib/provincias-rd'
 
 interface NuevoClienteModalProps {
   open: boolean
   onClose: () => void
   onSave: (data: NuevoContactoData) => void
   defaultTipo?: 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
-}
-
-const PROVINCIAS_MUNICIPIOS: Record<string, string[]> = {
-  'Distrito Nacional': ['Santo Domingo de Guzmán'],
-  'Santo Domingo': ['Santo Domingo Este', 'Santo Domingo Oeste', 'Santo Domingo Norte', 'Boca Chica', 'San Antonio de Guerra', 'Pedro Brand', 'Los Alcarrizos'],
-  'Santiago': ['Santiago de los Caballeros', 'Bisonó', 'Jánico', 'Licey al Medio', 'San José de las Matas', 'Tamboril', 'Villa González', 'Puñal', 'Sabana Iglesia'],
-  'La Altagracia': ['Salvaleón de Higüey', 'San Rafael del Yuma'],
-  'La Romana': ['La Romana', 'Guaymate', 'Villa Hermosa'],
-  'San Pedro de Macorís': ['San Pedro de Macorís', 'Consuelo', 'El Valle', 'Quisqueya', 'Ramón Santana', 'San José de los Llanos'],
-  'San Cristóbal': ['San Cristóbal', 'Bajos de Haina', 'Cambita Garabitos', 'Villa Altagracia', 'Yaguate', 'San Gregorio de Nigua', 'Los Cacaos'],
-  'Duarte': ['San Francisco de Macorís', 'Arenoso', 'Castillo', 'Las Guáranas', 'Pimentel', 'Villa Riva', 'Hostos']
 }
 
 function formatRncInput(value: string): string {

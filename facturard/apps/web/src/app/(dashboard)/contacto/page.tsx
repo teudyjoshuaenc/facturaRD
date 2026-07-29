@@ -19,6 +19,7 @@ import {
   Calendar,
   Send,
   Edit2,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,11 +27,12 @@ import { Spinner } from '@/components/ui/spinner'
 import { EmptyState } from '@/components/dashboard/EmptyState'
 import { useContactosDirectorio } from '@/hooks/useContactosDirectorio'
 import { useContactos } from '@/hooks/useContactos'
-import { useGhlSync, type SyncResultado } from '@/hooks/useGhlSync'
+import { useGhlSync } from '@/hooks/useGhlSync'
 import { Select } from '@/components/ui/select'
 import { useUI } from '@/lib/context/UIContext'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { EditarClienteModal } from '@/components/contacto/EditarClienteModal'
+import { SincronizarGhlModal } from '@/components/contacto/SincronizarGhlModal'
 import { formatDate } from '@/lib/comprobantes'
 import { cn } from '@/lib/utils'
 import { DetailPanel } from '@/components/contacto/DetailPanel'
@@ -78,12 +80,6 @@ const validacionOptions = [
   { value: 'SIN_VALIDAR', label: 'Sin validar' },
 ]
 
-const estadoOptions = [
-  { value: 'todos', label: 'Estado' },
-  { value: 'ACTIVO', label: 'Activo' },
-  { value: 'INACTIVO', label: 'Inactivo' },
-]
-
 type TipoFilter = 'todos' | 'CLIENTE' | 'PROVEEDOR' | 'CONSUMIDOR_FINAL'
 
 function formatRnc(rnc: string | null): string {
@@ -97,8 +93,8 @@ function formatRnc(rnc: string | null): string {
 export default function ContactosPage(): JSX.Element {
   const router = useRouter()
   const { globalSearch } = useUI()
-  const { crearContacto, actualizarContacto } = useContactos()
-  const { conectado, sincronizar, getErrorMessage } = useGhlSync()
+  const { crearContacto, actualizarContacto, eliminarContacto } = useContactos()
+  const { conectado } = useGhlSync()
 
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
@@ -107,7 +103,6 @@ export default function ContactosPage(): JSX.Element {
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos')
   const [tipoFiscalFilter, setTipoFiscalFilter] = useState('todos')
   const [validacionFilter, setValidacionFilter] = useState('todos')
-  const [estadoFilter, setEstadoFilter] = useState('todos')
   const [origenFilter, setOrigenFilter] = useState('todos')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -125,6 +120,7 @@ export default function ContactosPage(): JSX.Element {
   const [selectedContacto, setSelectedContacto] = useState<any | null>(null)
   const [editingContacto, setEditingContacto] = useState<any | null>(null)
   const [togglingContacto, setTogglingContacto] = useState<any | null>(null)
+  const [deletingContacto, setDeletingContacto] = useState<any | null>(null)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
@@ -213,19 +209,18 @@ export default function ContactosPage(): JSX.Element {
     printWindow.document.close()
   }
 
-  const [syncResult, setSyncResult] = useState<SyncResultado | null>(null)
-  const [syncError, setSyncError] = useState('')
   const [avisoNoConectado, setAvisoNoConectado] = useState(false)
+  const [ghlModalOpen, setGhlModalOpen] = useState(false)
+  const [sinRncCount, setSinRncCount] = useState<number | null>(null)
 
   const activeSearch = (search.trim() ? search : globalSearch).trim()
 
-  // estadoFilter es el control de 3 estados de la gestión → se resuelve server-side.
-  const activoParam = estadoFilter === 'todos' ? undefined : estadoFilter === 'ACTIVO'
-
+  // Contactos inactivos (desactivados o eliminados) nunca se muestran en el
+  // directorio: se piden solo activos, sin filtro de estado en la UI.
   const { contactos, total, totalPages, isLoading, isError, isFetching, refetch } = useContactosDirectorio({
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
-    activo: activoParam,
+    activo: true,
     page,
     limit: 10,
   })
@@ -244,6 +239,10 @@ export default function ContactosPage(): JSX.Element {
         activo: localStatusOverrides[c.id] !== undefined ? !!localStatusOverrides[c.id] : c.activo
       }
     })
+
+    // Inactivo (desactivado o eliminado) nunca se muestra, ni antes de que
+    // el refetch confirme el cambio en el servidor.
+    list = list.filter((c) => c.activo)
 
     if (soloSinRnc) {
       list = list.filter((c) => !c.rnc)
@@ -271,8 +270,6 @@ export default function ContactosPage(): JSX.Element {
       list = list.filter((c) => (c.origen === 'GHL' ? 'GHL' : 'MANUAL') === origenFilter)
     }
 
-    // estadoFilter se aplica server-side (ver activoParam en useContactosDirectorio).
-
     if (startDate) {
       list = list.filter((c) => {
         const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
@@ -289,20 +286,13 @@ export default function ContactosPage(): JSX.Element {
     return list
   }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter, startDate, endDate])
 
-  async function handleSincronizarGhl(): Promise<void> {
+  function handleAbrirSincronizarGhl(): void {
     if (!conectado) {
       setAvisoNoConectado(true)
       return
     }
-    setSyncError('')
-    setSyncResult(null)
-    try {
-      const res = await sincronizar.mutateAsync()
-      setSyncResult(res)
-      setPage(1)
-    } catch (err) {
-      setSyncError(getErrorMessage(err, 'No pudimos sincronizar con Dmaia CRM.'))
-    }
+    setAvisoNoConectado(false)
+    setGhlModalOpen(true)
   }
 
   function resetPage<T>(setter: (v: T) => void): (v: T) => void {
@@ -337,6 +327,20 @@ export default function ContactosPage(): JSX.Element {
     setTogglingContacto(null)
   }
 
+  async function confirmDeleteContacto(): Promise<void> {
+    if (!deletingContacto) return
+    const id = deletingContacto.id
+    try {
+      await eliminarContacto.mutateAsync(id)
+      if (selectedContacto && selectedContacto.id === id) {
+        setSelectedContacto(null)
+      }
+    } catch {
+      // el toast de error ya lo maneja la mutación
+    }
+    setDeletingContacto(null)
+  }
+
   async function handleEditSave(id: string, data: any) {
     try {
       const cleanPhone = data.telefono.replace(/\D/g, '')
@@ -352,6 +356,8 @@ export default function ContactosPage(): JSX.Element {
           email: data.email || undefined,
           telefono: cleanPhone || undefined,
           direccion: data.direccion || undefined,
+          provincia: data.provincia || undefined,
+          municipio: data.municipio || undefined,
           identificadorExtranjero: data.idExtranjero || undefined,
         }
       })
@@ -365,6 +371,8 @@ export default function ContactosPage(): JSX.Element {
           email: data.email || null,
           telefono: cleanPhone || null,
           direccion: data.direccion || null,
+          provincia: data.provincia || null,
+          municipio: data.municipio || null,
           identificadorExtranjero: data.idExtranjero || null,
         }))
       }
@@ -429,10 +437,10 @@ export default function ContactosPage(): JSX.Element {
             isSelectionMode ? "w-0 opacity-0 -translate-x-4 scale-0 -mr-2.5" : "w-[248px] opacity-100 translate-x-0 scale-100"
           )}>
             <ImportActionButton
-              onClick={handleSincronizarGhl}
-              isLoading={sincronizar.isPending}
-              label="Sincronizar con Dmaia CRM"
-              title={conectado ? 'Importar contactos desde Dmaia CRM' : 'Conecta Dmaia CRMl en Configuración'}
+              onClick={handleAbrirSincronizarGhl}
+              isLoading={false}
+              label="Sincronizar con GoHighLevel"
+              title={conectado ? 'Importar contactos desde GoHighLevel' : 'Conecta GoHighLevel en Configuración'}
               className="h-10 w-[244px] justify-center border-neutral-200"
             />
           </div>
@@ -492,38 +500,22 @@ export default function ContactosPage(): JSX.Element {
             </div>
           )}
 
-          {/* Error de sincronización */}
-          {syncError && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-body-sm text-danger-700">
-              <span className="flex items-center gap-2">
-                <XCircle size={18} className="shrink-0" />
-                {syncError} Revisa el token en Configuración.
-              </span>
-              <Link href="/configuracion" className="shrink-0 font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2">
-                Ir a Configuración
-              </Link>
-            </div>
-          )}
-
-          {/* Resultado de sincronización */}
-          {syncResult && (
-            <div className="flex flex-col gap-2 rounded-xl border border-success-500/40 bg-success-500/10 px-4 py-3">
-              <div className="flex items-center gap-2 text-body-sm font-semibold text-success-700">
-                <CheckCircle2 size={18} className="shrink-0" />
-                Importados: {syncResult.importados} · Actualizados: {syncResult.actualizados} · Sin RNC: {syncResult.sinRnc}
+          {/* Aviso: la última importación trajo contactos sin RNC */}
+          {sinRncCount !== null && sinRncCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-text-secondary">
+              <span>{sinRncCount} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setSoloSinRnc(true); setPage(1) }}
+                  className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
+                >
+                  Ver contactos sin RNC
+                </button>
+                <button type="button" onClick={() => setSinRncCount(null)} className="focus:outline-none" title="Descartar">
+                  <XCircle size={14} />
+                </button>
               </div>
-              {syncResult.sinRnc > 0 && (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-text-secondary">
-                  <span>{syncResult.sinRnc} contacto(s) se importaron sin RNC. Complétalo antes de poder facturarles un E31.</span>
-                  <button
-                    type="button"
-                    onClick={() => { setSoloSinRnc(true); setPage(1) }}
-                    className="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-2 focus:outline-none"
-                  >
-                    Ver contactos sin RNC
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -565,15 +557,6 @@ export default function ContactosPage(): JSX.Element {
               onChange={(val) => resetPage(setValidacionFilter)(val)}
               options={validacionOptions}
               className="w-[160px] shrink-0"
-              triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
-            />
-
-            {/* Estado Selector */}
-            <Select
-              value={estadoFilter}
-              onChange={(val) => resetPage(setEstadoFilter)(val)}
-              options={estadoOptions}
-              className="w-[95px] shrink-0"
               triggerClassName="h-[44px] bg-white font-semibold text-[13px] hover:bg-neutral-50 px-[13px]"
             />
 
@@ -671,7 +654,7 @@ export default function ContactosPage(): JSX.Element {
               <EmptyState
                 title=""
                 description={
-                  activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || estadoFilter !== 'todos' || origenFilter !== 'todos' || startDate || endDate || soloSinRnc
+                  activeSearch || tipoFilter !== 'todos' || tipoFiscalFilter !== 'todos' || validacionFilter !== 'todos' || origenFilter !== 'todos' || startDate || endDate || soloSinRnc
                     ? 'No hay contactos que coincidan con los filtros.'
                     : 'Aún no tienes contactos. Crea uno o sincroniza desde Dmaia CRM'
                 }
@@ -912,6 +895,17 @@ export default function ContactosPage(): JSX.Element {
                               >
                                 <Edit2 size={15} />
                               </button>
+                              <button
+                                type="button"
+                                title="Eliminar"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setDeletingContacto(c)
+                                }}
+                                className="text-text-secondary hover:text-danger-600 transition-colors focus:outline-none"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -983,6 +977,11 @@ export default function ContactosPage(): JSX.Element {
         onClose={() => setEditingContacto(null)}
         onSave={handleEditSave}
       />
+      <SincronizarGhlModal
+        open={ghlModalOpen}
+        onClose={() => setGhlModalOpen(false)}
+        onImported={(res) => setSinRncCount(res.sinRnc)}
+      />
 
       <Modal
         open={togglingContacto !== null}
@@ -1037,6 +1036,49 @@ export default function ContactosPage(): JSX.Element {
               </>
             ) : ''}
             ?
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deletingContacto !== null}
+        onClose={() => setDeletingContacto(null)}
+        title="Eliminar contacto"
+        subtitle=""
+        icon={<Trash2 size={20} className="text-danger-600" />}
+        className="max-w-[448px]"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setDeletingContacto(null)}
+              className="h-10 rounded-[10px] border-[#e2e8f0] text-[#64748b] text-[13px]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={confirmDeleteContacto}
+              className="h-10 rounded-[10px] bg-danger-600 hover:bg-danger-700 text-white border-0 text-[13px]"
+            >
+              Eliminar
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2 text-left">
+          <p className="text-[14px] text-[#64748b] leading-[22px] font-sans">
+            ¿Estás seguro de que deseas eliminar el contacto{' '}
+            <span className="font-bold text-[#333]">{deletingContacto?.razonSocial}</span>
+            {deletingContacto?.rnc ? (
+              <>
+                {' '}
+                (RNC/Cédula: <span className="font-bold text-[#333]">{formatRnc(deletingContacto.rnc)}</span>)
+              </>
+            ) : ''}
+            ? Quedará marcado como inactivo y no volverá a aparecer en tu directorio activo.
           </p>
         </div>
       </Modal>
