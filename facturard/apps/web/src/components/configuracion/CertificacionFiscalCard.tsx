@@ -183,8 +183,8 @@ export function CertificacionFiscalCard(): JSX.Element {
               </p>
               <p>
                 ¿Aún no lo tienes? Escríbenos a{' '}
-                <a href="mailto:hola@dmaia.do" className="font-medium text-brand-500 hover:underline">
-                  hola@dmaia.do
+                <a href="mailto:soporte@dmaia.io" className="font-medium text-brand-500 hover:underline">
+                  soporte@dmaia.io
                 </a>{' '}
                 y te acompañamos en todo el proceso de certificación.
               </p>

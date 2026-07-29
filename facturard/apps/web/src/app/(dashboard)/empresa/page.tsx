@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { api, getErrorMessage } from '@/lib/api'
+import { etiquetaIdentificacion } from '@/lib/comprobantes'
 
 interface TenantEmpresa {
   id: string
@@ -403,7 +404,7 @@ export default function EmpresaPage(): JSX.Element {
                 <span className="text-body-sm font-bold text-text-primary truncate">
                   {nombreMostrar}
                 </span>
-                <span className="text-[10px] text-text-secondary">RNC {tenant.rnc}</span>
+                <span className="text-[10px] text-text-secondary">{etiquetaIdentificacion(tenant.rnc)} {tenant.rnc}</span>
               </div>
             </div>
             <div className="flex flex-col items-end text-right leading-tight shrink-0">
