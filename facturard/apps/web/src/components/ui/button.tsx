@@ -6,7 +6,7 @@ const variantStyles = {
   primary: 'bg-brand-500 text-white hover:bg-brand-600 disabled:bg-neutral-200 disabled:text-neutral-400',
   secondary:
     'border border-neutral-300 bg-white text-text-primary hover:bg-neutral-50 disabled:border-neutral-200 disabled:text-text-disabled',
-  ghost: 'text-text-primary hover:bg-neutral-100 disabled:text-text-disabled',
+  ghost: 'bg-neutral-50 text-text-primary hover:bg-neutral-100 disabled:text-text-disabled disabled:bg-neutral-50',
   danger: 'bg-danger-500 text-white hover:bg-danger-600 disabled:bg-neutral-200 disabled:text-neutral-400',
 } as const
 

@@ -28,6 +28,7 @@ const REF_VAR = [
   ['Manufactura', 55],
 ] as const
 const STEPS = 6
+const MAX_SECTOR_OTRO = 12
 const fmt = (v: number) => 'RD$ ' + Math.round(v).toLocaleString('es-DO')
 
 function defaultCostosFijos(): CostoFijoLinea[] {
@@ -45,6 +46,7 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
 
   const [step, setStep] = useState(0)
   const [sector, setSector] = useState('Servicios')
+  const [sectorOtro, setSectorOtro] = useState('')
   const [moneda, setMoneda] = useState('DOP')
   const [mesFiscalInicio, setMesFiscalInicio] = useState(0)
   const [saldo, setSaldo] = useState(0)
@@ -60,7 +62,14 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
     if (!open) return
     setStep(0)
     if (config?.configurado) {
-      setSector(config.sector ?? 'Servicios')
+      const sectorGuardado = config.sector ?? 'Servicios'
+      if (sectorGuardado !== 'Otro' && !SECTORES.includes(sectorGuardado as (typeof SECTORES)[number])) {
+        setSector('Otro')
+        setSectorOtro(sectorGuardado.slice(0, MAX_SECTOR_OTRO))
+      } else {
+        setSector(sectorGuardado)
+        setSectorOtro('')
+      }
       setMoneda(config.moneda)
       setMesFiscalInicio(config.mesFiscalInicio)
       setCxc(config.cxcInicial)
@@ -81,9 +90,11 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
   const puntoEquilibrio = 1 - varPct / 100 > 0 ? fijoMensual / (1 - varPct / 100) : 0
   const netoMensual = ingresoMensual - fijoMensual - (ingresoMensual * varPct) / 100
 
+  const sectorFinal = sector === 'Otro' ? sectorOtro.trim() || 'Otro' : sector
+
   async function handleFinish(): Promise<void> {
     await guardar.mutateAsync({
-      sector, moneda, mesFiscalInicio, colchonMeses, metaMargenPct, varPct,
+      sector: sectorFinal, moneda, mesFiscalInicio, colchonMeses, metaMargenPct, varPct,
       cxcInicial: cxc, cxpInicial: cxp, ingresos, costosFijos,
     })
     if (saldo !== saldoActual) {
@@ -101,19 +112,29 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
       title="Configura tu presupuesto"
       subtitle={`Paso ${step + 1} de ${STEPS}`}
       icon={<TrendingUp size={20} />}
-      className="max-w-[640px]"
+      className="max-w-[760px]"
       footer={
         <div className="flex w-full items-center justify-between">
           <Button variant="secondary" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} disabled={saving}>
             {step === 0 ? 'Cancelar' : '← Atrás'}
           </Button>
-          {step < STEPS - 1 ? (
-            <Button variant="primary" onClick={() => setStep((s) => s + 1)}>Continuar →</Button>
-          ) : (
-            <Button variant="primary" onClick={handleFinish} disabled={saving}>
-              {saving ? 'Activando…' : 'Activar mi panel financiero →'}
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Nada en este wizard es obligatorio — "Omitir" lo deja explícito
+                en los pasos que son puro dato opcional (no en el setup base
+                ni en el paso final, que ya trae recomendados). */}
+            {step >= 1 && step <= 4 && (
+              <Button variant="ghost" onClick={() => setStep((s) => s + 1)} disabled={saving}>
+                Omitir
+              </Button>
+            )}
+            {step < STEPS - 1 ? (
+              <Button variant="primary" onClick={() => setStep((s) => s + 1)}>Continuar →</Button>
+            ) : (
+              <Button variant="primary" onClick={handleFinish} disabled={saving}>
+                {saving ? 'Activando…' : 'Activar mi panel financiero →'}
+              </Button>
+            )}
+          </div>
         </div>
       }
     >
@@ -140,6 +161,16 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
                 </button>
               ))}
             </div>
+            {sector === 'Otro' && (
+              <div className="mt-2">
+                <Input
+                  placeholder="¿Cuál? (máx. 12 caracteres)"
+                  maxLength={MAX_SECTOR_OTRO}
+                  value={sectorOtro}
+                  onChange={(e) => setSectorOtro(e.target.value.slice(0, MAX_SECTOR_OTRO))}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -205,12 +236,20 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
       {step === 4 && (
         <div className="flex flex-col gap-4">
           <p className="text-body-sm text-text-secondary">Los costos variables suben y bajan con las ventas: materia prima, comisiones, procesamiento de pagos. Exprésalo como % de tus ingresos.</p>
-          <Input label="Costo variable sobre ventas (%)" type="number" min={0} max={100} value={varPct} onChange={(e) => setVarPct(Number(e.target.value))} />
+          <Input label="Costo variable sobre ventas (%)" type="number" min={0} max={100} value={varPct || ''} placeholder="0" onChange={(e) => setVarPct(Number(e.target.value))} />
           <div>
             <p className="mb-2 text-ui-sm font-semibold text-text-secondary">¿No estás seguro? Referencias rápidas</p>
             <div className="flex flex-wrap gap-2">
               {REF_VAR.map(([label, pct]) => (
-                <button key={label} type="button" onClick={() => setVarPct(pct)} className="rounded-full border border-neutral-200 bg-white px-3.5 py-2 text-body-sm hover:border-brand-300">
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setVarPct(pct)}
+                  className={cn(
+                    'rounded-full border px-3.5 py-2 text-body-sm transition-colors',
+                    varPct === pct ? 'border-brand-500 bg-brand-500 text-white' : 'border-neutral-200 bg-white hover:border-brand-300',
+                  )}
+                >
                   {label} · {pct}%
                 </button>
               ))}

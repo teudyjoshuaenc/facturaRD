@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useCallback, type JSX, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useMounted } from '@/hooks/useMounted'
 
 interface ModalProps {
   open: boolean
@@ -34,9 +36,10 @@ export function Modal({ open, onClose, title, subtitle, icon, children, footer, 
     }
   }, [open, handleKeyDown])
 
-  if (!open) return null
+  const mounted = useMounted()
+  if (!open || !mounted) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
@@ -103,6 +106,7 @@ export function Modal({ open, onClose, title, subtitle, icon, children, footer, 
           animation: animate-in 0.2s ease-out;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body,
   )
 }
