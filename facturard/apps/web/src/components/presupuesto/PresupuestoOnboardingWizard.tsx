@@ -153,7 +153,7 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
             <Select value={String(mesFiscalInicio)} onChange={(v) => setMesFiscalInicio(Number(v))} options={MESES.map((m, i) => ({ value: String(i), label: m }))} />
           </div>
           <div>
-            <p className="mb-2 text-ui-sm font-semibold text-text-secondary">Sector</p>
+            <p className="mb-2 text-body-sm font-semibold text-text-secondary">Sector</p>
             <div className="flex flex-wrap gap-2">
               {SECTORES.map((s) => (
                 <button key={s} type="button" onClick={() => setSector(s)} className={cn('rounded-full border px-3.5 py-2 text-body-sm transition-colors', sector === s ? 'border-brand-500 bg-brand-500 text-white' : 'border-neutral-200 bg-white hover:border-brand-300')}>
@@ -203,8 +203,8 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
             <Plus size={15} /> Agregar otra fuente de ingreso
           </button>
           <div className="mt-2 flex gap-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Ingreso mensual</p><p className="text-h6 font-bold">{fmt(ingresoMensual)}</p></div>
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Proyectado 12 meses (sin crecimiento)</p><p className="text-h6 font-bold">{fmt(ingresoMensual * 12)}</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Ingreso mensual</p><p className="text-body-sm font-bold">{fmt(ingresoMensual)}</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Proyectado 12 meses (sin crecimiento)</p><p className="text-body-sm font-bold">{fmt(ingresoMensual * 12)}</p></div>
           </div>
         </div>
       )}
@@ -227,8 +227,8 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
             <Plus size={15} /> Agregar otro costo fijo
           </button>
           <div className="mt-2 flex gap-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Costo fijo mensual</p><p className="text-h6 font-bold">{fmt(fijoMensual)}</p></div>
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Punto de equilibrio</p><p className="text-h6 font-bold">{fmt(puntoEquilibrio)}</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Costo fijo mensual</p><p className="text-body-sm font-bold">{fmt(fijoMensual)}</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Punto de equilibrio</p><p className="text-body-sm font-bold">{fmt(puntoEquilibrio)}</p></div>
           </div>
         </div>
       )}
@@ -238,7 +238,7 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
           <p className="text-body-sm text-text-secondary">Los costos variables suben y bajan con las ventas: materia prima, comisiones, procesamiento de pagos. Exprésalo como % de tus ingresos.</p>
           <Input label="Costo variable sobre ventas (%)" type="number" min={0} max={100} value={varPct || ''} placeholder="0" onChange={(e) => setVarPct(Number(e.target.value))} />
           <div>
-            <p className="mb-2 text-ui-sm font-semibold text-text-secondary">¿No estás seguro? Referencias rápidas</p>
+            <p className="mb-2 text-body-sm font-semibold text-text-secondary">¿No estás seguro? Referencias rápidas</p>
             <div className="flex flex-wrap gap-2">
               {REF_VAR.map(([label, pct]) => (
                 <button
@@ -256,8 +256,8 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
             </div>
           </div>
           <div className="flex gap-6 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Margen bruto estimado</p><p className="text-h6 font-bold">{(100 - varPct).toFixed(0)}%</p></div>
-            <div><p className="text-ui-xs font-semibold uppercase text-text-secondary">Resultado mensual</p><p className={cn('text-h6 font-bold', netoMensual >= 0 ? 'text-success-600' : 'text-danger-600')}>{fmt(netoMensual)}</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Margen bruto estimado</p><p className="text-body-sm font-bold">{(100 - varPct).toFixed(0)}%</p></div>
+            <div><p className="text-body-sm font-semibold uppercase text-text-secondary">Resultado mensual</p><p className={cn('text-body-sm font-bold', netoMensual >= 0 ? 'text-success-600' : 'text-danger-600')}>{fmt(netoMensual)}</p></div>
           </div>
         </div>
       )}

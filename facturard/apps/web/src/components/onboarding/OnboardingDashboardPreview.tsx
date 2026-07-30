@@ -116,7 +116,7 @@ export function OnboardingDashboardPreview(): JSX.Element | null {
             {/* Métricas del mes */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard title="Ingresos" value={formatCurrencyCompact(458000)} icon={TrendingUp} subtitle="Julio 2026 · vs. mes anterior" tone="success" />
-              <MetricCard title="Gastos" value={formatCurrencyCompact(212000)} icon={TrendingDown} subtitle="Julio 2026 · vs. mes anterior" tone="danger" />
+              <MetricCard title="Egresos" value={formatCurrencyCompact(212000)} icon={TrendingDown} subtitle="Julio 2026 · vs. mes anterior" tone="danger" />
               <MetricCard title="Balance" value={formatCurrencyCompact(246000)} icon={Scale} subtitle="Flujo positivo" tone="brand" />
               <MetricCard title="Facturas emitidas" value={41} icon={FileText} subtitle="Julio 2026" tone="neutral" />
             </div>

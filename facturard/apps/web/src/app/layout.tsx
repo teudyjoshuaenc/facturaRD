@@ -7,7 +7,7 @@ import { Providers } from './providers'
 const openSans = Open_Sans({ subsets: ['latin'], variable: '--font-open-sans' })
 
 export const metadata: Metadata = {
-  title: 'FacturaRD',
+  title: 'Factura Dmaia',
   description: 'Facturación electrónica para PYMEs dominicanas',
 }
 

@@ -3,7 +3,7 @@
 import { useMemo, type JSX } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText, TrendingUp, TrendingDown, Scale, ChevronRight, AlertCircle, AlertTriangle, Plus, FileSpreadsheet, Wallet, UserPlus, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react'
+import { FileText, TrendingUp, TrendingDown, Scale, ChevronRight, AlertCircle, AlertTriangle, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react'
 import { MetricCard } from '@/components/dashboard/MetricCard'
 import { FacturasTable } from '@/components/dashboard/FacturasTable'
 import { IngresosGastosChart } from '@/components/dashboard/IngresosGastosChart'
@@ -172,89 +172,60 @@ export default function DashboardPage(): JSX.Element {
         isLoading={flujoLoading}
       />
 
-      {/* Alertas + Acciones rápidas — mismo tipo de card, misma fila, misma altura */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 items-stretch">
-        {/* Alertas */}
-        <div className="animate-fade-in-up h-full rounded-[20px] border border-neutral-200 bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4" style={{ animationDelay: '140ms' }}>
-          <div className="flex items-center justify-between">
-            <h3 className="text-body-sm font-bold text-text-primary">Alertas</h3>
-            {alerts.length > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-50 text-[10px] font-bold text-danger-600">
-                {alerts.length}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-1 flex-col justify-center gap-2.5">
-            {complianceLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <Spinner size={16} />
-              </div>
-            ) : alerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-5 text-center bg-green-50/20 border border-green-100/50 rounded-lg">
-                <span className="text-[12px] font-semibold text-green-700">¡Todo al día!</span>
-                <span className="text-[10px] text-green-600/70 font-medium mt-0.5">No hay alertas activas</span>
-              </div>
-            ) : (
-              alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  onClick={() => router.push(alert.path)}
-                  className={`flex items-center justify-between p-2.5 rounded-lg border transition-colors cursor-pointer ${
-                    alert.type === 'critical'
-                      ? 'bg-danger-50/50 border-danger-100/50 hover:bg-danger-50'
-                      : 'bg-warning-50/50 border-warning-100/50 hover:bg-warning-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
-                      alert.type === 'critical' ? 'bg-danger-100 text-danger-600' : 'bg-warning-100 text-warning-600'
-                    }`}>
-                      {alert.type === 'critical' ? <AlertCircle size={15} /> : <AlertTriangle size={15} />}
-                    </div>
-                    <div className="flex flex-col text-left min-w-0">
-                      <span className={`text-ui-xs font-semibold leading-tight truncate ${
-                        alert.type === 'critical' ? 'text-danger-700' : 'text-warning-700'
-                      }`}>
-                        {alert.message}
-                      </span>
-                      <span className={`text-[10px] font-medium ${
-                        alert.type === 'critical' ? 'text-danger-600/70' : 'text-warning-600/70'
-                      }`}>
-                        {alert.time}
-                      </span>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className={alert.type === 'critical' ? 'text-danger-400 flex-shrink-0' : 'text-warning-400 flex-shrink-0'} />
-                </div>
-              ))
-            )}
-          </div>
+      {/* Alertas */}
+      <div className="animate-fade-in-up rounded-[20px] border border-neutral-200 bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4" style={{ animationDelay: '140ms' }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-body-sm font-bold text-text-primary">Alertas</h3>
+          {alerts.length > 0 && (
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-danger-50 text-[10px] font-bold text-danger-600">
+              {alerts.length}
+            </span>
+          )}
         </div>
-
-        {/* Acciones rápidas */}
-        <div className="animate-fade-in-up h-full rounded-[20px] border border-neutral-200 bg-white shadow-sm p-4 sm:p-5 flex flex-col gap-4" style={{ animationDelay: '200ms' }}>
-          <h3 className="text-body-sm font-bold text-text-primary">Acciones rápidas</h3>
-          <div className="grid flex-1 grid-cols-2 gap-2.5">
-            {[
-              { label: 'Crear factura', path: '/nueva-factura', icon: Plus, tone: 'bg-brand-50 text-brand-600' },
-              { label: 'Crear cotización', path: '/cotizaciones/nueva', icon: FileSpreadsheet, tone: 'bg-ia-50 text-ia-500' },
-              { label: 'Registrar movimiento', path: '/finanzas', icon: Wallet, tone: 'bg-success-50 text-success-600' },
-              { label: 'Agregar contacto', path: '/contacto?new=true', icon: UserPlus, tone: 'bg-cta-50 text-cta-600' },
-            ].map((action, i) => (
-              <button
-                key={action.path}
-                type="button"
-                onClick={() => router.push(action.path)}
-                className="group animate-fade-in-up flex flex-col items-start justify-center gap-2.5 rounded-2xl border border-neutral-100 p-3.5 text-left transition-all duration-200 hover:border-brand-200 hover:bg-neutral-50/60 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97]"
-                style={{ animationDelay: `${260 + i * 50}ms` }}
+        <div className="flex flex-1 flex-col justify-center gap-2.5">
+          {complianceLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Spinner size={16} />
+            </div>
+          ) : alerts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-5 text-center bg-green-50/20 border border-green-100/50 rounded-lg">
+              <span className="text-[12px] font-semibold text-green-700">¡Todo al día!</span>
+              <span className="text-[10px] text-green-600/70 font-medium mt-0.5">No hay alertas activas</span>
+            </div>
+          ) : (
+            alerts.map((alert) => (
+              <div
+                key={alert.id}
+                onClick={() => router.push(alert.path)}
+                className={`flex items-center justify-between p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                  alert.type === 'critical'
+                    ? 'bg-danger-50/50 border-danger-100/50 hover:bg-danger-50'
+                    : 'bg-warning-50/50 border-warning-100/50 hover:bg-warning-50'
+                }`}
               >
-                <span className={`flex h-8 w-8 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110 ${action.tone}`}>
-                  <action.icon size={15} />
-                </span>
-                <span className="text-ui-xs font-semibold leading-tight text-text-primary">{action.label}</span>
-              </button>
-            ))}
-          </div>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
+                    alert.type === 'critical' ? 'bg-danger-100 text-danger-600' : 'bg-warning-100 text-warning-600'
+                  }`}>
+                    {alert.type === 'critical' ? <AlertCircle size={15} /> : <AlertTriangle size={15} />}
+                  </div>
+                  <div className="flex flex-col text-left min-w-0">
+                    <span className={`text-ui-xs font-semibold leading-tight truncate ${
+                      alert.type === 'critical' ? 'text-danger-700' : 'text-warning-700'
+                    }`}>
+                      {alert.message}
+                    </span>
+                    <span className={`text-[10px] font-medium ${
+                      alert.type === 'critical' ? 'text-danger-600/70' : 'text-warning-600/70'
+                    }`}>
+                      {alert.time}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={14} className={alert.type === 'critical' ? 'text-danger-400 flex-shrink-0' : 'text-warning-400 flex-shrink-0'} />
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -272,7 +243,7 @@ export default function DashboardPage(): JSX.Element {
           </div>
           <div className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
             <MetricCard
-              title="Gastos"
+              title="Egresos"
               value={flujoLoading ? '…' : formatCurrencyCompact(flujo?.egresos ?? 0)}
               icon={TrendingDown}
               subtitle={`${label} · vs. mes anterior`}

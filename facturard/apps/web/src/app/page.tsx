@@ -14,9 +14,9 @@ function EntryContent(): JSX.Element {
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background-canvas px-4 text-center">
         <Logo />
         <div className="flex flex-col gap-1">
-          <h1 className="text-h6 text-text-primary">Abre FacturaRD desde Dmaia CRM</h1>
+          <h1 className="text-h6 text-text-primary">Abre Factura Dmaia desde Dmaia CRM</h1>
           <p className="max-w-sm text-body-sm text-text-secondary">
-            FacturaRD funciona dentro de tu cuenta de Dmaia CRM. Ábrelo desde ahí para continuar.
+            Factura Dmaia funciona dentro de tu cuenta de Dmaia CRM. Ábrelo desde ahí para continuar.
           </p>
         </div>
       </main>

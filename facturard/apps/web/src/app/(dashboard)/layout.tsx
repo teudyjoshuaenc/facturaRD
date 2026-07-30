@@ -50,10 +50,6 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Datos de la Empresa',
     subtitle: 'Información comercial y datos del emisor de facturas',
   },
-  '/usuarios-y-roles': {
-    title: 'Usuarios y Permisos',
-    subtitle: 'Control de accesos y configuración de roles',
-  },
   '/certificado-digital': {
     title: 'Certificado Digital',
     subtitle: 'Estado y configuración de tu firma digital para e-NCF',
@@ -71,7 +67,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
   const wipRoutes = [
     '/compras',
     '/reportes',
-    '/usuarios-y-roles',
     '/certificado-digital',
     '/cumplimiento',
   ]
@@ -119,7 +114,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }): 
     )
   }
 
-  const meta = PAGE_META[pathname] ?? { title: 'FacturaRD', subtitle: '' }
+  const meta = PAGE_META[pathname] ?? { title: 'Factura Dmaia', subtitle: '' }
   let pageSubtitle = meta.subtitle
   if (pathname === '/dashboard' && tenant) {
     pageSubtitle = `${tenant.razonSocial} · ${etiquetaIdentificacion(tenant.rnc)} ${tenant.rnc}`

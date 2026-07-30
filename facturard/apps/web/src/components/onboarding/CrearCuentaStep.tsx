@@ -149,7 +149,7 @@ export function CrearCuentaStep({
           <div className="flex flex-col gap-1 text-body-sm">
             <span className="font-medium text-text-primary">Listo para empezar</span>
             <span className="text-text-secondary">
-              Usa FacturaRD para cotizar y preparar tus facturas. Cuando quieras enviarlas a la DGII,
+              Usa Factura Dmaia para cotizar y preparar tus facturas. Cuando quieras enviarlas a la DGII,
               te ayudamos con la certificación.
             </span>
           </div>
