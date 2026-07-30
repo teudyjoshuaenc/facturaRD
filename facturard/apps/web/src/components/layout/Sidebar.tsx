@@ -84,9 +84,9 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
   const isEffectiveCollapsed = isMobile ? false : collapsed
 
   const showWip = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_SHOW_WIP_TABS === 'true'
-  const visibleOperacionItems = OPERACION_ITEMS.filter(
-    (item) => (!('wip' in item && item.wip) || showWip) && (item.href !== '/finanzas' || tenant?.finanzasHabilitado),
-  )
+  // Finanzas siempre visible aunque no esté activado — al entrar sin activar,
+  // /finanzas abre directo el wizard de configuración (capital + presupuesto).
+  const visibleOperacionItems = OPERACION_ITEMS.filter((item) => !('wip' in item && item.wip) || showWip)
   const visibleSistemaItems = SISTEMA_ITEMS.filter((item) => !('wip' in item && item.wip) || showWip)
 
   return (
