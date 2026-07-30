@@ -46,18 +46,18 @@ export function CertificacionChoiceStep({ onYaCertificado, onTodaviaNo, onBack }
         <button
           type="button"
           onClick={onTodaviaNo}
-          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-white p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_12px_28px_-8px_rgba(15,151,61,0.35)] focus:outline-none focus:ring-2 focus:ring-success-500/30"
+          className="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-border bg-white p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_12px_28px_-8px_rgba(244,122,60,0.35)] focus:outline-none focus:ring-2 focus:ring-cta-500/30"
         >
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-success-50 via-white to-white opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cta-50 via-white to-white opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
 
-          <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-success-400 to-success-600 text-white shadow-lg shadow-success-500/30 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
+          <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cta-500 to-cta-600 text-white shadow-lg shadow-cta-500/30 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
             <Sparkles size={22} />
           </span>
           <span className="relative flex flex-1 flex-col">
             <span className="text-body-base font-bold text-text-primary">Todavía no / No sé qué es</span>
             <span className="text-body-sm text-text-secondary">Empieza a cotizar y preparar facturas ya mismo.</span>
           </span>
-          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-50 text-text-tertiary transition-all duration-300 group-hover:bg-success-500 group-hover:text-white group-hover:shadow-md group-hover:shadow-success-500/40">
+          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-50 text-text-tertiary transition-all duration-300 group-hover:bg-cta-500 group-hover:text-white group-hover:shadow-md group-hover:shadow-cta-500/40">
             <ChevronRight size={16} className="transition-transform duration-300 group-hover:translate-x-0.5" />
           </span>
         </button>

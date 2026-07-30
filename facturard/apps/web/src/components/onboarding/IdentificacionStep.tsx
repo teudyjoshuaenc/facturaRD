@@ -25,12 +25,24 @@ interface Props {
   onComplete: (result: IdentificacionResult) => void
 }
 
+/** RNC: 3-5-1 (131-88322-5). Cédula: 3-7-1 (013-3339005-2). */
+function formatearIdentificacion(digitos: string, tipo: TipoIdentificacion): string {
+  const grupos = tipo === 'CEDULA' ? [3, 10, 11] : [3, 8, 9]
+  const partes = [digitos.slice(0, grupos[0]), digitos.slice(grupos[0], grupos[1]), digitos.slice(grupos[1], grupos[2])]
+  return partes.filter(Boolean).join('-')
+}
+
 export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element {
-  const [tipo, setTipo] = useState<TipoIdentificacion>(initial?.tipo ?? 'RNC')
+  const [tipoManual, setTipoManual] = useState<TipoIdentificacion>(initial?.tipo ?? 'RNC')
   const [valor, setValor] = useState(initial?.identificacion ?? '')
+  const [excedeLimite, setExcedeLimite] = useState(false)
   const [nombreManual, setNombreManual] = useState('')
   const [nonce, setNonce] = useState(0)
   const { status, razonSocial, error } = useRncValidation(valor, nonce)
+
+  // Sin dígitos aún: se respeta el toggle manual. Con dígitos: el largo manda solo
+  // (RNC=9, cédula=11), así el toggle cambia solo mientras se escribe.
+  const tipo: TipoIdentificacion = valor.length > 9 ? 'CEDULA' : valor.length > 0 ? 'RNC' : tipoManual
 
   const esCedula = tipo === 'CEDULA'
   const largoOk = esCedula ? valor.length === 11 : valor.length === 9
@@ -38,13 +50,19 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
   const permiteManual = esCedula && status === 'invalid' && largoOk
 
   function cambiarTipo(next: TipoIdentificacion): void {
-    setTipo(next)
+    setTipoManual(next)
     setValor('')
+    setExcedeLimite(false)
     setNombreManual('')
     setNonce((n) => n + 1)
   }
 
+  // Defensa extra por si el maxLength del input se bypasea (paste, devtools, etc).
   function continuar(): void {
+    if (valor.length > 11) {
+      setExcedeLimite(true)
+      return
+    }
     if (status === 'valid') {
       onComplete({ identificacion: valor, tipo, razonSocial, manual: false })
     } else if (permiteManual && nombreManual.trim() !== '') {
@@ -52,7 +70,7 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
     }
   }
 
-  const puedeContinuar = status === 'valid' || (permiteManual && nombreManual.trim() !== '')
+  const puedeContinuar = !excedeLimite && (status === 'valid' || (permiteManual && nombreManual.trim() !== ''))
 
   return (
     <div className="animate-fade-in-up flex flex-col gap-6">
@@ -85,17 +103,18 @@ export function IdentificacionStep({ initial, onComplete }: Props): JSX.Element 
       <div className="relative">
         <Input
           label={esCedula ? 'Cédula' : 'RNC'}
-          placeholder={esCedula ? '11 dígitos' : '9 dígitos'}
+          placeholder={esCedula ? '000-0000000-0' : '000-00000-0'}
           inputMode="numeric"
           autoFocus
-          maxLength={esCedula ? 11 : 9}
-          value={valor}
+          maxLength={13}
+          value={formatearIdentificacion(valor, tipo)}
           onChange={(e) => {
-            const max = esCedula ? 11 : 9
-            setValor(e.target.value.replace(/\D/g, '').slice(0, max))
+            const digitos = e.target.value.replace(/\D/g, '')
+            setExcedeLimite(digitos.length > 11)
+            setValor(digitos.slice(0, 11))
             setNombreManual('')
           }}
-          error={status === 'invalid' && !esCedula ? error : ''}
+          error={excedeLimite ? 'Máximo 11 dígitos (RNC = 9, cédula = 11).' : status === 'invalid' && !esCedula ? error : ''}
         />
         {status === 'loading' && (
           <div className="absolute right-3 top-9">
