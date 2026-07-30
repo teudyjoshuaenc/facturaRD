@@ -16,6 +16,7 @@ import { VentasPorProvinciaMap } from '@/components/dashboard/VentasPorProvincia
 import { useFinanzasResumen, useFinanzasFlujo, useTransacciones, CATEGORIA_LABELS } from '@/hooks/useFinanzas'
 import { Spinner } from '@/components/ui/spinner'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
+import { useAuth } from '@/lib/context/AuthContext'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -69,6 +70,7 @@ function TrendBadge({ delta, invertirBueno = false }: { delta: number | null; in
 
 export default function DashboardPage(): JSX.Element {
   const router = useRouter()
+  const { tenant } = useAuth()
   const { fechaDesde, fechaHasta, label } = monthRange()
 
   const { comprobantes, isLoading: tableLoading, downloadingId, handleDownload } =
@@ -163,13 +165,15 @@ export default function DashboardPage(): JSX.Element {
   const balancePositivo = (flujo?.balance ?? 0) >= 0
 
   return (
-    <div className="flex flex-col gap-6 text-left">
+    <div className="flex flex-col gap-4 text-left">
       <DashboardHero
         periodoLabel={label}
         balance={flujo?.balance ?? 0}
         ingresos={flujo?.ingresos ?? 0}
         egresos={flujo?.egresos ?? 0}
         isLoading={flujoLoading}
+        finanzasHabilitado={tenant?.finanzasHabilitado === true}
+        onActivarFinanzas={() => router.push('/finanzas')}
       />
 
       {/* Alertas */}

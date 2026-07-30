@@ -196,13 +196,13 @@ export function StepCliente({
           <div className="flex flex-col gap-4 w-full max-w-[904px]">
             <h3 className="text-[18px] font-semibold text-[#333333] leading-[27px] font-sans text-left">Seleccionar Cliente</h3>
 
-            {isE32OverLimit && !selectedCliente && (
+            {esFiscal && isE32OverLimit && !selectedCliente && (
               <p className="text-[12px] font-semibold text-danger-600 text-left animate-in fade-in-50 mb-2">
                 La factura de consumo (E32) supera el límite de RD$250,000. Debe seleccionar un cliente con RNC o cédula.
               </p>
             )}
 
-            {isRncRequired && selectedCliente && selectedCliente.rnc.trim() === '' && (
+            {esFiscal && isRncRequired && selectedCliente && selectedCliente.rnc.trim() === '' && (
               <p className="text-[12px] font-semibold text-danger-600 animate-in fade-in-50 text-left mt-1 mb-2">
                 {tipoECF === 'E32'
                   ? 'El RNC o cédula es obligatorio para comprobantes de consumo (E32) de RD$250,000 o más.'
@@ -603,7 +603,7 @@ export function StepCliente({
             onClick={onNext}
             className="w-full h-[48px] rounded-[14px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-[16px] font-normal font-sans text-white flex items-center justify-center gap-2"
           >
-            <span>siguiente</span>
+            <span>Siguiente</span>
             <ChevronRight size={16} className="text-white" />
           </Button>
         </div>

@@ -1,6 +1,7 @@
 import type { JSX } from 'react'
 import { CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { etiquetaIdentificacion } from '@/lib/comprobantes'
 import type { TenantInfo } from '@/lib/session'
 
 interface Props {
@@ -32,7 +33,7 @@ export function SuccessStep({ tenant, onContinue, puedeEmitir = true }: Props): 
             <dd className="truncate text-text-primary" title={tenant.razonSocial}>{tenant.razonSocial}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-text-secondary">RNC</dt>
+            <dt className="text-text-secondary">{etiquetaIdentificacion(tenant.rnc)}</dt>
             <dd className="text-text-primary">{tenant.rnc}</dd>
           </div>
           <div className="flex justify-between gap-3">

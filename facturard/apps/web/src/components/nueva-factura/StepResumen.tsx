@@ -249,9 +249,9 @@ export function StepResumen({
         <button
           type="button"
           onClick={onBack}
-          className="w-full h-[48px] rounded-[14px] border border-[#f5f5f5] text-[16px] font-normal text-black bg-white hover:bg-neutral-50 transition-colors"
+          className="w-full h-[48px] rounded-[14px] border border-neutral-200 text-[16px] font-normal text-black bg-white transition-colors hover:border-neutral-300 hover:bg-neutral-200"
         >
-          Back
+          Atrás
         </button>
       </div>
     </div>

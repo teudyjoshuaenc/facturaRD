@@ -1,6 +1,6 @@
 import { useState, useMemo, useId, useEffect } from 'react'
 import type { JSX } from 'react'
-import { Plus, Trash2, Pencil, ChevronRight, ChevronLeft, Package, Search, Wrench } from 'lucide-react'
+import { Plus, Trash2, Pencil, Package, Search, Wrench } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { NuevoProductoModal } from './NuevoProductoModal'
@@ -34,7 +34,6 @@ interface StepDetalleProps {
   onItemsChange: (items: ItemRow[]) => void
   notas: string
   onNotasChange: (notas: string) => void
-  onNext: () => void
   onBack: () => void
   isQuickMode?: boolean
   tipoECF?: TipoECF | undefined
@@ -45,7 +44,6 @@ export function StepDetalle({
   onItemsChange,
   notas,
   onNotasChange,
-  onNext,
   onBack,
   isQuickMode,
   tipoECF,
@@ -162,10 +160,6 @@ export function StepDetalle({
     }
   }
 
-  const hasValidItems = items.length > 0 && items.every(
-    (i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0,
-  )
-
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -261,10 +255,10 @@ export function StepDetalle({
             </p>
           </div>
         ) : (
-          <div className="overflow-auto max-h-[360px] bg-white rounded-xl border border-neutral-200/60 shadow-sm animate-in fade-in-50 duration-200">
+          <div className="overflow-auto max-h-[360px] bg-white rounded-xl border border-neutral-200 animate-in fade-in-50 duration-200">
             <table className="w-full text-left text-body-sm border-collapse">
-              <thead className="sticky top-0 bg-neutral-50 z-10 shadow-[0_1px_0_0_rgba(226,232,240,1)]">
-                <tr className="text-[11px] uppercase tracking-wider text-text-secondary bg-neutral-50 border-b border-neutral-100 select-none">
+              <thead className="sticky top-0 bg-white z-10">
+                <tr className="text-[11px] uppercase tracking-wider text-neutral-400 border-b border-neutral-100 select-none">
                   <th className="py-3 px-4 font-semibold text-text-secondary min-w-[240px] max-w-[320px]">Producto</th>
                   <th className="py-3 px-4 font-semibold text-text-secondary">Unidad de Medida</th>
                   <th className="py-3 px-4 font-semibold text-text-secondary text-center">Bien o Servicio</th>
@@ -436,26 +430,17 @@ export function StepDetalle({
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Navigation — "Siguiente" vive en el panel Resumen de la derecha (mismo botón
+          para todos los pasos), así que aquí solo queda Atrás. */}
       {!isQuickMode && (
-        <div className="flex items-center gap-[24px] w-full max-w-[904px] h-[48px] select-none">
+        <div className="flex items-center w-full max-w-[904px] h-[48px] select-none">
           <Button
             variant="secondary"
             size="lg"
             onClick={onBack}
-            className="w-[114px] h-[48px] rounded-[14px] border border-[#F5F5F5] text-black font-normal text-[16px] font-sans hover:bg-neutral-50"
+            className="w-[114px] h-[48px] rounded-[14px] border border-neutral-200 text-black font-normal text-[16px] font-sans transition-colors hover:border-neutral-300 hover:bg-neutral-200"
           >
             Atrás
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            disabled={!hasValidItems}
-            onClick={onNext}
-            className="flex-1 h-[48px] rounded-[14px] bg-[#0379D5] hover:bg-[#0379D5]/90 text-[16px] font-normal text-white font-sans flex items-center justify-center gap-2"
-          >
-            <span>siguiente</span>
-            <ChevronRight size={16} className="text-white" />
           </Button>
         </div>
       )}
