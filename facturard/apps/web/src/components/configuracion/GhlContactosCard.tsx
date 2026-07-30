@@ -51,7 +51,7 @@ export function GhlContactosCard(): JSX.Element {
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
             <CardTitle>Integración con Dmaia CRM</CardTitle>
-            <CardDescription>Importa tus contactos desde Dmaia CRM a FacturaRD (en una sola dirección).</CardDescription>
+            <CardDescription>Importa tus contactos desde Dmaia CRM a Factura Dmaia (en una sola dirección).</CardDescription>
           </div>
           <Badge variant={conectado ? 'success' : 'neutral'}>
             <Plug size={13} />

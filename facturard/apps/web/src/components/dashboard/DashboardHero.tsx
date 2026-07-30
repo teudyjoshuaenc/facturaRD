@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-react'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
 import { cn } from '@/lib/utils'
 
@@ -45,19 +45,30 @@ export function DashboardHero({ periodoLabel, balance, ingresos, egresos, isLoad
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1.5 text-ui-sm font-bold text-success-700">
-              <ArrowUpRight size={14} /> {isLoading ? '…' : formatCurrencyCompact(ingresos)} ingresos
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-50 px-3 py-1.5 text-ui-sm font-bold text-danger-700">
-              <ArrowDownRight size={14} /> {isLoading ? '…' : formatCurrencyCompact(egresos)} gastos
-            </span>
-            <span className={cn(
-              'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-ui-sm font-bold',
-              positivo ? 'bg-brand-100 text-brand-700' : 'bg-warning-100 text-warning-700',
-            )}>
-              {positivo ? 'Flujo positivo' : 'Flujo negativo'}
-            </span>
+          <div className="flex flex-wrap items-stretch gap-6">
+            <div className="flex flex-col gap-1">
+              <span className="text-ui-xs font-semibold uppercase tracking-wide text-text-secondary">Ingresos</span>
+              <span className="inline-flex items-center gap-1.5 text-body-base font-bold text-text-primary">
+                <ArrowUpRight size={16} className="text-success-600" /> {isLoading ? '…' : formatCurrencyCompact(ingresos)}
+              </span>
+            </div>
+            <div className="w-px shrink-0 bg-neutral-200" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <span className="text-ui-xs font-semibold uppercase tracking-wide text-text-secondary">Egresos</span>
+              <span className="inline-flex items-center gap-1.5 text-body-base font-bold text-text-primary">
+                <ArrowDownRight size={16} className="text-danger-600" /> {isLoading ? '…' : formatCurrencyCompact(egresos)}
+              </span>
+            </div>
+            <div className="w-px shrink-0 bg-neutral-200" aria-hidden />
+            <div className="flex flex-col gap-1">
+              <span className="text-ui-xs font-semibold uppercase tracking-wide text-text-secondary">Flujo</span>
+              <span className={cn(
+                'inline-flex items-center gap-1.5 text-body-base font-bold',
+                positivo ? 'text-success-700' : 'text-warning-700',
+              )}>
+                <CheckCircle2 size={16} /> {positivo ? 'Positivo' : 'Negativo'}
+              </span>
+            </div>
           </div>
         </div>
 

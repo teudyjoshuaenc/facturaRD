@@ -216,7 +216,7 @@ export default function ConfiguracionPage(): JSX.Element {
                     factura/pago).
                   </li>
                   <li>
-                    Guarda los cambios. Cada evento enviará los datos a FacturaRD para emitir el
+                    Guarda los cambios. Cada evento enviará los datos a Factura Dmaia para emitir el
                     e-CF correspondiente.
                   </li>
                 </ol>

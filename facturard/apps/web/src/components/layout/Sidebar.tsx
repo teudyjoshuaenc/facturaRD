@@ -23,7 +23,6 @@ const OPERACION_ITEMS = [
 const SISTEMA_ITEMS = [
   { href: '/reportes', label: 'Reportes', iconPath: '/assets/6f267c4ae6c73dc4966f99316120ffac8a1a08f4.svg', wip: true },
   { href: '/empresa', label: 'Empresa', iconPath: '/assets/aea6417e5c12c502b8498862cacbc1c5f8370dc0.svg' },
-  { href: '/usuarios-y-roles', label: 'Usuarios y roles', iconPath: '/assets/2d9e550eb3a7ec6201239db740788d0b9c47c15c.svg', wip: true },
   { href: '/certificado-digital', label: 'Certificado Digital', iconPath: '/assets/13241a49cce1e26dd59c84c1a822c865bb4b5d48.svg', wip: true },
   { href: '/cumplimiento', label: 'Cumplimiento', iconPath: '/assets/b5e2b788c5b6fba6b49f4fe30c0ba26277cad92e.svg', wip: true },
   { href: '/configuracion', label: 'Configuración', iconPath: '/assets/8e23a0d26d3f1ac328a53f7e8d576582527ebaae.svg' },
@@ -103,12 +102,12 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
       <aside
         className={cn(
           // Base & Styles matching Figma
-          'flex flex-shrink-0 flex-col justify-between border-r border-white/10 bg-brand-500 transition-all duration-300 ease-in-out',
+          'flex flex-shrink-0 flex-col justify-between border-r border-white/10 bg-[linear-gradient(180deg,#0161BE_0%,#014F9B_55%,#013D7C_100%)] transition-all duration-300 ease-in-out',
           // Mobile: fixed drawer
           'fixed inset-y-0 left-0 z-50 w-64 md:static md:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           // Tablet/Desktop width based on collapse state
-          collapsed ? 'md:w-[76px]' : 'md:w-[215px]'
+          collapsed ? 'md:w-[76px]' : 'md:w-[250px]'
         )}
       >
         {/* Top Header Section (Logo + Chevron Toggle) */}

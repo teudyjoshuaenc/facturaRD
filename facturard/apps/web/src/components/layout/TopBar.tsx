@@ -1,7 +1,8 @@
 'use client'
 
 import type { JSX } from 'react'
-import { Plus, Search, Activity, ShieldCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Search, Activity, ShieldCheck, FileSpreadsheet, Wallet, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useUI } from '@/lib/context/UIContext'
@@ -13,18 +14,26 @@ interface Props {
   dgiiConectado?: boolean
 }
 
+const ACCIONES_CREAR = [
+  { label: 'Cotización', path: '/cotizaciones/nueva', icon: FileSpreadsheet },
+  { label: 'Movimiento', path: '/finanzas', icon: Wallet },
+  { label: 'Contacto', path: '/contacto?new=true', icon: UserPlus },
+] as const
+
 export function TopBar({
   pageTitle,
   pageSubtitle,
   certDias = 12,
   dgiiConectado = true,
 }: Props): JSX.Element {
+  const router = useRouter()
   const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
 
   const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Crear factura'
   const isEmitir = pageTitle === 'Crear factura'
 
   return (
+    <>
     <header className="hidden border-b border-border-subtle bg-white px-6 py-3.5 md:flex md:items-center md:justify-between h-[68px] shrink-0">
       {/* Left side: title/subtitle OR global search */}
       {isDashboardOrEmitir ? (
@@ -85,5 +94,28 @@ export function TopBar({
         )}
       </div>
     </header>
+
+    {/* Barra de creación rápida — siempre visible, no vive dentro de <main> así que nunca se pierde con el scroll. */}
+    <div className="hidden shrink-0 items-center gap-2.5 bg-[linear-gradient(180deg,#0161BE_0%,#014F9B_55%,#013D7C_100%)] px-6 py-4 md:flex">
+      <span className="mr-1 text-ui-xs font-bold uppercase tracking-wide text-white">Crear</span>
+      <button
+        type="button"
+        onClick={() => router.push('/nueva-factura')}
+        className="inline-flex items-center gap-1.5 rounded-full bg-cta-500 px-4 py-2.5 text-ui-sm font-semibold text-white shadow-sm transition-colors hover:bg-cta-600"
+      >
+        <Plus size={14} /> Factura
+      </button>
+      {ACCIONES_CREAR.map((accion) => (
+        <button
+          key={accion.path}
+          type="button"
+          onClick={() => router.push(accion.path)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2.5 text-ui-sm font-semibold text-white/90 transition-colors hover:bg-cta-500 hover:text-white"
+        >
+          <accion.icon size={14} /> {accion.label}
+        </button>
+      ))}
+    </div>
+    </>
   )
 }

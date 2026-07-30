@@ -85,7 +85,7 @@ export function PresupuestoTab(): JSX.Element {
         <div className="mb-4 flex gap-3 rounded-xl bg-brand-50 px-4 py-3 text-body-sm text-text-secondary">
           <span className="text-brand-600">⚡</span>
           <span>
-            <b className="text-brand-700">Origen: manual.</b> Al conectar tu software de facturación FacturaRD, las facturas emitidas
+            <b className="text-brand-700">Origen: manual.</b> Al conectar tu software de facturación Factura Dmaia, las facturas emitidas
             actualizarán estas entradas solas y aquí solo ajustarás lo proyectado. <span className="rounded-full bg-brand-100 px-2 py-0.5 text-ui-xs font-bold text-brand-600">Fase 2</span>
           </span>
         </div>

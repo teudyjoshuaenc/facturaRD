@@ -33,7 +33,7 @@ export function OnboardingMarketingPanel(): JSX.Element {
       <div className="pointer-events-none absolute -right-24 top-1/3 h-72 w-72 rounded-full bg-brand-500/10 blur-3xl" aria-hidden />
 
       <div className="relative flex max-w-[460px] flex-col gap-8">
-        <Logo />
+        <Logo stacked />
 
         <div className="flex flex-col gap-3">
           <h1 className="text-h3 font-bold leading-tight tracking-tight text-text-primary">
