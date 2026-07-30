@@ -75,7 +75,7 @@ export function OnboardingDashboardPreview(): JSX.Element | null {
       <Sidebar tenant={MOCK_TENANT} activeRoute="/dashboard" />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar pageTitle="Dashboard" pageSubtitle={`${MOCK_TENANT.razonSocial} · RNC ${MOCK_TENANT.rnc}`} certDias={312} dgiiConectado />
+        <TopBar pageTitle="Tablero de Facturación" pageSubtitle={`${MOCK_TENANT.razonSocial} · RNC ${MOCK_TENANT.rnc}`} certDias={312} dgiiConectado />
 
         <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8 flex justify-center items-start">
           <div className="w-full max-w-[1400px] flex flex-col gap-6 text-left mx-auto">

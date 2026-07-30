@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import { ArrowUpRight, ArrowDownRight, CheckCircle2 } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, CheckCircle2, Wallet, ArrowRight } from 'lucide-react'
 import { formatCurrencyCompact } from '@/lib/comprobantes'
 import { cn } from '@/lib/utils'
 
@@ -9,6 +9,9 @@ interface DashboardHeroProps {
   ingresos: number
   egresos: number
   isLoading?: boolean
+  /** false → el tenant no activó Finanzas: el balance real (0) es engañoso, así que se sugiere activarlo en vez de mostrarlo. */
+  finanzasHabilitado?: boolean
+  onActivarFinanzas?: () => void
 }
 
 const RING_SIZE = 104
@@ -16,10 +19,60 @@ const RING_STROKE = 10
 const RING_R = (RING_SIZE - RING_STROKE) / 2
 const RING_C = 2 * Math.PI * RING_R
 
-export function DashboardHero({ periodoLabel, balance, ingresos, egresos, isLoading }: DashboardHeroProps): JSX.Element {
+export function DashboardHero({
+  periodoLabel,
+  balance,
+  ingresos,
+  egresos,
+  isLoading,
+  finanzasHabilitado = true,
+  onActivarFinanzas,
+}: DashboardHeroProps): JSX.Element {
   const positivo = balance >= 0
   const margenPct = ingresos > 0 ? Math.max(0, Math.min(100, (balance / ingresos) * 100)) : 0
   const dash = (margenPct / 100) * RING_C
+
+  if (!finanzasHabilitado) {
+    return (
+      <div className="animate-fade-in-up relative overflow-hidden rounded-[24px] border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-white p-6 sm:p-8 shadow-sm">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{ backgroundImage: 'radial-gradient(#0379D5 1px, transparent 1px)', backgroundSize: '18px 18px', maskImage: 'radial-gradient(ellipse 420px 260px at 88% 30%, black, transparent)' }}
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-brand-500/10 blur-2xl" aria-hidden />
+
+        <div className="relative flex flex-wrap items-center justify-between gap-8">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-ui-xs font-bold uppercase tracking-wide text-brand-600">Resumen del mes</span>
+              <h2 className="text-h4 font-bold text-text-primary">{periodoLabel}</h2>
+            </div>
+            <p className="max-w-md text-body-sm text-text-secondary">
+              Todavía no activas tu flujo de caja, así que aquí no hay nada real que mostrar. Actívalo
+              en un par de minutos y vas a ver tu balance, ingresos y egresos de este mes.
+            </p>
+            {onActivarFinanzas && (
+              <button
+                type="button"
+                onClick={onActivarFinanzas}
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-500 px-4 py-2.5 text-ui-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
+              >
+                <Wallet size={15} /> Activar mi flujo de caja <ArrowRight size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="animate-scale-in relative hidden shrink-0 flex-col items-center gap-2 rounded-[20px] border border-dashed border-brand-200 bg-white/70 p-4 shadow-sm backdrop-blur-sm sm:flex">
+            <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border border-dashed border-brand-200">
+              <Wallet size={28} className="text-brand-300" />
+            </div>
+            <span className="text-ui-xs font-semibold uppercase tracking-wide text-text-tertiary">Sin activar</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="animate-fade-in-up relative overflow-hidden rounded-[24px] border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-white p-6 sm:p-8 shadow-sm">

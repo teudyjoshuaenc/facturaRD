@@ -4,7 +4,6 @@ import type { JSX } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Activity, ShieldCheck, FileSpreadsheet, Wallet, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { useUI } from '@/lib/context/UIContext'
 
 interface Props {
@@ -29,7 +28,7 @@ export function TopBar({
   const router = useRouter()
   const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
 
-  const isDashboardOrEmitir = pageTitle === 'Dashboard' || pageTitle === 'Crear factura'
+  const isDashboardOrEmitir = pageTitle === 'Tablero de Facturación' || pageTitle === 'Crear factura'
   const isEmitir = pageTitle === 'Crear factura'
 
   return (
@@ -96,12 +95,12 @@ export function TopBar({
     </header>
 
     {/* Barra de creación rápida — siempre visible, no vive dentro de <main> así que nunca se pierde con el scroll. */}
-    <div className="hidden shrink-0 items-center gap-2.5 bg-[linear-gradient(180deg,#0161BE_0%,#014F9B_55%,#013D7C_100%)] px-6 py-4 md:flex">
-      <span className="mr-1 text-ui-xs font-bold uppercase tracking-wide text-white">Crear</span>
+    <div className="hidden shrink-0 items-center gap-2 border-b border-border-subtle bg-white px-6 py-2.5 md:flex">
+      <span className="mr-1 text-ui-xs font-bold uppercase tracking-wide text-text-secondary">Crear</span>
       <button
         type="button"
         onClick={() => router.push('/nueva-factura')}
-        className="inline-flex items-center gap-1.5 rounded-full bg-cta-500 px-4 py-2.5 text-ui-sm font-semibold text-white shadow-sm transition-colors hover:bg-cta-600"
+        className="inline-flex items-center gap-1.5 rounded-full bg-cta-500 px-3.5 py-1.5 text-ui-sm font-semibold text-white shadow-sm transition-colors hover:bg-cta-600"
       >
         <Plus size={14} /> Factura
       </button>
@@ -110,7 +109,7 @@ export function TopBar({
           key={accion.path}
           type="button"
           onClick={() => router.push(accion.path)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2.5 text-ui-sm font-semibold text-white/90 transition-colors hover:bg-cta-500 hover:text-white"
+          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3.5 py-1.5 text-ui-sm font-semibold text-text-primary transition-colors hover:bg-neutral-50 hover:border-neutral-300"
         >
           <accion.icon size={14} /> {accion.label}
         </button>

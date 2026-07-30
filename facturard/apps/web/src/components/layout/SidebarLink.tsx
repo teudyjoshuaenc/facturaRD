@@ -39,7 +39,7 @@ const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, act
           }}
         />
         {!collapsed && (
-          <span className="font-sans text-[14px] leading-5 truncate">{label}</span>
+          <span className="font-sans text-[14px] leading-5 truncate min-w-0 flex-1">{label}</span>
         )}
       </Link>
 
@@ -49,7 +49,7 @@ const SidebarLink = React.memo(function SidebarLink({ href, iconPath, label, act
           className={cn(
             "absolute left-[44px] top-0 h-[44px] flex items-center pr-4 pl-2 z-50 pointer-events-none select-none",
             "rounded-r-[10px] whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out",
-            "opacity-0 max-w-0 -translate-x-3 group-hover:opacity-100 group-hover:max-w-[200px] group-hover:translate-x-0",
+            "opacity-0 max-w-0 -translate-x-3 group-hover:opacity-100 group-hover:max-w-[240px] group-hover:translate-x-0",
             active
               ? "bg-white text-brand-500 font-semibold"
               : "bg-brand-600 text-white font-normal"

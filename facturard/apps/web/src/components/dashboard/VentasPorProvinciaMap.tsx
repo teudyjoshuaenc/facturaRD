@@ -166,6 +166,7 @@ export function VentasPorProvinciaMap({ fechaDesde, fechaHasta }: Props): JSX.El
           </CardDescription>
         </div>
         <ToggleGroup
+          variant="solid"
           value={clase}
           onChange={setClase}
           options={[

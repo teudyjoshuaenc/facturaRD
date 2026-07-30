@@ -16,25 +16,34 @@ interface StepWizardProps {
 }
 
 export function StepWizard({ steps, currentStep, onStepClick }: StepWizardProps): JSX.Element {
-  // Line width calculation based on step: 1 -> 53px, 2 -> 210px, 3 -> 366px
-  const activeLineWidth = currentStep === 1 ? '53px' : currentStep === 2 ? '210px' : '366px'
+  const n = steps.length
+  // Fracción del track recorrida — el track en sí ya está inset a los centros
+  // de los círculos extremos, así que esto es simplemente lineal 0..1.
+  const progress = n > 1 ? (currentStep - 1) / (n - 1) : 0
 
   return (
-    <div className="relative flex items-center justify-between w-[450px] h-[68px] mx-auto select-none">
-      {/* Step Line Container */}
-      <div className="absolute w-[366px] h-4 left-[calc(50%-366px/2)] top-3 flex items-center z-0">
-        {/* Base Line */}
-        <div className="w-full h-0 border-[3px] border-[#F5F5F5] rounded-full" />
-        {/* Progress Line — gradient light-to-full matching the circles */}
-        <div
-          className="absolute h-0 border-[3px] transition-all duration-500 ease-out left-0 rounded-full"
-          style={{
-            width: activeLineWidth,
-            borderColor: 'transparent',
-            borderImage: 'linear-gradient(90deg, rgba(3,121,213,0.45), #0379D5) 1',
-          }}
-        />
-      </div>
+    <div
+      className="relative mx-auto grid w-[450px] select-none"
+      style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}
+    >
+      {/* Track — inset exactamente medio ancho de columna en cada lado, así
+          arranca y termina en el centro real del primer/último círculo (no en
+          un pixel fijo que se desalinea con el layout real). El círculo va
+          encima (z-10) y lo tapa por completo: nada "traspasa".
+          Fondo sólido/gradiente en vez de border-image: border-image IGNORA
+          border-radius en la mayoría de navegadores, así que las puntas
+          quedaban cuadradas y se veían asomar por fuera del círculo redondo. */}
+      <div
+        className="pointer-events-none absolute top-[17px] z-0 h-1.5 rounded-full bg-[#F5F5F5]"
+        style={{ left: `calc(50% / ${n})`, right: `calc(50% / ${n})` }}
+      />
+      <div
+        className="pointer-events-none absolute top-[17px] z-0 h-1.5 rounded-full bg-gradient-to-r from-[#0379D5]/45 to-[#0379D5] transition-all duration-500 ease-out"
+        style={{
+          left: `calc(50% / ${n})`,
+          width: `calc((100% - 100% / ${n}) * ${progress})`,
+        }}
+      />
 
       {steps.map((step) => {
         const isActive = step.number === currentStep
@@ -51,7 +60,7 @@ export function StepWizard({ steps, currentStep, onStepClick }: StepWizardProps)
           : undefined
 
         return (
-          <div key={step.number} className="relative flex flex-col items-center gap-2 z-10 w-[70px] h-[68px]">
+          <div key={step.number} className="relative z-10 flex flex-col items-center gap-2">
             {/* Step Circle */}
             <button
               type="button"

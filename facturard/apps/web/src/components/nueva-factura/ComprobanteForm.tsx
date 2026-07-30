@@ -515,7 +515,8 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // bloqueado. Las validaciones son las MISMAS que gatean el botón de abajo:
   // paso 1 → datos del cliente, paso 2 → líneas del detalle.
   // 'estandar' es exactamente la condición con la que se renderiza el wizard de
-  // 3 pasos; en modo 'rapido' no hay pasos y el botón no debe navegar.
+  // 3 pasos; en modo 'rapido' no hay pasos y el botón no
+  // debe navegar.
   const isWizardMode = facturacionMode === 'estandar'
   const isOnLastStep = currentStep >= 3
   const showStepNav = isWizardMode && !isOnLastStep
@@ -591,15 +592,12 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       <div className={cn(
         "w-full",
         facturacionMode === 'estandar'
-          ? "flex flex-col lg:flex-row gap-[24px] lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0 lg:min-h-[948px] lg:h-auto mx-auto overflow-visible"
+          ? "flex flex-col lg:flex-row gap-[24px] lg:w-full lg:max-w-[1336px] lg:px-[16px] xl:px-0 lg:h-auto mx-auto overflow-visible"
           : "grid grid-cols-1 gap-6 lg:grid-cols-3 h-full overflow-hidden"
       )}>
         {/* Left Column */}
         {facturacionMode === 'estandar' ? (
-          <Card className={cn(
-            "w-full lg:flex-1 lg:max-w-[952px] lg:min-w-0 p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px]",
-            currentStep === 2 ? "lg:h-[850px] overflow-y-auto" : "lg:h-auto lg:self-start overflow-visible"
-          )}>
+          <Card className="w-full lg:flex-1 lg:max-w-[952px] lg:min-w-0 p-6 flex flex-col bg-white border border-[#E2E8F0] shadow-sm rounded-[14px] overflow-visible">
             {/* Stepper Wizard centered at top of the panel */}
             <div className="flex justify-center border-[#F5F5F5] pb-5 pt-0">
               <StepWizard
@@ -653,7 +651,6 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   onItemsChange={handleItemsChange}
                   notas={notas}
                   onNotasChange={setNotas}
-                  onNext={() => goToStep(3)}
                   onBack={() => goToStep(1)}
                   tipoECF={tipoECF}
                 />
@@ -683,7 +680,6 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
               onItemsChange={handleItemsChange}
               notas={notas}
               onNotasChange={setNotas}
-              onNext={() => { }}
               onBack={() => { }}
               isQuickMode={true}
               tipoECF={tipoECF}
@@ -693,8 +689,8 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
         {/* Right Column */}
         <div className={cn(
-          "h-full flex flex-col overflow-hidden",
-          facturacionMode === 'estandar' ? "w-full lg:w-[360px] max-[1200px]:lg:w-[310px] shrink-0" : "lg:col-span-1"
+          "flex flex-col overflow-hidden",
+          facturacionMode === 'estandar' ? "w-full lg:w-[360px] max-[1200px]:lg:w-[310px] shrink-0" : "h-full lg:col-span-1"
         )}>
           {/* Rápido Mode Selectors (Client, Type, Date) above the card */}
           {facturacionMode === 'rapido' && (
@@ -874,7 +870,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           <Card className={cn(
             "flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] transition-all duration-300 gap-[16px] items-stretch p-[21px] relative",
             facturacionMode === 'estandar'
-              ? "w-full shadow-sm h-auto lg:self-start"
+              ? "w-full flex-1 shadow-sm"
               : "flex-1 shadow-sm overflow-y-auto h-full"
           )}>
             {/* Header */}
@@ -1044,10 +1040,10 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                       disabled={disabled}
                       onClick={() => (showStepNav ? goToStep(currentStep + 1) : handleSubmit(false))}
                       className={cn(
-                        "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                        "w-full h-[44px] rounded-[10px] bg-brand-500 text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
                         disabled
                           ? "opacity-20 cursor-not-allowed"
-                          : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
+                          : "hover:bg-brand-600 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                       )}
                     >
                       {submitting ? (
