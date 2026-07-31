@@ -74,6 +74,12 @@ export class ContactosService {
             ],
           }
         : {}),
+      ...((query.desde !== undefined || query.hasta !== undefined) && {
+        createdAt: {
+          ...(query.desde !== undefined && { gte: new Date(`${query.desde}T00:00:00.000Z`) }),
+          ...(query.hasta !== undefined && { lte: new Date(`${query.hasta}T23:59:59.999Z`) }),
+        },
+      }),
     }
 
     const [data, total] = await prisma.$transaction([

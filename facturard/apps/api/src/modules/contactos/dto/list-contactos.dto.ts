@@ -24,6 +24,16 @@ export class ListContactosDto {
   @IsOptional()
   activo?: boolean
 
+  @ApiPropertyOptional({ description: 'Fecha mínima de creación (YYYY-MM-DD)' })
+  @IsString()
+  @IsOptional()
+  desde?: string
+
+  @ApiPropertyOptional({ description: 'Fecha máxima de creación (YYYY-MM-DD)' })
+  @IsString()
+  @IsOptional()
+  hasta?: string
+
   @ApiPropertyOptional({ default: 1 })
   @Type(() => Number)
   @IsNumber()

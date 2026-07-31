@@ -15,7 +15,7 @@ interface Props {
 
 const ACCIONES_CREAR = [
   { label: 'Cotización', path: '/cotizaciones/nueva', icon: FileSpreadsheet },
-  { label: 'Movimiento', path: '/finanzas', icon: Wallet },
+  { label: 'Finanzas', path: '/finanzas', icon: Wallet },
   { label: 'Contacto', path: '/contacto?new=true', icon: UserPlus },
 ] as const
 

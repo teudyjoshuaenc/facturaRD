@@ -14,6 +14,7 @@ import { formatCurrency } from '@/lib/comprobantes'
 import type { ComprobanteFormData, ItemRow, TipoECF } from '@/hooks/useNuevaFactura'
 import type { Contacto } from '@/hooks/useContactos'
 import { useContactos } from '@/hooks/useContactos'
+import { useRncValidation } from '@/hooks/useRncValidation'
 import { useUI } from '@/lib/context/UIContext'
 import { cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
@@ -79,7 +80,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const baseId = useId()
   const router = useRouter()
   const { facturacionMode } = useUI()
-  const { contactos } = useContactos()
+  const { contactos, crearContacto } = useContactos()
   const emisionRef = useRef<HTMLInputElement>(null)
 
   const searchParams = useSearchParams()
@@ -341,6 +342,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     )
   }, [contactos, clientSearch])
 
+  // Sin match local y lo escrito es un RNC completo (9 dígitos) → se busca en
+  // la DGII para no obligar a abrir "+ Nuevo Cliente" a mano. Al usarlo se
+  // crea el Contacto igual que el modal (la factura SIEMPRE referencia un
+  // Contacto real). Cédula (11 dígitos) no tiene padrón público en la DGII.
+  const clientSearchDigits = clientSearch.replace(/\D/g, '')
+  const dropdownRncLookupHabilitado = filteredClientes.length === 0 && clientSearchDigits.length === 9
+  const { status: dropdownRncStatus, razonSocial: dropdownRncRazonSocial } = useRncValidation(
+    dropdownRncLookupHabilitado ? clientSearchDigits : '',
+  )
+
+  async function handleUsarResultadoDgii(): Promise<void> {
+    try {
+      const nuevo = await crearContacto({
+        nombre: dropdownRncRazonSocial,
+        rnc: clientSearchDigits,
+        email: '',
+        telefono: '',
+        tipo: 'CLIENTE',
+      })
+      setSelectedCliente(nuevo)
+      setShowClientDropdown(false)
+      setClientSearch('')
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   // Reset client when tipo changes to E43 (Gastos Menores — no client needed)
   useEffect(() => {
     if (tipoECF === 'E43') {
@@ -508,6 +536,17 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   )
 
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
+
+  // Reglas de validez (isClienteStepValid/isDetalleStepValid) se recalculan en
+  // vivo, pero currentStep es estado propio — sin esto, alternar "Nota de
+  // venta" (no exige cliente) ↔ "Factura fiscal" (sí) mientras ya estás en el
+  // paso 2/3 te deja PARADO ahí con campos vacíos: nunca se re-valida el paso
+  // en el que estás al cambiar las reglas. Se regresa al último paso que sigue
+  // siendo válido apenas eso pasa.
+  useEffect(() => {
+    if (currentStep > 1 && !isClienteStepValid) setCurrentStep(1)
+    else if (currentStep > 2 && !isDetalleStepValid) setCurrentStep(2)
+  }, [isClienteStepValid, isDetalleStepValid, currentStep])
 
   // ─── Wizard: navegación desde el botón principal de la derecha ─────────────
   // Cuando NO estás en el paso final, ese botón actúa como "Siguiente" (misma
@@ -742,9 +781,48 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                         {/* Client rows */}
                         <div className="overflow-y-auto max-h-[404px] flex flex-col w-full py-1">
                           {filteredClientes.length === 0 ? (
-                            <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
-                              No se encontraron clientes
-                            </div>
+                            clientSearchDigits.length === 11 ? (
+                              <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
+                                No se encontraron clientes.
+                                <br />
+                                La cédula no tiene registro público en la DGII — usa &quot;+ Nuevo Cliente&quot; para escribir el nombre a mano.
+                              </div>
+                            ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'loading' ? (
+                              <div className="flex items-center justify-center gap-2 px-4 py-4 text-ui-sm text-text-secondary">
+                                <Spinner size={16} /> Buscando RNC en la DGII...
+                              </div>
+                            ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'valid' ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleUsarResultadoDgii()}
+                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F0F5FF]/50 focus:bg-[#F0F5FF] focus:outline-none"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F3F4F6] text-[#6A7282]">
+                                    <Building2 size={16} />
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[16px] font-semibold text-[#333333] leading-6 truncate">
+                                      {dropdownRncRazonSocial}
+                                    </span>
+                                    <span className="text-[13px] font-normal text-[#99A1AF] leading-[20px] mt-0.5">
+                                      Encontrado en la DGII · RNC: {clientSearchDigits.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="text-[13px] font-semibold text-[#0379D5] shrink-0">Usar</span>
+                              </button>
+                            ) : (
+                              <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
+                                No se encontraron clientes
+                                {dropdownRncLookupHabilitado && dropdownRncStatus === 'invalid' && (
+                                  <>
+                                    <br />
+                                    RNC no registrado en la DGII.
+                                  </>
+                                )}
+                              </div>
+                            )
                           ) : (
                             filteredClientes.map((c) => {
                               const isSelected = selectedCliente?.id === c.id

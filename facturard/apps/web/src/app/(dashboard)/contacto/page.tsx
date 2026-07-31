@@ -221,6 +221,8 @@ export default function ContactosPage(): JSX.Element {
     search: activeSearch,
     tipo: tipoFilter === 'todos' ? undefined : tipoFilter,
     activo: true,
+    desde: startDate || undefined,
+    hasta: endDate || undefined,
     page,
     limit: 10,
   })
@@ -270,21 +272,8 @@ export default function ContactosPage(): JSX.Element {
       list = list.filter((c) => (c.origen === 'GHL' ? 'GHL' : 'MANUAL') === origenFilter)
     }
 
-    if (startDate) {
-      list = list.filter((c) => {
-        const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
-        return dateStr >= startDate
-      })
-    }
-    if (endDate) {
-      list = list.filter((c) => {
-        const dateStr = c.createdAt ? c.createdAt.split('T')[0] || '' : ''
-        return dateStr <= endDate
-      })
-    }
-
     return list
-  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter, startDate, endDate])
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter])
 
   function handleAbrirSincronizarGhl(): void {
     if (!conectado) {

@@ -358,20 +358,53 @@ async function downloadPdfBlob(
   URL.revokeObjectURL(objectUrl)
 }
 
+const MESES_LARGO = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+/** "Mes DD, AAAA" — misma lógica UTC-vs-local que formatDate() para evitar
+ * que una fecha sin hora (YYYY-MM-DD) se corra un día por timezone. */
+function formatFechaLarga(value: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return value
+  const hasTime = value.includes('T') || value.includes(' ')
+  const day = hasTime ? date.getDate() : date.getUTCDate()
+  const month = hasTime ? date.getMonth() : date.getUTCMonth()
+  const year = hasTime ? date.getFullYear() : date.getUTCFullYear()
+  return `${MESES_LARGO[month]} ${day}, ${year}`
+}
+
+/** Quita caracteres inválidos en nombres de archivo (Windows/macOS/Linux). */
+function sanitizeNombreArchivo(value: string): string {
+  return value.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function nombreArchivoDocumento(prefijo: string, numero: string, cliente: string, fecha: string): string {
+  const partes = [`${prefijo} #${numero || 'S-N'}`, `- ${cliente || 'Consumidor Final'}`, formatFechaLarga(fecha)]
+    .filter(Boolean)
+  return `${sanitizeNombreArchivo(partes.join(' '))}.pdf`
+}
+
 export async function downloadComprobantePdf(
   api: { get: (url: string, config: object) => Promise<{ data: Blob }> },
   id: string,
   eNCF: string,
+  cliente: string,
+  fecha: string,
 ): Promise<void> {
-  // eNCF puede venir vacío en borradores; el backend nombra el archivo, aquí sólo
-  // damos un nombre de descarga razonable.
-  await downloadPdfBlob(api, `/comprobantes/${id}/pdf`, `${eNCF || 'borrador'}.pdf`)
+  const filename = nombreArchivoDocumento('Factura', eNCF, cliente, fecha)
+  await downloadPdfBlob(api, `/comprobantes/${id}/pdf`, filename)
 }
 
 export async function downloadCotizacionPdf(
   api: { get: (url: string, config: object) => Promise<{ data: Blob }> },
   id: string,
   folio: string,
+  cliente: string,
+  fecha: string,
 ): Promise<void> {
-  await downloadPdfBlob(api, `/cotizaciones/${id}/pdf`, `${folio || 'cotizacion'}.pdf`)
+  const filename = nombreArchivoDocumento('Cotización', folio, cliente, fecha)
+  await downloadPdfBlob(api, `/cotizaciones/${id}/pdf`, filename)
 }

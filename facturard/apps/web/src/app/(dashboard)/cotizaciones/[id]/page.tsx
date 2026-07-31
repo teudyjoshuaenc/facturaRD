@@ -275,7 +275,8 @@ export default function CotizacionDetailPage({ params }: PageProps): JSX.Element
   const handleDescargarPdf = async () => {
     setDownloading(true)
     try {
-      await downloadCotizacionPdf(api, cotizacion.id, cotizacion.folio)
+      const clienteNombre = contacto?.razonSocial || contacto?.nombreComercial || 'Consumidor Final'
+      await downloadCotizacionPdf(api, cotizacion.id, cotizacion.folio, clienteNombre, cotizacion.createdAt)
     } catch {
       toast.error('No se pudo descargar el PDF de la cotización')
     } finally {

@@ -30,6 +30,7 @@ import type { Producto, NuevoProductoData } from '@/hooks/useProductos'
 import { NuevoClienteModal } from '@/components/nueva-factura/NuevoClienteModal'
 import { NuevoProductoModal } from '@/components/nueva-factura/NuevoProductoModal'
 import { ConfirmLeaveDraftModal } from '@/components/ui/confirm-leave-draft-modal'
+import { useRncValidation } from '@/hooks/useRncValidation'
 import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
@@ -88,6 +89,22 @@ export function CotizacionForm(): JSX.Element {
   const [clienteTelefono, setClienteTelefono] = useState('')
   const [clienteDireccion, setClienteDireccion] = useState('')
 
+  // Autocompletar por RNC/Cédula: si el cliente NO se seleccionó de la lista
+  // (cliente ad-hoc, sin crear Contacto), al completar un RNC válido (9
+  // dígitos) se busca en la DGII y se llena el nombre solo. Cédula (11
+  // dígitos) no tiene padrón público — la DGII no puede validarla, así que
+  // ahí no hay autocompletado posible.
+  const cleanClienteRnc = clienteRnc.replace(/\D/g, '')
+  const rncLookupHabilitado = !selectedContacto && cleanClienteRnc.length === 9
+  const { status: rncLookupStatus, razonSocial: rncLookupRazonSocial } = useRncValidation(
+    rncLookupHabilitado ? cleanClienteRnc : '',
+  )
+  useEffect(() => {
+    if (rncLookupStatus === 'valid' && rncLookupRazonSocial && !clienteNombre.trim()) {
+      setClienteNombre(rncLookupRazonSocial)
+    }
+  }, [rncLookupStatus, rncLookupRazonSocial, clienteNombre])
+
   // Form Fields - General/Commercial Section
   const [fechaEmision, setFechaEmision] = useState(() => {
     const today = new Date()
@@ -120,6 +137,26 @@ export function CotizacionForm(): JSX.Element {
         c.rnc.toLowerCase().includes(q)
     ).slice(0, 5)
   }, [contactos, clientSearch])
+
+  // Si no hay match local y lo escrito es un RNC completo (9 dígitos), se
+  // busca en la DGII para poder usarlo sin tener que crear el Contacto.
+  // Cédula (11 dígitos) NO tiene padrón público — la DGII no la puede validar.
+  const clientSearchDigits = clientSearch.replace(/\D/g, '')
+  const dropdownRncLookupHabilitado = filteredClientes.length === 0 && clientSearchDigits.length === 9
+  const { status: dropdownRncStatus, razonSocial: dropdownRncRazonSocial } = useRncValidation(
+    dropdownRncLookupHabilitado ? clientSearchDigits : '',
+  )
+
+  function handleUsarResultadoDgii(): void {
+    setSelectedContacto(null)
+    setClienteNombre(dropdownRncRazonSocial)
+    setClienteRnc(clientSearchDigits)
+    setClienteCorreo('')
+    setClienteTelefono('')
+    setClienteDireccion('')
+    setShowClientDropdown(false)
+    setClientSearch('')
+  }
 
   // Search filter for products
   const filteredProducts = useMemo(() => {
@@ -431,9 +468,48 @@ export function CotizacionForm(): JSX.Element {
                       {/* Client rows */}
                       <div className="overflow-y-auto max-h-[349px] flex flex-col w-full py-1">
                         {filteredClientes.length === 0 ? (
-                          <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
-                            No se encontraron clientes
-                          </div>
+                          clientSearchDigits.length === 11 ? (
+                            <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
+                              No se encontraron clientes.
+                              <br />
+                              La cédula no tiene registro público en la DGII — escribe el nombre manualmente abajo.
+                            </div>
+                          ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'loading' ? (
+                            <div className="flex items-center justify-center gap-2 px-4 py-4 text-ui-sm text-text-secondary">
+                              <Spinner size={16} /> Buscando RNC en la DGII...
+                            </div>
+                          ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'valid' ? (
+                            <button
+                              type="button"
+                              onClick={handleUsarResultadoDgii}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F0F5FF]/50 focus:bg-[#F0F5FF] focus:outline-none cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F3F4F6] text-[#6A7282]">
+                                  <Building2 size={16} />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[14px] font-semibold text-[#333333] leading-5 truncate">
+                                    {dropdownRncRazonSocial}
+                                  </span>
+                                  <span className="text-[12px] font-normal text-[#99A1AF] leading-[18px] mt-0.5">
+                                    Encontrado en la DGII · RNC: {clientSearchDigits.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-[12px] font-semibold text-[#0379D5] shrink-0">Usar</span>
+                            </button>
+                          ) : (
+                            <div className="px-4 py-4 text-center text-ui-sm text-text-secondary">
+                              No se encontraron clientes
+                              {dropdownRncLookupHabilitado && dropdownRncStatus === 'invalid' && (
+                                <>
+                                  <br />
+                                  RNC no registrado en la DGII.
+                                </>
+                              )}
+                            </div>
+                          )
                         ) : (
                           filteredClientes.map((c) => {
                             const isSelected = selectedContacto?.id === c.id
@@ -509,13 +585,24 @@ export function CotizacionForm(): JSX.Element {
                 {/* RNC */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-semibold text-[#344054]">RNC / Cédula</label>
-                  <input
-                    type="text"
-                    placeholder="000-0000000-0"
-                    value={clienteRnc}
-                    onChange={(e) => setClienteRnc(e.target.value)}
-                    className="border border-[#E2E8F0] rounded-[10px] h-[44px] px-3.5 text-[14px] bg-white focus:outline-none focus:border-brand-500 transition-colors w-full"
-                  />
+                  <div className="relative w-full">
+                    <input
+                      type="text"
+                      placeholder="000-0000000-0"
+                      value={clienteRnc}
+                      onChange={(e) => setClienteRnc(e.target.value)}
+                      className="border border-[#E2E8F0] rounded-[10px] h-[44px] px-3.5 pr-10 text-[14px] bg-white focus:outline-none focus:border-brand-500 transition-colors w-full"
+                    />
+                    {rncLookupHabilitado && (rncLookupStatus === 'loading' || rncLookupStatus === 'valid') && (
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                        {rncLookupStatus === 'loading' ? (
+                          <Spinner size={16} />
+                        ) : (
+                          <Check size={16} className="text-green-600" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {/* Correo */}
                 <div className="flex flex-col gap-1">
@@ -832,136 +919,144 @@ export function CotizacionForm(): JSX.Element {
 
         </div>
 
-        {/* Right Column (Fixed Resumen) */}
-        <div className="w-full lg:w-[360px] shrink-0 sticky lg:top-0 h-fit transition-all duration-300">
-          <Card className="flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-[21px] gap-[16px] relative text-left">
-            {/* Header */}
-            <div className="flex items-center justify-between w-full select-none">
-              <div className="flex items-center gap-[8px]">
-                <FileText size={20} className="text-[#333333]" />
-                <span className="font-semibold text-[#333333] text-[16px]">
-                  Resumen
-                </span>
+        {/* Right Column (Fixed Resumen) — los botones de acción quedan en un pie
+            fijo (shrink-0) FUERA del área con scroll, así nunca quedan tapados:
+            solo el detalle (metadata/cliente/ítems/subtotales) hace scroll interno
+            cuando no cabe, el pie con Total + Guardar/Cancelar siempre está visible. */}
+        <div className="w-full lg:w-[360px] shrink-0 lg:sticky lg:top-0 lg:max-h-full lg:min-h-0 transition-all duration-300">
+          <Card className="flex flex-col bg-white border border-[#E2E8F0] rounded-[14px] shadow-sm p-[21px] gap-[16px] relative text-left lg:max-h-full lg:min-h-0">
+            {/* Contenido con scroll propio */}
+            <div className="flex flex-col gap-[16px] min-h-0 lg:flex-1 lg:overflow-y-auto pr-1 -mr-1">
+              {/* Header */}
+              <div className="flex items-center justify-between w-full select-none">
+                <div className="flex items-center gap-[8px]">
+                  <FileText size={20} className="text-[#333333]" />
+                  <span className="font-semibold text-[#333333] text-[16px]">
+                    Resumen
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Metadata info */}
-            <div className="flex flex-col gap-[8px] items-start w-full select-none">
-              {/* Date */}
-              <div className="flex items-center gap-[8px] text-[#64748B] text-[13px]">
-                <Calendar size={16} className="text-[#64748B] flex-shrink-0" />
-                <span>Fecha: 18 jun de 2026</span>
+              {/* Metadata info */}
+              <div className="flex flex-col gap-[8px] items-start w-full select-none">
+                {/* Date */}
+                <div className="flex items-center gap-[8px] text-[#64748B] text-[13px]">
+                  <Calendar size={16} className="text-[#64748B] flex-shrink-0" />
+                  <span>Fecha: 18 jun de 2026</span>
+                </div>
+                {/* Pay Cond */}
+                <div className="flex items-center gap-[8px] text-[#64748B] text-[13px]">
+                  <CreditCard size={16} className="text-[#64748B] flex-shrink-0" />
+                  <span className="truncate">
+                    {condicionPago === 'CREDITO' ? 'Crédito' : 'Contado'}
+                  </span>
+                </div>
               </div>
-              {/* Pay Cond */}
-              <div className="flex items-center gap-[8px] text-[#64748B] text-[13px]">
-                <CreditCard size={16} className="text-[#64748B] flex-shrink-0" />
-                <span className="truncate">
-                  {condicionPago === 'CREDITO' ? 'Crédito' : 'Contado'}
-                </span>
+
+              <hr className="border-[#E2E8F0] my-0" />
+
+              {/* Client Info */}
+              <div className="flex flex-col gap-[4px] items-start w-full text-left font-sans select-none">
+                <p className="font-semibold text-[#374B6A] text-[12px] truncate w-full">
+                  {clienteNombre || 'Consumidor Final'}
+                </p>
+                <p className="font-normal text-[#7A8FAD] text-[11px] truncate w-full">
+                  {clienteRnc ? `RNC: ${clienteRnc}` : 'RNC: -'}
+                </p>
               </div>
-            </div>
 
-            <hr className="border-[#E2E8F0] my-0" />
+              <hr className="border-[#E2E8F0] my-0" />
 
-            {/* Client Info */}
-            <div className="flex flex-col gap-[4px] items-start w-full text-left font-sans select-none">
-              <p className="font-semibold text-[#374B6A] text-[12px] truncate w-full">
-                {clienteNombre || 'Consumidor Final'}
-              </p>
-              <p className="font-normal text-[#7A8FAD] text-[11px] truncate w-full">
-                {clienteRnc ? `RNC: ${clienteRnc}` : 'RNC: -'}
-              </p>
-            </div>
-
-            <hr className="border-[#E2E8F0] my-0" />
-
-            {/* Items Summary (List of added products) */}
-            {items.length > 0 && (
-              <>
-                <div className="flex flex-col gap-[10px] w-full text-[12px] text-[#475569] max-h-[160px] overflow-y-auto pr-1">
-                  {items.map((item, index) => {
-                    const itemSubtotal = item.cantidad * item.precioUnitarioItem
-                    return (
-                      <div key={item.key || index} className="flex items-start justify-between w-full gap-2 select-none">
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="font-semibold text-[#334155] truncate text-[13px]" title={item.nombreItem || 'Ítem personalizado'}>
-                            {item.nombreItem || 'Ítem personalizado'}
-                          </span>
-                          <span className="text-[11px] text-[#64748B] mt-0.5">
-                            Cant: {item.cantidad} × {formatCurrency(item.precioUnitarioItem)}
+              {/* Items Summary (List of added products) */}
+              {items.length > 0 && (
+                <>
+                  <div className="flex flex-col gap-[10px] w-full text-[12px] text-[#475569] max-h-[160px] overflow-y-auto pr-1">
+                    {items.map((item, index) => {
+                      const itemSubtotal = item.cantidad * item.precioUnitarioItem
+                      return (
+                        <div key={item.key || index} className="flex items-start justify-between w-full gap-2 select-none">
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="font-semibold text-[#334155] truncate text-[13px]" title={item.nombreItem || 'Ítem personalizado'}>
+                              {item.nombreItem || 'Ítem personalizado'}
+                            </span>
+                            <span className="text-[11px] text-[#64748B] mt-0.5">
+                              Cant: {item.cantidad} × {formatCurrency(item.precioUnitarioItem)}
+                            </span>
+                          </div>
+                          <span className="font-bold text-[#334155] shrink-0 text-right text-[13px] self-start mt-0.5">
+                            {formatCurrency(itemSubtotal)}
                           </span>
                         </div>
-                        <span className="font-bold text-[#334155] shrink-0 text-right text-[13px] self-start mt-0.5">
-                          {formatCurrency(itemSubtotal)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <hr className="border-[#E2E8F0] my-0" />
-              </>
-            )}
+                      )
+                    })}
+                  </div>
+                  <hr className="border-[#E2E8F0] my-0" />
+                </>
+              )}
 
-            {/* Totals Summary */}
-            <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] select-none">
-              <div className="flex items-center justify-between w-full">
-                <span>Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex items-center justify-between w-full">
-                <span>Descuento</span>
-                <span>{formatCurrency(descuento)}</span>
-              </div>
-              <div className="flex items-center justify-between w-full">
-                <span>ITBIS (18%)</span>
-                <span>{formatCurrency(itbis)}</span>
+              {/* Totals Summary */}
+              <div className="flex flex-col gap-[8px] w-full text-[13px] text-[#64748B] select-none">
+                <div className="flex items-center justify-between w-full">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between w-full">
+                  <span>Descuento</span>
+                  <span>{formatCurrency(descuento)}</span>
+                </div>
+                <div className="flex items-center justify-between w-full">
+                  <span>ITBIS (18%)</span>
+                  <span>{formatCurrency(itbis)}</span>
+                </div>
               </div>
             </div>
 
-            <hr className="border-[#E2E8F0] my-0" />
+            {/* Pie fijo: Total + acciones. Nunca hace scroll, siempre visible. */}
+            <div className="flex flex-col gap-[16px] w-full shrink-0">
+              <hr className="border-[#E2E8F0] my-0" />
 
-            {/* Total */}
-            <div className="flex flex-col gap-[24px] w-full select-none">
-              <div className="flex items-center justify-between w-full font-bold text-[#333333] text-[18px]">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
+              <div className="flex flex-col gap-[24px] w-full select-none">
+                <div className="flex items-center justify-between w-full font-bold text-[#333333] text-[18px]">
+                  <span>Total</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-[8px] w-full">
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleSaveQuote()}
-                  className="w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:bg-[#0262ad] transition-colors shadow-sm focus:outline-none cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <Spinner size={18} className="text-white" />
-                  ) : (
-                    <>
-                      <Save size={15} />
-                      <span>{id ? 'Guardar cambios' : 'Guardar cotización'}</span>
-                    </>
-                  )}
-                </button>
-                {/* Una cotización SIEMPRE se guarda como borrador (ver nota
-                    abajo), así que el botón primario de arriba ya es "el guardar":
-                    un segundo "Guardar borrador" con el mismo handler sobraba.
-                    Queda solo "Cancelar" como acción fantasma (sin borde), para
-                    que no compita visualmente con el guardar. */}
-                <button
-                  type="button"
-                  onClick={() => router.push('/cotizaciones')}
-                  className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
-                >
-                  <span>Cancelar</span>
-                </button>
-              </div>
+                {/* Action Buttons */}
+                <div className="flex flex-col gap-[8px] w-full">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => handleSaveQuote()}
+                    className="w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-bold flex items-center justify-center gap-2 hover:bg-[#0262ad] transition-colors shadow-sm focus:outline-none cursor-pointer disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <Spinner size={18} className="text-white" />
+                    ) : (
+                      <>
+                        <Save size={15} />
+                        <span>{id ? 'Guardar cambios' : 'Guardar cotización'}</span>
+                      </>
+                    )}
+                  </button>
+                  {/* Una cotización SIEMPRE se guarda como borrador (ver nota
+                      abajo), así que el botón primario de arriba ya es "el guardar":
+                      un segundo "Guardar borrador" con el mismo handler sobraba.
+                      Queda solo "Cancelar" como acción fantasma (sin borde), para
+                      que no compita visualmente con el guardar. */}
+                  <button
+                    type="button"
+                    onClick={() => router.push('/cotizaciones')}
+                    className="w-full h-[36px] rounded-[10px] text-text-secondary text-[13px] font-medium flex items-center justify-center hover:bg-neutral-100 hover:text-text-primary transition-colors focus:outline-none cursor-pointer"
+                  >
+                    <span>Cancelar</span>
+                  </button>
+                </div>
 
-              {/* Info text */}
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 text-[11px] text-[#64748b] leading-normal text-left">
-                Se guarda como borrador. Podrás marcarla como enviada y descargar su PDF desde el
-                detalle de la cotización.
+                {/* Info text */}
+                <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 text-[11px] text-[#64748b] leading-normal text-left">
+                  Se guarda como borrador. Podrás marcarla como enviada y descargar su PDF desde el
+                  detalle de la cotización.
+                </div>
               </div>
             </div>
           </Card>

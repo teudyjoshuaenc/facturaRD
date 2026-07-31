@@ -2,7 +2,11 @@ import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { getToken, saveSession, clearSession, getLocationId } from './session'
 import type { TenantInfo } from './session'
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
+// Sin slash final: la llamada de reautenticación más abajo concatena
+// `${BASE_URL}/ghl/init` a mano (no usa el join de axios, que sí tolera
+// slashes duplicados) — con un env var que termine en "/" eso arma
+// ".../api/v1//ghl/init", la API responde 404 y el refresh queda roto.
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1').replace(/\/+$/, '')
 
 export const api = axios.create({ baseURL: BASE_URL })
 

@@ -97,9 +97,7 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
       sector: sectorFinal, moneda, mesFiscalInicio, colchonMeses, metaMargenPct, varPct,
       cxcInicial: cxc, cxpInicial: cxp, ingresos, costosFijos,
     })
-    if (saldo !== saldoActual) {
-      await setCapital.mutateAsync({ monto: saldo, fecha: new Date().toISOString().slice(0, 10) })
-    }
+    await setCapital.mutateAsync({ monto: saldo, fecha: new Date().toISOString().slice(0, 10) })
     onClose()
   }
 
@@ -266,7 +264,10 @@ export function PresupuestoOnboardingWizard({ open, onClose, config, saldoActual
         <div className="flex flex-col gap-4">
           <p className="text-body-sm text-text-secondary">Te avisaremos apenas la proyección indique que tu caja va a bajar de este nivel, con meses de anticipación.</p>
           <div className="grid grid-cols-2 gap-4">
-            <Select value={String(colchonMeses)} onChange={(v) => setColchonMeses(Number(v))} options={[{ value: '1', label: '1 mes' }, { value: '2', label: '2 meses' }, { value: '3', label: '3 meses (recomendado)' }, { value: '6', label: '6 meses' }]} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-ui-sm font-semibold text-text-secondary">Colchón de seguridad</label>
+              <Select value={String(colchonMeses)} onChange={(v) => setColchonMeses(Number(v))} options={[{ value: '1', label: '1 mes' }, { value: '2', label: '2 meses' }, { value: '3', label: '3 meses (recomendado)' }, { value: '6', label: '6 meses' }]} />
+            </div>
             <Input label="Margen neto objetivo (%)" type="number" min={0} max={90} value={metaMargenPct} onChange={(e) => setMetaMargenPct(Number(e.target.value))} />
           </div>
           <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-body-sm text-text-secondary">
