@@ -10,6 +10,8 @@ import type { Contacto, NuevoContactoData } from '@/hooks/useContactos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
+import { useRncValidation } from '@/hooks/useRncValidation'
+import { Spinner } from '@/components/ui/spinner'
 
 function formatDateSpanish(isoDate: string): string {
   if (!isoDate) return ''
@@ -189,6 +191,33 @@ export function StepCliente({
   const showSearch = clienteFocused
   const clientesVisibles = contactos.slice(0, 15)
 
+  // Sin match local y lo escrito es un RNC completo (9 dígitos) → se busca en
+  // la DGII para no obligar a abrir "+ Nuevo Cliente" a mano. Al usarlo se
+  // crea el Contacto igual que el modal (la factura SIEMPRE referencia un
+  // Contacto real). Cédula (11 dígitos) no tiene padrón público en la DGII.
+  const searchDigits = searchQuery.replace(/\D/g, '')
+  const dropdownRncLookupHabilitado = clientesVisibles.length === 0 && searchDigits.length === 9
+  const { status: dropdownRncStatus, razonSocial: dropdownRncRazonSocial } = useRncValidation(
+    dropdownRncLookupHabilitado ? searchDigits : '',
+  )
+
+  async function handleUsarResultadoDgii(): Promise<void> {
+    try {
+      const nuevo = await crearContacto({
+        nombre: dropdownRncRazonSocial,
+        rnc: searchDigits,
+        email: '',
+        telefono: '',
+        tipo: 'CLIENTE',
+      })
+      onSelectCliente(nuevo)
+      setSearchQuery('')
+      setClienteFocused(false)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -278,9 +307,48 @@ export function StepCliente({
                       )
                     })}
                     {clientesVisibles.length === 0 && (
-                      <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
-                        {searchQuery.trim().length > 0 ? 'No se encontraron clientes' : 'No tienes clientes activos todavía'}
-                      </div>
+                      searchDigits.length === 11 ? (
+                        <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
+                          No se encontraron clientes.
+                          <br />
+                          La cédula no tiene registro público en la DGII — usa &quot;+ Nuevo Cliente&quot; para escribir el nombre a mano.
+                        </div>
+                      ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'loading' ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-4 text-body-sm text-text-secondary">
+                          <Spinner size={16} /> Buscando RNC en la DGII...
+                        </div>
+                      ) : dropdownRncLookupHabilitado && dropdownRncStatus === 'valid' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleUsarResultadoDgii()}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F0F5FF]/50 focus:bg-[#F0F5FF] focus:outline-none"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F3F4F6] text-[#6A7282]">
+                              <Building2 size={16} />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[16px] font-semibold text-[#333333] leading-6 truncate">
+                                {dropdownRncRazonSocial}
+                              </span>
+                              <span className="text-[13px] font-normal text-[#99A1AF] leading-[20px] mt-0.5">
+                                Encontrado en la DGII · RNC: {searchDigits.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[13px] font-semibold text-[#0379D5] shrink-0">Usar</span>
+                        </button>
+                      ) : (
+                        <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
+                          {searchQuery.trim().length > 0 ? 'No se encontraron clientes' : 'No tienes clientes activos todavía'}
+                          {dropdownRncLookupHabilitado && dropdownRncStatus === 'invalid' && (
+                            <>
+                              <br />
+                              RNC no registrado en la DGII.
+                            </>
+                          )}
+                        </div>
+                      )
                     )}
                   </div>
                 )}

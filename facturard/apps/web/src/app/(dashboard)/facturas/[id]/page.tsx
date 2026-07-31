@@ -91,7 +91,8 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
     if (!comprobante) return
     setDownloading(true)
     try {
-      await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+      const numero = comprobante.eNCF || comprobante.folioInterno || ''
+      await downloadComprobantePdf(api, comprobante.id, numero, comprobante.razonSocial, comprobante.createdAt)
     } catch {
       toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {

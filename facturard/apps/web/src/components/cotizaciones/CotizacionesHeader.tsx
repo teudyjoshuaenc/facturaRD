@@ -17,6 +17,7 @@ interface Props {
   /** Ya no se usa: el envío de cotizaciones no tiene backend todavía. */
   onBulkSend?: () => void
   onBulkDownload: () => void
+  bulkDownloading?: boolean
 }
 
 export function CotizacionesHeader({
@@ -27,7 +28,8 @@ export function CotizacionesHeader({
   isSelectionMode,
   onToggleSelectionMode,
   selectedCount,
-  onBulkDownload
+  onBulkDownload,
+  bulkDownloading = false
 }: Props): JSX.Element {
   return (
     <div className="flex items-center justify-between border-b border-neutral-100 pb-5 select-none font-sans">

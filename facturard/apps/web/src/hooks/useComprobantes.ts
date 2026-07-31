@@ -43,7 +43,8 @@ export function useDashboardComprobantes(options: UseDashboardOptions = {}) {
   const handleDownload = useCallback(async (comprobante: Comprobante): Promise<void> => {
     setDownloadingId(comprobante.id)
     try {
-      await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+      const numero = comprobante.eNCF || comprobante.folioInterno || ''
+      await downloadComprobantePdf(api, comprobante.id, numero, comprobante.razonSocial, comprobante.createdAt)
     } catch {
       toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {
@@ -251,7 +252,8 @@ export function useComprobantes() {
   const handleDownload = useCallback(async (comprobante: Comprobante): Promise<void> => {
     setDownloadingId(comprobante.id)
     try {
-      await downloadComprobantePdf(api, comprobante.id, comprobante.eNCF)
+      const numero = comprobante.eNCF || comprobante.folioInterno || ''
+      await downloadComprobantePdf(api, comprobante.id, numero, comprobante.razonSocial, comprobante.createdAt)
     } catch {
       toast.error('No se pudo descargar el PDF de este comprobante')
     } finally {

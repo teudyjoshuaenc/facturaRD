@@ -39,7 +39,10 @@ function NuevaFacturaContent(): JSX.Element {
         toast.success('Comprobante emitido exitosamente y enviado a la DGII', {
           description: `e-NCF asignado: ${emitData.eNCF}`,
         })
-        router.push(`/nueva-factura/exito?id=${emitData.id}&encf=${emitData.eNCF}&total=${emitData.montoTotal}`)
+        router.push(
+          `/nueva-factura/exito?id=${emitData.id}&encf=${emitData.eNCF}&total=${emitData.montoTotal}` +
+            `&cliente=${encodeURIComponent(emitData.razonSocial ?? '')}&fecha=${encodeURIComponent(emitData.createdAt ?? '')}`,
+        )
       }
     } else {
       // Create new comprobante
@@ -58,7 +61,10 @@ function NuevaFacturaContent(): JSX.Element {
         toast.success('Factura enviada a la DGII, verifica el estado en unos segundos', {
           description: `e-NCF asignado: ${res.eNCF}`,
         })
-        router.push(`/nueva-factura/exito?id=${res.id}&encf=${res.eNCF}&total=${res.montoTotal}`)
+        router.push(
+          `/nueva-factura/exito?id=${res.id}&encf=${res.eNCF}&total=${res.montoTotal}` +
+            `&cliente=${encodeURIComponent(res.razonSocial ?? '')}&fecha=${encodeURIComponent(res.createdAt ?? '')}`,
+        )
       }
     }
   }

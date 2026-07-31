@@ -247,7 +247,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
 
             {/* Razón Social */}
             <Input
-              label="Razón Social *"
+              label="Nombre o Razón Social *"
               placeholder="Ej: Distribuidora López SRL"
               leftIcon={<Building2 size={16} className="text-[#64748B]" />}
               value={nombre}

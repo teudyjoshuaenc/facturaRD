@@ -31,17 +31,20 @@ export interface ContactosDirParams {
   origen?: string | undefined
   // Filtro de 3 estados de la gestión: undefined → todos; true → activos; false → inactivos.
   activo?: boolean | undefined
+  // Rango de fecha de creación (YYYY-MM-DD, del <input type="date">).
+  desde?: string | undefined
+  hasta?: string | undefined
   page?: number | undefined
   limit?: number | undefined
 }
 
 export function useContactosDirectorio(params: ContactosDirParams) {
   const queryClient = useQueryClient()
-  const { search, tipo, origen, activo, page = 1, limit = 10 } = params
+  const { search, tipo, origen, activo, desde, hasta, page = 1, limit = 10 } = params
 
   const { data, isLoading, isError, isFetching } = useQuery({
     // La key empieza con 'contactos' → la invalida la sync GHL y crearContacto.
-    queryKey: ['contactos', 'directorio', { search, tipo, origen, activo, page, limit }],
+    queryKey: ['contactos', 'directorio', { search, tipo, origen, activo, desde, hasta, page, limit }],
     queryFn: () =>
       api
         .get<PaginatedResponse<ContactoDir>>('/contactos', {
@@ -50,6 +53,8 @@ export function useContactosDirectorio(params: ContactosDirParams) {
             tipo: tipo || undefined,
             origen: origen || undefined,
             activo,
+            desde: desde || undefined,
+            hasta: hasta || undefined,
             page,
             limit,
           },

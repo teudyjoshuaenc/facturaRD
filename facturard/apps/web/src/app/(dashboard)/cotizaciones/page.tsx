@@ -24,7 +24,7 @@ import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { CotizacionesHeader } from '@/components/cotizaciones/CotizacionesHeader'
 import { CotizacionesMetrics } from '@/components/cotizaciones/CotizacionesMetrics'
-import { formatCurrency } from '@/lib/comprobantes'
+import { formatCurrency, downloadCotizacionPdf } from '@/lib/comprobantes'
 import { toast } from 'sonner'
 import { useCotizaciones } from '@/hooks/useCotizaciones'
 import type { Cotizacion } from '@/hooks/useCotizaciones'
@@ -131,6 +131,7 @@ function CotizacionesPageInner(): JSX.Element {
   const [page, setPage] = useState(1)
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDownloading, setBulkDownloading] = useState(false)
   const [convertTarget, setConvertTarget] = useState<Cotizacion | null>(null)
   const [converting, setConverting] = useState(false)
 
@@ -187,8 +188,32 @@ function CotizacionesPageInner(): JSX.Element {
     }
   }
 
-  const handleBulkDownload = () => {
-    toast.success(`Descargando ${selectedIds.size} cotizaciones seleccionadas...`)
+  // Descarga real, una por una (el navegador bloquea descargas simultáneas
+  // masivas): antes este botón solo mostraba un toast de éxito sin descargar
+  // nada. Pequeña pausa entre cada una para que Chrome no las agrupe/bloquee.
+  const handleBulkDownload = async () => {
+    const selectedList = cotizaciones.filter((c) => selectedIds.has(c.id))
+    if (selectedList.length === 0 || bulkDownloading) return
+
+    setBulkDownloading(true)
+    let ok = 0
+    let fail = 0
+    for (const c of selectedList) {
+      try {
+        await downloadCotizacionPdf(api, c.id, c.folio, c.contacto?.nombre || 'Consumidor Final', c.createdAt)
+        ok++
+      } catch {
+        fail++
+      }
+      await new Promise((resolve) => setTimeout(resolve, 400))
+    }
+    setBulkDownloading(false)
+
+    if (fail === 0) {
+      toast.success(`${ok} cotizaciones descargadas`)
+    } else {
+      toast.error(`${ok} descargadas, ${fail} fallaron`)
+    }
   }
 
   const handleBulkExport = () => {
@@ -305,6 +330,7 @@ function CotizacionesPageInner(): JSX.Element {
         onToggleSelectionMode={toggleSelectionMode}
         selectedCount={selectedIds.size}
         onBulkDownload={handleBulkDownload}
+        bulkDownloading={bulkDownloading}
       />
 
       {/* Summary Cards Row */}

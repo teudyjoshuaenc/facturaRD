@@ -15,6 +15,8 @@ function SuccessPanelContent(): JSX.Element {
   const id = searchParams.get('id') ?? ''
   const encf = searchParams.get('encf') ?? ''
   const total = Number(searchParams.get('total') ?? '0')
+  const cliente = searchParams.get('cliente') ?? ''
+  const fecha = searchParams.get('fecha') ?? ''
 
   const [downloading, setDownloading] = useState(false)
 
@@ -25,7 +27,7 @@ function SuccessPanelContent(): JSX.Element {
     }
     setDownloading(true)
     try {
-      await downloadComprobantePdf(api, id, encf)
+      await downloadComprobantePdf(api, id, encf, cliente, fecha)
       toast.success('PDF descargado correctamente')
     } catch (err) {
       console.error(err)

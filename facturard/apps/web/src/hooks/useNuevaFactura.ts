@@ -45,7 +45,9 @@ function toDDMMYYYY(iso: string): string {
 }
 
 export function useNuevaFactura() {
-  async function createComprobante(data: ComprobanteFormData): Promise<{ id: string; eNCF: string; montoTotal: number }> {
+  async function createComprobante(
+    data: ComprobanteFormData,
+  ): Promise<{ id: string; eNCF: string; montoTotal: number; razonSocial?: string; createdAt?: string }> {
     try {
       const referencia = data.ncfModificado && data.fechaNCFModificado && data.codigoModificacion
         ? {
@@ -62,7 +64,7 @@ export function useNuevaFactura() {
       if (data.condicionPago === 'CREDITO') backendTipoPago = 2
       else if (data.condicionPago === 'GRATUITO') backendTipoPago = 3
 
-      const res = await api.post<{ id: string; eNCF: string; montoTotal: number }>('/comprobantes', {
+      const res = await api.post<{ id: string; eNCF: string; montoTotal: number; razonSocial?: string; createdAt?: string }>('/comprobantes', {
         tipoECF: data.tipoECF,
         tipoPago: backendTipoPago,
         ...(data.esFiscal !== undefined && { esFiscal: data.esFiscal }),
