@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { Prisma, prisma, ComprobanteEstado } from '@facturard/database'
-import type { MovimientoFinanciero, Pago, CapitalInicial } from '@facturard/database'
+import type { MovimientoFinanciero, Pago, CapitalInicial, CajaDiaria } from '@facturard/database'
 import type { PaginatedResponse } from '@facturard/shared'
 import type { CreateMovimientoDto } from './dto/create-movimiento.dto'
 import type { UpdateMovimientoDto } from './dto/update-movimiento.dto'
@@ -12,6 +12,9 @@ import type { RangoDto } from './dto/rango.dto'
 import type { FlujoDto } from './dto/flujo.dto'
 import type { SaldoDto } from './dto/saldo.dto'
 import type { ListTransaccionesDto } from './dto/list-transacciones.dto'
+import type { AperturaCajaDto } from './dto/apertura-caja.dto'
+import type { CierreCajaDto } from './dto/cierre-caja.dto'
+import type { ListCajaDto } from './dto/list-caja.dto'
 
 export type TransaccionOrigen =
   | 'FACTURA'
@@ -54,6 +57,18 @@ const pad = (n: number): string => String(n).padStart(2, '0')
 // Convención horaria RD (UTC-4, sin horario de verano) igual que el resto del repo.
 function inicioDia(date: string): Date { return new Date(`${date.slice(0, 10)}T00:00:00.000-04:00`) }
 function finDia(date: string): Date { return new Date(`${date.slice(0, 10)}T23:59:59.999-04:00`) }
+
+// "Hoy" en zona RD (UTC-4), como YYYY-MM-DD.
+function hoyRD(): string {
+  const d = new Date(Date.now() - 4 * 3600 * 1000)
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+}
+
+// CajaDiaria.fecha es @db.Date (sin hora): se ancla siempre a medianoche UTC
+// para que el mismo YYYY-MM-DD produzca el mismo valor en apertura y cierre.
+function fechaSoloDia(s: string): Date {
+  return new Date(`${s.slice(0, 10)}T00:00:00.000Z`)
+}
 
 // Fecha de entrada: si viene sólo la fecha (YYYY-MM-DD) la anclamos a mediodía RD
 // para que caiga siempre dentro de su día bajo el filtro de rango (evita que el
@@ -104,6 +119,20 @@ interface TotalesDevengado extends TotalesVista {
   ingresosManual: number
   egresosCompras: number
   egresosManual: number
+}
+
+export interface CajaEstadoResponse {
+  fecha: string
+  estado: 'NO_ABIERTA' | 'ABIERTA' | 'CERRADA'
+  montoApertura: number | null
+  montoActual: number | null
+  montoEsperado: number | null
+  montoContado: number | null
+  diferencia: number | null
+  notasApertura: string | null
+  notasCierre: string | null
+  abiertaEn: string | null
+  cerradaEn: string | null
 }
 
 @Injectable()
@@ -594,6 +623,125 @@ export class FinanzasService {
     const page = query.page ?? 1
     const limit = Math.min(query.limit ?? 15, CAP)
     const data = filtered.slice((page - 1) * limit, (page - 1) * limit + limit)
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+  }
+
+  // ─── Caja diaria (apertura/cierre de efectivo) ───────────────────────────
+
+  private toCajaResponse(fecha: string, caja: CajaDiaria | null, montoActual: number | null): CajaEstadoResponse {
+    if (!caja) {
+      return {
+        fecha,
+        estado: 'NO_ABIERTA',
+        montoApertura: null,
+        montoActual: null,
+        montoEsperado: null,
+        montoContado: null,
+        diferencia: null,
+        notasApertura: null,
+        notasCierre: null,
+        abiertaEn: null,
+        cerradaEn: null,
+      }
+    }
+    return {
+      fecha,
+      estado: caja.estado,
+      montoApertura: r2(Number(caja.montoApertura)),
+      montoActual,
+      montoEsperado: caja.montoEsperado !== null ? r2(Number(caja.montoEsperado)) : null,
+      montoContado: caja.montoContado !== null ? r2(Number(caja.montoContado)) : null,
+      diferencia: caja.diferencia !== null ? r2(Number(caja.diferencia)) : null,
+      notasApertura: caja.notasApertura,
+      notasCierre: caja.notasCierre,
+      abiertaEn: caja.abiertaEn.toISOString(),
+      cerradaEn: caja.cerradaEn?.toISOString() ?? null,
+    }
+  }
+
+  /**
+   * Estado de la caja de un día: NO_ABIERTA / ABIERTA (con `montoActual` en
+   * vivo = apertura + neto cobrado hasta ahora) / CERRADA (con lo calculado
+   * al cierre). Sólo LEE — no crea nada.
+   */
+  async getCaja(tenantId: string, fecha?: string): Promise<CajaEstadoResponse> {
+    const f = fecha ?? hoyRD()
+    const caja = await prisma.cajaDiaria.findUnique({ where: { tenantId_fecha: { tenantId, fecha: fechaSoloDia(f) } } })
+    if (!caja) return this.toCajaResponse(f, null, null)
+
+    if (caja.estado === 'CERRADA') {
+      return this.toCajaResponse(f, caja, r2(Number(caja.montoContado)))
+    }
+    const { cobrado } = await this.totales(tenantId, f, f)
+    const montoActual = r2(Number(caja.montoApertura) + cobrado.balance)
+    return this.toCajaResponse(f, caja, montoActual)
+  }
+
+  /** Abre la caja del día con el efectivo inicial. Una sola apertura por tenant+fecha. */
+  async abrirCaja(tenantId: string, dto: AperturaCajaDto): Promise<CajaDiaria> {
+    const fecha = dto.fecha ?? hoyRD()
+    const existente = await prisma.cajaDiaria.findUnique({
+      where: { tenantId_fecha: { tenantId, fecha: fechaSoloDia(fecha) } },
+    })
+    if (existente) throw new ConflictException(`La caja del ${fecha} ya fue abierta`)
+
+    return prisma.cajaDiaria.create({
+      data: {
+        tenantId,
+        fecha: fechaSoloDia(fecha),
+        montoApertura: dto.monto,
+        ...(dto.notas !== undefined && { notasApertura: dto.notas }),
+      },
+    })
+  }
+
+  /**
+   * Cierra la caja del día: calcula el esperado (apertura + neto cobrado del
+   * día) y la diferencia contra lo contado. Exige una apertura previa sin
+   * cerrar para esa fecha.
+   */
+  async cerrarCaja(tenantId: string, dto: CierreCajaDto): Promise<CajaDiaria> {
+    const fecha = dto.fecha ?? hoyRD()
+    const caja = await prisma.cajaDiaria.findUnique({
+      where: { tenantId_fecha: { tenantId, fecha: fechaSoloDia(fecha) } },
+    })
+    if (!caja) throw new NotFoundException(`No hay caja abierta el ${fecha}; ábrela primero`)
+    if (caja.estado === 'CERRADA') throw new ConflictException(`La caja del ${fecha} ya está cerrada`)
+
+    const { cobrado } = await this.totales(tenantId, fecha, fecha)
+    const montoEsperado = r2(Number(caja.montoApertura) + cobrado.balance)
+    const diferencia = r2(dto.montoContado - montoEsperado)
+
+    return prisma.cajaDiaria.update({
+      where: { id: caja.id },
+      data: {
+        estado: 'CERRADA',
+        montoEsperado,
+        montoContado: dto.montoContado,
+        diferencia,
+        cerradaEn: new Date(),
+        ...(dto.notas !== undefined && { notasCierre: dto.notas }),
+      },
+    })
+  }
+
+  async listCajas(tenantId: string, query: ListCajaDto): Promise<PaginatedResponse<CajaDiaria>> {
+    const page = query.page ?? 1
+    const limit = Math.min(query.limit ?? 20, 100)
+    const skip = (page - 1) * limit
+
+    const where: Prisma.CajaDiariaWhereInput = {
+      tenantId,
+      ...(query.desde !== undefined && { fecha: { gte: fechaSoloDia(query.desde) } }),
+      ...(query.hasta !== undefined && {
+        fecha: { ...(query.desde !== undefined ? { gte: fechaSoloDia(query.desde) } : {}), lte: fechaSoloDia(query.hasta) },
+      }),
+    }
+
+    const [data, total] = await prisma.$transaction([
+      prisma.cajaDiaria.findMany({ where, orderBy: { fecha: 'desc' }, skip, take: limit }),
+      prisma.cajaDiaria.count({ where }),
+    ])
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 }

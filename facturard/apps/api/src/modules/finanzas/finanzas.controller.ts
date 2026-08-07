@@ -11,6 +11,10 @@ import { RangoDto } from './dto/rango.dto'
 import { FlujoDto } from './dto/flujo.dto'
 import { SaldoDto } from './dto/saldo.dto'
 import { ListTransaccionesDto } from './dto/list-transacciones.dto'
+import { AperturaCajaDto } from './dto/apertura-caja.dto'
+import { CierreCajaDto } from './dto/cierre-caja.dto'
+import { ListCajaDto } from './dto/list-caja.dto'
+import { GetCajaDto } from './dto/get-caja.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
@@ -113,5 +117,30 @@ export class FinanzasController {
   @ApiOperation({ summary: 'Feed unificado (facturas/compras/notas/movimientos) filtrable — base del historial y export' })
   transacciones(@CurrentTenant() tenantId: string, @Query() query: ListTransaccionesDto) {
     return this.service.transacciones(tenantId, query)
+  }
+
+  // ─── Caja diaria (apertura/cierre de efectivo) ──────────────────────────
+  @Get('caja')
+  @ApiOperation({ summary: 'Estado de la caja del día: no abierta / abierta (monto actual en vivo) / cerrada' })
+  getCaja(@CurrentTenant() tenantId: string, @Query() query: GetCajaDto) {
+    return this.service.getCaja(tenantId, query.fecha)
+  }
+
+  @Get('caja/historial')
+  @ApiOperation({ summary: 'Historial de aperturas/cierres de caja' })
+  listCajas(@CurrentTenant() tenantId: string, @Query() query: ListCajaDto) {
+    return this.service.listCajas(tenantId, query)
+  }
+
+  @Post('caja/apertura')
+  @ApiOperation({ summary: 'Abre la caja del día con el efectivo inicial' })
+  abrirCaja(@CurrentTenant() tenantId: string, @Body() dto: AperturaCajaDto) {
+    return this.service.abrirCaja(tenantId, dto)
+  }
+
+  @Post('caja/cierre')
+  @ApiOperation({ summary: 'Cierra la caja del día: calcula esperado y diferencia contra lo contado' })
+  cerrarCaja(@CurrentTenant() tenantId: string, @Body() dto: CierreCajaDto) {
+    return this.service.cerrarCaja(tenantId, dto)
   }
 }

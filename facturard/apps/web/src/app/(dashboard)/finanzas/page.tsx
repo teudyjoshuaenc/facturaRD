@@ -10,6 +10,7 @@ import { FinanzasMetrics } from '@/components/finanzas/FinanzasMetrics'
 import { FlujoChart } from '@/components/finanzas/FlujoChart'
 import { CategoriasBreakdown } from '@/components/finanzas/CategoriasBreakdown'
 import { CapitalCard } from '@/components/finanzas/CapitalCard'
+import { CajaCard } from '@/components/finanzas/CajaCard'
 import { TransaccionesTable } from '@/components/finanzas/TransaccionesTable'
 import { MovimientoModal } from '@/components/finanzas/MovimientoModal'
 import { PresupuestoTab } from '@/components/presupuesto/PresupuestoTab'
@@ -309,7 +310,8 @@ export default function FinanzasPage(): JSX.Element {
       {/* Capital + categorías: fila propia, para dejar la tabla a ancho completo.
           Flujo top-down: números (KPIs) → tendencia (gráfico) → desglose (capital/
           categorías) → detalle (transacciones). */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        <CajaCard />
         <CapitalCard />
         <div className="lg:col-span-2">
           <CategoriasBreakdown categorias={categorias.data?.categorias ?? []} isLoading={categorias.isLoading} />

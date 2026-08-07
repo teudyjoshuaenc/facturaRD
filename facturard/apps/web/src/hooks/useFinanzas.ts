@@ -141,6 +141,37 @@ export interface NuevoMovimiento {
   metodoPago?: string
 }
 
+export type CajaEstadoValor = 'NO_ABIERTA' | 'ABIERTA' | 'CERRADA'
+
+export interface CajaEstado {
+  fecha: string
+  estado: CajaEstadoValor
+  montoApertura: number | null
+  montoActual: number | null
+  montoEsperado: number | null
+  montoContado: number | null
+  diferencia: number | null
+  notasApertura: string | null
+  notasCierre: string | null
+  abiertaEn: string | null
+  cerradaEn: string | null
+}
+
+export interface CajaDiaria {
+  id: string
+  tenantId: string
+  fecha: string
+  estado: CajaEstadoValor
+  montoApertura: string | number
+  notasApertura: string | null
+  abiertaEn: string
+  montoEsperado: string | number | null
+  montoContado: string | number | null
+  diferencia: string | number | null
+  notasCierre: string | null
+  cerradaEn: string | null
+}
+
 // ─── Rango ───────────────────────────────────────────────────────────────────
 
 interface Rango {
@@ -231,6 +262,25 @@ export async function fetchTransaccionesExport(params: TransaccionesParams): Pro
   return res.data.data
 }
 
+export function useCaja(fecha: string) {
+  return useQuery({
+    queryKey: ['finanzas-caja', fecha],
+    queryFn: () => api.get<CajaEstado>('/finanzas/caja', { params: { fecha } }).then((r) => r.data),
+    staleTime: 15 * 1000,
+  })
+}
+
+export function useCajaHistorial({ desde, hasta, page = 1, limit = 20 }: Rango & { page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['finanzas-caja-historial', desde, hasta, page, limit],
+    queryFn: () =>
+      api
+        .get<PaginatedResponse<CajaDiaria>>('/finanzas/caja/historial', { params: { desde, hasta, page, limit } })
+        .then((r) => r.data),
+    staleTime: 30 * 1000,
+  })
+}
+
 // ─── Mutaciones ──────────────────────────────────────────────────────────────
 
 function useInvalidarFinanzas() {
@@ -272,6 +322,32 @@ export function useEliminarMovimiento() {
       toast.success('Movimiento eliminado')
     },
     onError: (err) => toast.error('No se pudo eliminar', { description: getErrorMessage(err) }),
+  })
+}
+
+export function useAbrirCaja() {
+  const invalidar = useInvalidarFinanzas()
+  return useMutation({
+    mutationFn: (data: { fecha: string; monto: number; notas?: string }) =>
+      api.post('/finanzas/caja/apertura', data).then((r) => r.data),
+    onSuccess: () => {
+      invalidar()
+      toast.success('Caja abierta')
+    },
+    onError: (err) => toast.error('No se pudo abrir la caja', { description: getErrorMessage(err) }),
+  })
+}
+
+export function useCerrarCaja() {
+  const invalidar = useInvalidarFinanzas()
+  return useMutation({
+    mutationFn: (data: { fecha: string; montoContado: number; notas?: string }) =>
+      api.post('/finanzas/caja/cierre', data).then((r) => r.data),
+    onSuccess: () => {
+      invalidar()
+      toast.success('Caja cerrada')
+    },
+    onError: (err) => toast.error('No se pudo cerrar la caja', { description: getErrorMessage(err) }),
   })
 }
 

@@ -79,6 +79,11 @@ enum PagoTipo {
   PAGO  // sale dinero  — sobre una compra
 }
 
+enum CajaEstado {
+  ABIERTA
+  CERRADA
+}
+
 // Canales de entrega de un comprobante al cliente, vía GoHighLevel. WHATSAPP
 // existe desde el día uno para no migrar el enum después, pero AÚN NO está
 // implementado: la WhatsApp Business Platform exige plantillas aprobadas por
@@ -148,6 +153,7 @@ model Tenant {
   pagos                Pago[]
   capitalInicial       CapitalInicial?
   presupuestoConfig    PresupuestoConfig?
+  cajaDiaria           CajaDiaria[]
   enviosComprobante    EnvioComprobante[]
 
   @@map("tenants")
@@ -550,6 +556,34 @@ model CapitalInicial {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@map("capital_inicial")
+}
+
+// Apertura/cierre de caja física, un registro por tenant+día. NO fiscal: sólo
+// control interno de efectivo (con cuánto abre el día, cuánto queda). El
+// "esperado" al cerrar = montoApertura + neto COBRADO del día (pagos +
+// movimientos manuales) — no distingue efectivo de tarjeta/transferencia
+// (metodoPago es texto libre opcional, no confiable para filtrar).
+model CajaDiaria {
+  id            String     @id @default(uuid())
+  tenantId      String
+  fecha         DateTime   @db.Date
+  estado        CajaEstado @default(ABIERTA)
+  montoApertura Decimal    @db.Decimal(18, 2)
+  notasApertura String?
+  abiertaEn     DateTime   @default(now())
+  montoEsperado Decimal?   @db.Decimal(18, 2)
+  montoContado  Decimal?   @db.Decimal(18, 2)
+  diferencia    Decimal?   @db.Decimal(18, 2)
+  notasCierre   String?
+  cerradaEn     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, fecha])
+  @@index([tenantId, estado])
+  @@map("caja_diaria")
 }
 
 // Presupuesto/proyección de caja a 12 meses (NO fiscal, NO se toca desde el
