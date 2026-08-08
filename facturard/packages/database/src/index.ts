@@ -12,6 +12,7 @@ export {
   PagoTipo,
   CanalEnvio,
   EstadoEnvio,
+  CajaEstado,
 } from '@prisma/client'
 
 // Model types
@@ -35,6 +36,7 @@ export type {
   CapitalInicial,
   PresupuestoConfig,
   EnvioComprobante,
+  CajaDiaria,
 } from '@prisma/client'
 
 import { PrismaClient } from '@prisma/client'
