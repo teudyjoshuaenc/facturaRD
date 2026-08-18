@@ -5,6 +5,8 @@ import { dirname } from 'path';
 
 export interface EcfItem {
   descripcion: string;
+  /** Detalle libre de la línea (DescripcionItem del e-CF). Se imprime bajo el nombre. */
+  detalle?: string;
   cantidad: number;
   unidadMedida?: string;
   precioUnitario: number;
@@ -425,8 +427,18 @@ export async function generarRepresentacionImpresa(
     let rowY = curY + ROW_H;
 
     ecf.items.forEach((item, i) => {
+      // La fila crece si el nombre y/o el detalle (DescripcionItem) ocupan varias
+      // líneas: antes se pintaba con alto fijo y el texto largo se salía del borde.
+      const detalle = item.detalle?.trim();
+      const nombreH = doc.font('Helvetica').fontSize(7.5)
+        .heightOfString(item.descripcion, { width: COL_DESC - 8 });
+      const detalleH = detalle
+        ? doc.font('Helvetica').fontSize(6.5).heightOfString(detalle, { width: COL_DESC - 8 }) + 2
+        : 0;
+      const rowH = Math.max(ROW_H, nombreH + detalleH + 8);
+
       const bg = i % 2 === 0 ? '#ffffff' : GRAY_ROW;
-      doc.rect(margin, rowY, contentW, ROW_H).fill(bg);
+      doc.rect(margin, rowY, contentW, rowH).fill(bg);
       doc.font('Helvetica').fontSize(7.5).fillColor(TEXT);
       doc.text(item.cantidad.toString(),                    xQty   + 2, rowY + 5, { width: COL_QTY - 4,   align: 'right' });
       doc.text(item.descripcion,                            xDesc  + 4, rowY + 5, { width: COL_DESC - 8 });
@@ -434,7 +446,12 @@ export async function generarRepresentacionImpresa(
       doc.text(fmt(item.precioUnitario),                   xPrice + 2, rowY + 5, { width: COL_PRICE - 4, align: 'right' });
       doc.text(item.itbis != null ? fmt(item.itbis) : '-', xItbis + 2, rowY + 5, { width: COL_ITBIS - 4, align: 'right' });
       doc.text(fmt(item.valor),                            xValor + 2, rowY + 5, { width: COL_VALOR - 4, align: 'right' });
-      rowY += ROW_H;
+      if (detalle) {
+        doc.font('Helvetica').fontSize(6.5).fillColor(MUTED)
+           .text(detalle, xDesc + 4, rowY + 5 + nombreH + 2, { width: COL_DESC - 8 });
+        doc.font('Helvetica').fontSize(7.5).fillColor(TEXT);
+      }
+      rowY += rowH;
     });
 
     doc.rect(margin, curY, contentW, rowY - curY).strokeColor(BORDER).lineWidth(0.5).stroke();

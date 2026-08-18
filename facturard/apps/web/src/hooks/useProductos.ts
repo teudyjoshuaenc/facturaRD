@@ -70,6 +70,7 @@ export function useProductos(options?: UseProductosParams) {
           indicadorFacturacion: p.tratamientoITBIS === 'EXENTO' ? 'E' : (p.tratamientoITBIS || 'I1'),
           precioIncluyeItbis: false,
           activo: p.activo !== false,
+          ...(p.descripcion ? { descripcion: p.descripcion as string } : {}),
         }
         if (p.unidadMedida) {
           item.unidadMedida = Number(p.unidadMedida)
@@ -88,6 +89,7 @@ export function useProductos(options?: UseProductosParams) {
         tratamientoITBIS: data.indicadorFacturacion === 'E' || data.indicadorFacturacion === 'I4' ? 'EXENTO' : data.indicadorFacturacion,
         unidadMedida: data.unidadMedida ? String(data.unidadMedida) : undefined,
         codigo: data.codigo || undefined,
+        descripcion: data.descripcion || undefined,
       }
       const res = await api.post('/productos', body)
       return res.data
@@ -114,6 +116,7 @@ export function useProductos(options?: UseProductosParams) {
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
         precioIncluyeItbis: false,
         activo: result.activo !== false,
+        ...(result.descripcion ? { descripcion: result.descripcion as string } : {}),
       }
       if (result.unidadMedida) {
         p.unidadMedida = Number(result.unidadMedida)
@@ -134,6 +137,7 @@ export function useProductos(options?: UseProductosParams) {
         }),
         ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida ? String(data.unidadMedida) : null }),
         ...(data.codigo !== undefined && { codigo: data.codigo || null }),
+        ...(data.descripcion !== undefined && { descripcion: data.descripcion }),
         ...(data.activo !== undefined && { activo: data.activo }),
       }
       const res = await api.patch(`/productos/${id}`, body)
@@ -161,6 +165,7 @@ export function useProductos(options?: UseProductosParams) {
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
         precioIncluyeItbis: false,
         activo: result.activo !== false,
+        ...(result.descripcion ? { descripcion: result.descripcion as string } : {}),
       }
       if (result.unidadMedida) {
         p.unidadMedida = Number(result.unidadMedida)

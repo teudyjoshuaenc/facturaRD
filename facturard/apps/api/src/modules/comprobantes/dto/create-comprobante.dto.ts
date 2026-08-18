@@ -42,6 +42,16 @@ export class CreateItemDto {
   @MaxLength(80, { message: 'El nombre del artículo no puede exceder 80 caracteres (límite de la DGII).' })
   nombreItem?: string
 
+  @ApiPropertyOptional({
+    example: 'Servicios Mensualidad\n1. DMAIA CRM 360',
+    maxLength: 1000,
+    description: 'Detalle libre de la línea (DescripcionItem del XSD, AlfNum1000Type). No sustituye a nombreItem.',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000, { message: 'La descripción de la línea no puede exceder 1000 caracteres (límite de la DGII).' })
+  descripcion?: string
+
   @ApiPropertyOptional({ enum: [1, 2], description: '1=Bien, 2=Servicio' })
   @ValidateIf((o: CreateItemDto) => o.productoId === undefined)
   @IsIn([1, 2])

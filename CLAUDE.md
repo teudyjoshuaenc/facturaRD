@@ -270,6 +270,32 @@ APP_URL=http://localhost:3000
     location vinculada → 400, y que el flujo individual usa la misma cascada) + 3 casos de regresión de
     `contactoEmail`. **212 e2e + 118 ecf-engine, build API y web en 0.**
 
+- ✅ **🐞 Fix — "el precio incluye ITBIS" + descripción de línea (2026-08-18).** Dos bugs del formulario
+  de factura reportados en producción, mismo origen: el modal capturaba datos que nadie leía.
+  - **(1) El check "El precio incluye ITBIS" se ignoraba al guardar.** La vista previa del modal SÍ
+    desagregaba (36,049 → 30,550 + 5,499), pero `handleSave` mandaba el precio **tecleado** y el ITBIS se
+    sumaba **encima** (36,049 → total 42,537.82). Ahora la conversión ocurre UNA sola vez, en el punto de
+    captura: `precioBaseSinItbis(precio, rate, incluye)` (`lib/comprobantes.ts`, redondeo a 2 decimales
+    porque el DTO rechaza más) en `NuevoProductoModal` y `EditarProductoModal`. **Invariante:** el precio
+    que sale del modal —y el que viaja al DTO/XML/PDF/totales— es SIEMPRE la base sin ITBIS; el check es
+    sólo comodidad de captura y no se persiste. Arregla de una vez las 3 rutas que usan esos modales
+    (línea de factura, catálogo `/producto`, cotizaciones).
+  - **(2) La descripción de la línea se borraba al salir del modal.** No existía en NINGÚN lado del
+    pipeline: ni en `ItemRow`, ni en el payload, ni en `CreateItemDto`. Ahora `descripcion` viaja
+    entera → `DescripcionItem` del e-CF (`AlfNum1000Type`, **tope 1000**, `@MaxLength(1000)` + `maxLength`
+    en el textarea). `resolverItem` la toma de la línea y cae al texto del catálogo como snapshot
+    (`item.descripcion ?? producto.descripcion`); el processor la pasa al builder XML. `EditarProductoModal`
+    además **precarga** descripción y unidad (antes se limpiaban en cada apertura) y manda `''` (no
+    `undefined`) para poder BORRARLAS. `useProductos` dejó de tirar `descripcion` en create/update/list.
+  - **PDF:** `EcfItem.detalle` nuevo, se imprime bajo el nombre en gris 6.5pt y **la fila ahora crece**
+    (`heightOfString`) — con alto fijo el texto largo se salía del borde. Sirve para e-CF y cotización.
+  - **Convertir cotización → factura** ahora arrastra la descripción de cada línea.
+  - **No hay migración ni backfill:** los borradores creados ANTES con el check marcado quedaron con el
+    precio inflado (el ITBIS ya sumado dentro de la base) — hay que corregirlos a mano.
+  - **Tests:** `item-descripcion.e2e-spec.ts` (5 casos: guarda lo enviado, snapshot del catálogo, la línea
+    gana sobre el catálogo, >1000 → 400, el PATCH del borrador la conserva). **252 e2e + 118 ecf-engine,
+    build API y web en 0.**
+
 ---
 
 ## 8. PRÓXIMOS PASOS (en orden de prioridad)

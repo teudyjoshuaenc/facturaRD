@@ -377,6 +377,7 @@ export class ComprobantesService {
             ? Number(producto.unidadMedida)
             : undefined
     const unidadMedida = item.unidadMedida ?? unidadProducto
+    const descripcionItem = item.descripcion ?? producto.descripcion ?? undefined
 
     return {
       numeroLinea: item.numeroLinea,
@@ -386,6 +387,9 @@ export class ComprobantesService {
       precioUnitarioItem: item.precioUnitarioItem ?? Number(producto.precioUnitario),
       indicadorFacturacion: item.indicadorFacturacion ?? mapTratamientoITBIS(producto.tratamientoITBIS),
       indicadorBienoServicio: item.indicadorBienoServicio ?? (producto.tipo === 'SERVICIO' ? 2 : 1),
+      // La descripción de la línea: la del item manda; si no vino, cae al texto
+      // del catálogo (snapshot, igual que nombre/precio).
+      ...(descripcionItem !== undefined && { descripcion: descripcionItem }),
       ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
       ...(item.descuento !== undefined && { descuento: item.descuento }),
       ...(item.itbisRetenido !== undefined && { itbisRetenido: item.itbisRetenido }),

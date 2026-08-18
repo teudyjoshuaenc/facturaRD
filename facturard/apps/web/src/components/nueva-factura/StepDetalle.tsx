@@ -92,6 +92,7 @@ export function StepDetalle({
       precioUnitarioItem: p.precio,
       indicadorFacturacion: p.indicadorFacturacion,
       indicadorBienoServicio: p.tipo === 'BIEN' ? 1 : 2,
+      ...(p.descripcion && { descripcion: p.descripcion }),
       ...(p.unidadMedida && { unidadMedida: p.unidadMedida }),
       ...(p.descuento && { descuento: p.descuento }),
       ...(p.itbisRetenido && { itbisRetenido: p.itbisRetenido }),
@@ -138,15 +139,20 @@ export function StepDetalle({
         indicadorFacturacion: editingItem.indicadorFacturacion,
         precioFinal: editingItem.precioUnitarioItem,
         estado: 'ACTIVO',
+        ...(editingItem.descripcion !== undefined && { descripcion: editingItem.descripcion }),
+        ...(editingItem.unidadMedida !== undefined && { unidadMedida: editingItem.unidadMedida }),
       }
     : null
 
   function handleEditItem(key: string, data: any): void {
+    // `data.precio` ya viene SIN ITBIS (el modal desagrega cuando el usuario
+    // marca "el precio incluye ITBIS"); aquí no se recalcula nada.
     updateItem(key, {
       nombreItem: data.nombre,
       indicadorBienoServicio: data.tipo === 'BIEN' ? 1 : 2,
       precioUnitarioItem: data.precio,
       indicadorFacturacion: data.indicadorFacturacion,
+      descripcion: data.descripcion || undefined,
       ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida }),
     })
   }
@@ -287,6 +293,14 @@ export function StepDetalle({
                     <tr key={item.key} className="border-t border-neutral-100 hover:bg-neutral-50/40">
                       <td className="py-3.5 px-4 font-semibold text-text-primary max-w-[280px]">
                         <span className="block truncate" title={item.nombreItem}>{item.nombreItem}</span>
+                        {item.descripcion ? (
+                          <span
+                            className="mt-0.5 block truncate text-[11px] font-normal text-text-secondary"
+                            title={item.descripcion}
+                          >
+                            {item.descripcion}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="py-3.5 px-4 text-text-secondary font-medium">
                         {UNIDADES_MEDIDA_MAP[item.unidadMedida ?? 43] ?? 'Unidad'}

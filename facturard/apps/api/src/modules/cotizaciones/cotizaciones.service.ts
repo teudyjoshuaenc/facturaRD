@@ -212,6 +212,7 @@ export class CotizacionesService {
       else gravado += valor
       return {
         descripcion: it.nombre,
+        ...(it.descripcion !== null && it.descripcion !== '' ? { detalle: it.descripcion } : {}),
         cantidad,
         precioUnitario,
         valor,
@@ -346,6 +347,9 @@ export class CotizacionesService {
         precioUnitarioItem: s.precioUnitario,
         indicadorFacturacion: s.tratamientoITBIS === 'EXENTO' ? 'E' : s.tratamientoITBIS,
         indicadorBienoServicio: s.indicadorBienoServicio === '1' ? 1 : 2,
+        // La descripción de la línea viaja a la factura al convertir: es parte
+        // del snapshot de la cotización, no un texto decorativo.
+        ...(s.descripcion !== undefined && { descripcion: s.descripcion }),
         ...(unidad !== undefined && { unidadMedida: unidad }),
       }
     })
