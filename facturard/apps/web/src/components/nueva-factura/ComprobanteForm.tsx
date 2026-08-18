@@ -192,6 +192,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
             precioUnitarioItem: Number(item.precioUnitarioItem || 0),
             indicadorFacturacion: item.indicadorFacturacion || 'I1',
             indicadorBienoServicio: Number(item.indicadorBienoServicio || 1) as 1 | 2,
+            ...(item.descripcion ? { descripcion: String(item.descripcion) } : {}),
             descuento: Number(item.descuento || 0),
             itbisRetenido: Number(item.itbisRetenido || 0),
             isrRetenido: Number(item.isrRetenido || 0),

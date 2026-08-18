@@ -540,7 +540,14 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
                       const itemTotal = (it.cantidad * it.precioUnitarioItem - (it.descuento || 0)) * 1.18
                       return (
                         <tr key={index} className="border-b border-[#f1f5f9] text-[14px] text-[#333] leading-[19.5px]">
-                          <td className="py-[16px] font-semibold">{it.nombreItem}</td>
+                          <td className="py-[16px] font-semibold">
+                            {it.nombreItem}
+                            {it.descripcion ? (
+                              <span className="block whitespace-pre-line text-[12px] font-normal text-[#64748B]">
+                                {it.descripcion}
+                              </span>
+                            ) : null}
+                          </td>
                           <td className="py-[16px] text-right">{it.cantidad}</td>
                           <td className="py-[16px] text-right">{formatCurrency(it.precioUnitarioItem)}</td>
                           <td className="py-[16px] text-right">{formatCurrency(itemItbis)}</td>

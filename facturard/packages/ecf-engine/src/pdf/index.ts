@@ -5,6 +5,8 @@ import { dirname } from 'path';
 
 export interface EcfItem {
   descripcion: string;
+  /** Detalle libre de la línea (DescripcionItem del e-CF). Se imprime bajo el nombre. */
+  detalle?: string;
   cantidad: number;
   unidadMedida?: string;
   precioUnitario: number;
@@ -19,7 +21,7 @@ export type DgiiAmbiente = 'certecf' | 'ecf';
  * - 'ECF'        → e-CF fiscal con QR/timbre DGII (comportamiento por defecto).
  * - 'BORRADOR'   → borrador aún no emitido: sin QR, badge "sin valor fiscal".
  * - 'COTIZACION' → cotización (no fiscal): sin QR, título "COTIZACIÓN", folio COT-xxxx.
- * - 'INTERNO'    → Nota de venta interna (no fiscal): sin QR, título "NOTA DE VENTA",
+ * - 'INTERNO'    → Nota de venta interna (no fiscal): sin QR, título "FACTURA DE CONSUMO",
  *                  folio NV-xxxx, leyenda de documento sin valor fiscal.
  */
 export type PdfModo = 'ECF' | 'BORRADOR' | 'COTIZACION' | 'INTERNO';
@@ -229,7 +231,7 @@ export async function generarRepresentacionImpresa(
   // bottom triggering pdfkit auto-pagination inside the page-loop.
   const tituloDoc =
     modo === 'COTIZACION' ? `Cotización ${ecf.folio ?? ''}`.trim()
-    : modo === 'INTERNO' ? `Nota de venta ${ecf.folio ?? ''}`.trim()
+    : modo === 'INTERNO' ? `Factura de Consumo ${ecf.folio ?? ''}`.trim()
     : modo === 'BORRADOR' ? `Borrador ${ecf.eNCF ?? ''}`.trim()
     : `e-CF ${ecf.eNCF}`;
 
@@ -318,7 +320,7 @@ export async function generarRepresentacionImpresa(
     // documento "e-CF" (no lo es); en fiscal se usa la etiqueta oficial del tipo.
     const tipo =
       modo === 'COTIZACION' ? 'COTIZACIÓN'
-      : modo === 'INTERNO' ? 'NOTA DE VENTA'
+      : modo === 'INTERNO' ? 'FACTURA DE CONSUMO'
       : modo === 'BORRADOR' ? `${tipoLabel(ecf.tipoECF)} (Borrador)`
       : tipoLabel(ecf.tipoECF);
     const tipoCode = ecf.tipoECF.replace(/^[Ee]/, '');
@@ -343,7 +345,7 @@ export async function generarRepresentacionImpresa(
 
     if (modo === 'COTIZACION' || modo === 'INTERNO') {
       // Documento interno: folio propio en vez de e-NCF; sin vencimiento de secuencia.
-      const etiquetaFolio = modo === 'INTERNO' ? 'Nota de venta No.' : 'Cotización No.';
+      const etiquetaFolio = modo === 'INTERNO' ? 'Factura de Consumo No.' : 'Cotización No.';
       doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
          .text(`${etiquetaFolio}: ${ecf.folio ?? '—'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
       rY += 13;
@@ -425,8 +427,18 @@ export async function generarRepresentacionImpresa(
     let rowY = curY + ROW_H;
 
     ecf.items.forEach((item, i) => {
+      // La fila crece si el nombre y/o el detalle (DescripcionItem) ocupan varias
+      // líneas: antes se pintaba con alto fijo y el texto largo se salía del borde.
+      const detalle = item.detalle?.trim();
+      const nombreH = doc.font('Helvetica').fontSize(7.5)
+        .heightOfString(item.descripcion, { width: COL_DESC - 8 });
+      const detalleH = detalle
+        ? doc.font('Helvetica').fontSize(6.5).heightOfString(detalle, { width: COL_DESC - 8 }) + 2
+        : 0;
+      const rowH = Math.max(ROW_H, nombreH + detalleH + 8);
+
       const bg = i % 2 === 0 ? '#ffffff' : GRAY_ROW;
-      doc.rect(margin, rowY, contentW, ROW_H).fill(bg);
+      doc.rect(margin, rowY, contentW, rowH).fill(bg);
       doc.font('Helvetica').fontSize(7.5).fillColor(TEXT);
       doc.text(item.cantidad.toString(),                    xQty   + 2, rowY + 5, { width: COL_QTY - 4,   align: 'right' });
       doc.text(item.descripcion,                            xDesc  + 4, rowY + 5, { width: COL_DESC - 8 });
@@ -434,7 +446,12 @@ export async function generarRepresentacionImpresa(
       doc.text(fmt(item.precioUnitario),                   xPrice + 2, rowY + 5, { width: COL_PRICE - 4, align: 'right' });
       doc.text(item.itbis != null ? fmt(item.itbis) : '-', xItbis + 2, rowY + 5, { width: COL_ITBIS - 4, align: 'right' });
       doc.text(fmt(item.valor),                            xValor + 2, rowY + 5, { width: COL_VALOR - 4, align: 'right' });
-      rowY += ROW_H;
+      if (detalle) {
+        doc.font('Helvetica').fontSize(6.5).fillColor(MUTED)
+           .text(detalle, xDesc + 4, rowY + 5 + nombreH + 2, { width: COL_DESC - 8 });
+        doc.font('Helvetica').fontSize(7.5).fillColor(TEXT);
+      }
+      rowY += rowH;
     });
 
     doc.rect(margin, curY, contentW, rowY - curY).strokeColor(BORDER).lineWidth(0.5).stroke();
@@ -512,7 +529,7 @@ export async function generarRepresentacionImpresa(
       modo === 'COTIZACION'
         ? 'COTIZACIÓN — Este documento NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
         : modo === 'INTERNO'
-          ? 'NOTA DE VENTA — Documento interno. NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
+          ? 'FACTURA DE CONSUMO — Documento interno. NO es un Comprobante Fiscal Electrónico (e-CF) y no tiene validez fiscal ante la DGII.'
           : modo === 'BORRADOR'
             ? 'BORRADOR — Vista previa sin validez fiscal. Este documento no ha sido emitido ni aceptado por la DGII.'
             : 'Representación impresa de Comprobante Fiscal Electrónico (e-CF) — Conserve este documento';

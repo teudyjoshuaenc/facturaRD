@@ -88,6 +88,24 @@ export const ESTADOS_EN_PROCESO: readonly ComprobanteEstado[] = ['PENDIENTE', 'E
 export const MAX_NOMBRE_ITEM = 80
 
 /**
+ * Tope de `DescripcionItem` en los XSD de la DGII (AlfNum1000Type).
+ */
+export const MAX_DESCRIPCION_ITEM = 1000
+
+/**
+ * Desagrega el ITBIS de un precio "con impuesto incluido".
+ *
+ * Todo el sistema (DTO, XML, PDF, totales) trabaja con el precio BASE sin ITBIS:
+ * "el precio incluye ITBIS" es sólo una comodidad de captura, y la conversión
+ * ocurre una sola vez, al guardar en el formulario. Redondea a 2 decimales
+ * porque el backend rechaza precios con más (`maxDecimalPlaces: 2`).
+ */
+export function precioBaseSinItbis(precio: number, rate: number, incluye = true): number {
+  if (!incluye || !rate || !Number.isFinite(precio)) return precio
+  return Math.round((precio / (1 + rate)) * 100) / 100
+}
+
+/**
  * Identificador visible del documento: e-NCF si es fiscal, folio NV- si es nota
  * de venta. Espejo de `EnvioComprobanteService.referencia()` en el backend.
  */

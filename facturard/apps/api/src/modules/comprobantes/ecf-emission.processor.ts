@@ -123,6 +123,7 @@ function mapItems(datos: CreateComprobanteDto) {
     indicadorFacturacion: mapIndicador(item.indicadorFacturacion ?? 'E'),
     indicadorBienoServicio: (item.indicadorBienoServicio ?? 2) as IndicadorBienoServicio,
     ...(item.unidadMedida !== undefined && { unidadMedida: item.unidadMedida }),
+    ...(item.descripcion !== undefined && { descripcion: item.descripcion }),
     ...(item.descuentoPorcentaje !== undefined && { descuentoPorcentaje: item.descuentoPorcentaje }),
   }))
 }

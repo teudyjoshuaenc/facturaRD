@@ -178,6 +178,8 @@ export default function ProductosPage(): JSX.Element {
         precioFinal: p.precio * (p.indicadorFacturacion === 'I1' ? 1.18 : 1),
         uso: 5,
         estado: p.activo ? 'ACTIVO' : 'INACTIVO',
+        ...(p.descripcion !== undefined && { descripcion: p.descripcion }),
+        ...(p.unidadMedida !== undefined && { unidadMedida: p.unidadMedida }),
       })),
     [allProductos],
   )
