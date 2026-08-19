@@ -16,7 +16,7 @@ function EntryContent(): JSX.Element {
         <div className="flex flex-col gap-1">
           <h1 className="text-h6 text-text-primary">Abre Factura Dmaia desde Dmaia CRM</h1>
           <p className="max-w-sm text-body-sm text-text-secondary">
-            Factura Dmaia funciona dentro de tu cuenta de Dmaia CRM. Ábrelo desde ahí para continuar.
+            Factura Dmaia funciona dentro de tu cuenta de Dmaia CRM. Ábrelo desde ahí para continuar
           </p>
         </div>
       </main>
