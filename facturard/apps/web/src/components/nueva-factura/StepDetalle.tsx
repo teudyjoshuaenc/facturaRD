@@ -92,6 +92,10 @@ export function StepDetalle({
       precioUnitarioItem: p.precio,
       indicadorFacturacion: p.indicadorFacturacion,
       indicadorBienoServicio: p.tipo === 'BIEN' ? 1 : 2,
+      // El producto del catálogo arrastra su modo de captura a la línea, para
+      // que editarla enseñe el precio como se capturó (y no la base).
+      ...(p.precioIncluyeItbis ? { precioIncluyeItbis: true } : {}),
+      ...(p.precioIncluyeItbis && p.precioCaptura ? { precioCaptura: p.precioCaptura } : {}),
       ...(p.descripcion && { descripcion: p.descripcion }),
       ...(p.unidadMedida && { unidadMedida: p.unidadMedida }),
       ...(p.descuento && { descuento: p.descuento }),
@@ -139,6 +143,10 @@ export function StepDetalle({
         indicadorFacturacion: editingItem.indicadorFacturacion,
         precioFinal: editingItem.precioUnitarioItem,
         estado: 'ACTIVO',
+        // El modo de captura viaja con la línea: si no, el modal reabría en "sin
+        // ITBIS" y re-marcar el check volvía a dividir un precio ya dividido.
+        precioIncluyeItbis: editingItem.precioIncluyeItbis === true,
+        ...(editingItem.precioCaptura !== undefined && { precioCaptura: editingItem.precioCaptura }),
         ...(editingItem.descripcion !== undefined && { descripcion: editingItem.descripcion }),
         ...(editingItem.unidadMedida !== undefined && { unidadMedida: editingItem.unidadMedida }),
       }
@@ -153,6 +161,9 @@ export function StepDetalle({
       precioUnitarioItem: data.precio,
       indicadorFacturacion: data.indicadorFacturacion,
       descripcion: data.descripcion || undefined,
+      // Se recuerda el modo de captura para la próxima apertura del modal.
+      precioIncluyeItbis: data.precioIncluyeItbis === true,
+      precioCaptura: data.precioIncluyeItbis === true ? (data.precioCaptura ?? undefined) : undefined,
       ...(data.unidadMedida !== undefined && { unidadMedida: data.unidadMedida }),
     })
   }

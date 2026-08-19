@@ -180,7 +180,12 @@ export default function ProductosPage(): JSX.Element {
         tipo: p.tipo,
         precio: p.precio,
         indicadorFacturacion: p.indicadorFacturacion,
-        precioFinal: p.precio * (p.indicadorFacturacion === 'I1' ? 1.18 : 1),
+        // Con captura "ITBIS incluido" el total es el monto tecleado, no
+        // base×1.18: ese recálculo enseñaba 14,999.99 donde el usuario puso 15,000.
+        precioFinal:
+          p.precioIncluyeItbis && p.precioCaptura
+            ? p.precioCaptura
+            : p.precio * (p.indicadorFacturacion === 'I1' ? 1.18 : 1),
         uso: 5,
         // Un borrador es un estado propio: aún no se puede facturar.
         estado: p.borrador ? 'BORRADOR' : p.activo ? 'ACTIVO' : 'INACTIVO',

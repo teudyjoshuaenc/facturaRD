@@ -13,6 +13,15 @@ export interface ItemRow {
   indicadorBienoServicio: 1 | 2
   /** Detalle libre de la línea → DescripcionItem del e-CF (máx 1000). */
   descripcion?: string
+  /**
+   * MODO DE CAPTURA de la línea (no viaja al DTO). `precioUnitarioItem` es
+   * SIEMPRE la base sin ITBIS; esto sólo recuerda cómo lo escribió el usuario
+   * para que al reabrir el modal de edición vea su propio número. Sin esto, la
+   * línea reabría en "sin ITBIS" y volver a marcar el check dividía otra vez.
+   */
+  precioIncluyeItbis?: boolean
+  /** Monto exacto tecleado cuando la línea se capturó con ITBIS incluido. */
+  precioCaptura?: number
   unidadMedida?: number
   descuento?: number
   itbisRetenido?: number
