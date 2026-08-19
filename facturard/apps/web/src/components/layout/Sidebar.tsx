@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import type { JSX } from 'react'
+import Image from 'next/image'
 import { X } from 'lucide-react'
 import { SidebarLink } from './SidebarLink'
 import { useUI } from '@/lib/context/UIContext'
@@ -118,9 +119,12 @@ export function Sidebar({ tenant, activeRoute }: Props): JSX.Element {
           {/* Show Figma Logo when expanded */}
           {!isEffectiveCollapsed && (
             <div className="flex-1 truncate pr-2">
-              <img
+              <Image
                 src="/icons/logo_dmaia.png"
                 alt="Logo"
+                width={140}
+                height={26}
+                priority
                 className="h-[26px] w-auto max-w-full shrink-0 object-contain"
               />
             </div>

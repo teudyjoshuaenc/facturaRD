@@ -222,6 +222,10 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           setLoadingDraft(false)
         })
     }
+    // Carga ÚNICA del borrador: `facturacionMode` se lee al montar a propósito.
+    // Si entrara en deps, alternar Estándar/Rápido re-dispararía el GET y
+    // pisaría la edición en curso.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId, cloneId, router])
 
   // Match and select the client once contacts are loaded
@@ -233,11 +237,34 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       // contacto sin RNC hacía match con cualquier otro.
       const contactoIdGuardado = draftData.datos?.contactoId || draftData.contactoId
       const rncComp = draftData.datos?.rncComprador || draftData.rnc
+      const razonComp = draftData.datos?.razonSocialComprador || draftData.razonSocial
+      // El RNC se compara SOLO por dígitos: guardado y lista pueden venir con
+      // guiones/espacios ("132-86405-2" vs "132864052") y eso rompía el match.
+      const soloDigitos = (v: unknown): string => String(v ?? '').replace(/\D/g, '')
+      const rncCompDigits = soloDigitos(rncComp)
       const clientMatch =
         (contactoIdGuardado ? contactos.find((contact) => contact.id === contactoIdGuardado) : undefined) ??
-        (rncComp ? contactos.find((contact) => contact.rnc === rncComp) : undefined)
+        (rncCompDigits ? contactos.find((contact) => soloDigitos(contact.rnc) === rncCompDigits) : undefined)
+
       if (clientMatch) {
         setSelectedCliente(clientMatch)
+      } else if (rncCompDigits || (razonComp && String(razonComp).trim())) {
+        // EL COMPRADOR YA ESTÁ EN EL BORRADOR (rnc + razón social son el snapshot
+        // fiscal). Antes, si el Contacto no aparecía en la lista —inactivo, fuera
+        // de los 100 que trae el selector, borrado, o RNC con otro formato— el
+        // cliente se perdía y había que volver a elegirlo. Ahora se reconstruye
+        // desde el propio borrador: sin `id` no se manda `contactoId`, y el
+        // backend emite igual con rncComprador + razonSocialComprador.
+        setSelectedCliente({
+          id: contactoIdGuardado || '',
+          nombre: String(razonComp || '').trim() || 'Cliente del borrador',
+          rnc: rncCompDigits,
+          email: draftData.contactoEmail || '',
+          telefono: '',
+          tipo: 'EMPRESA',
+          idExtranjero: draftData.datos?.identificadorExtranjero || '',
+          estado: 'ACTIVO',
+        })
       }
 
       // Recién ahora se sabe en qué paso se puede retomar. Un borrador fiscal
@@ -246,13 +273,16 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       // AVISO, en vez de dejarte en el Resumen con el botón apagado.
       if (pendingResume) {
         setPendingResume(false)
-        const clienteOk = draftData.esFiscal === false || Boolean(clientMatch)
+        const clienteOk =
+          draftData.esFiscal === false ||
+          Boolean(clientMatch) ||
+          Boolean(soloDigitos(rncComp) || String(razonComp || '').trim())
         const itemsOk =
           items.length > 0 &&
           items.every((i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0)
         if (!clienteOk) {
           setCurrentStep(1)
-          toast.error('Vuelve a seleccionar el cliente: el contacto de este borrador ya no está disponible.')
+          toast.error('Vuelve a seleccionar el cliente: este borrador no tiene comprador guardado.')
         } else if (itemsOk) {
           setCurrentStep(3)
         } else {
@@ -578,9 +608,6 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     if (!isReferenciaValid) faltas.push('Completa la referencia: NCF modificado, su fecha y el código de modificación.')
     if (!isIdentificadorExtranjeroValid) faltas.push('Falta el identificador extranjero del comprador.')
     if (!isPaisCompradorValid) faltas.push('Falta el país del comprador.')
-    if (faltas.length === 0 && facturacionMode !== 'rapido' && currentStep < 3) {
-      faltas.push('Avanza hasta el paso Confirmar para emitir.')
-    }
     return faltas
   })()
 
@@ -1213,8 +1240,29 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     </div>
                   </div>
                 )}
-                {/* Emitir e-CF Button (solo fiscal) */}
-                {esFiscal && emitDisabledReasons.length > 0 && (
+                {/* Fiscal fuera del paso final: el primario AVANZA el wizard.
+                    Antes aquí sólo existía "Emitir e-CF", apagado hasta el paso 3,
+                    y StepDetalle no tiene "Siguiente" propio → desde el paso 2 no
+                    había NINGUNA forma de llegar al 3. Callejón sin salida. */}
+                {esFiscal && showStepNav && (
+                  <button
+                    type="button"
+                    disabled={!isCurrentStepValid || submitting}
+                    onClick={() => goToStep(currentStep + 1)}
+                    className={cn(
+                      "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
+                      (!isCurrentStepValid || submitting)
+                        ? "opacity-20 cursor-not-allowed"
+                        : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
+                    )}
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight size={16} className="text-white" />
+                  </button>
+                )}
+
+                {/* Emitir e-CF: sólo en el paso final (o en modo rápido) */}
+                {esFiscal && !showStepNav && emitDisabledReasons.length > 0 && (
                   <div className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-left leading-snug font-sans mb-1">
                     <p className="font-bold mb-1">Para emitir falta:</p>
                     <ul className="list-disc pl-4 space-y-0.5 font-normal">
@@ -1222,15 +1270,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                     </ul>
                   </div>
                 )}
-                {esFiscal && (
+                {esFiscal && !showStepNav && (
                   <button
                     type="button"
-                    disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason}
+                    disabled={!isEmitEnabled || submitting || !!blockingReason}
                     title={emitDisabledReasons.join(' ') || 'Emitir e-CF a la DGII'}
                     onClick={() => handleSubmit(true)}
                     className={cn(
                       "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
-                      ((facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason)
+                      (!isEmitEnabled || submitting || !!blockingReason)
                         ? "opacity-20 cursor-not-allowed"
                         : "hover:bg-[#0379D5]/90 hover:scale-[1.03] hover:shadow-md active:scale-[0.98] cursor-pointer"
                     )}
