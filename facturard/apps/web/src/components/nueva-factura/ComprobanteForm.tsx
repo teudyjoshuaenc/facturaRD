@@ -80,7 +80,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const baseId = useId()
   const router = useRouter()
   const { facturacionMode } = useUI()
-  const { contactos, crearContacto } = useContactos()
+  const { contactos, crearContacto, isLoading: loadingContactos } = useContactos()
   const emisionRef = useRef<HTMLInputElement>(null)
 
   const searchParams = useSearchParams()
@@ -100,6 +100,8 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   const [originalEstado, setOriginalEstado] = useState<string | null>(null)
   const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
   const [draftData, setDraftData] = useState<any>(null)
+  // Salto de paso pendiente al reabrir un borrador (ver efecto de match de cliente).
+  const [pendingResume, setPendingResume] = useState(false)
 
   // Auto select client from query param
   useEffect(() => {
@@ -203,21 +205,13 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
           // Save draft data for client matching
           setDraftData(c)
 
-          // Retomar el borrador donde se quedó, no siempre desde el paso 1.
-          // Se calcula sobre los datos crudos de la respuesta (no sobre el estado
-          // de React, que todavía no se actualizó en este mismo tick).
+          // Retomar el borrador donde se quedó. NO se decide aquí: antes se
+          // miraba el RNC/razón social CRUDOS y se saltaba al paso 3 aunque el
+          // Contacto no se hubiera podido reencontrar — el Resumen se veía
+          // completo y "Emitir" quedaba apagado sin decir nada. Ahora el salto
+          // espera a saber si el cliente existe de verdad (efecto de match).
           if (draftId && facturacionMode === 'estandar') {
-            const hasClienteInfo =
-              c.esFiscal === false ||
-              Boolean(c.datos?.rncComprador || c.rnc || c.datos?.razonSocialComprador || c.razonSocialComprador)
-            const hasValidItems =
-              mappedItems.length > 0 &&
-              mappedItems.every((i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0)
-            if (hasValidItems) {
-              setCurrentStep(3)
-            } else if (hasClienteInfo) {
-              setCurrentStep(2)
-            }
+            setPendingResume(true)
           }
         })
         .catch((err) => {
@@ -232,7 +226,7 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   // Match and select the client once contacts are loaded
   useEffect(() => {
-    if (draftData && contactos.length > 0) {
+    if (draftData && !loadingContactos) {
       // Se busca primero por contactoId (identidad exacta) y sólo después por RNC
       // (compatibilidad con borradores viejos, guardados antes de que se mandara
       // el contactoId). El RNC vacío NO cuenta como coincidencia: si no, cualquier
@@ -245,8 +239,28 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
       if (clientMatch) {
         setSelectedCliente(clientMatch)
       }
+
+      // Recién ahora se sabe en qué paso se puede retomar. Un borrador fiscal
+      // cuyo Contacto ya no se puede reencontrar (borrado, inactivo, o guardado
+      // por una versión vieja que no persistía contactoId) vuelve al paso 1 CON
+      // AVISO, en vez de dejarte en el Resumen con el botón apagado.
+      if (pendingResume) {
+        setPendingResume(false)
+        const clienteOk = draftData.esFiscal === false || Boolean(clientMatch)
+        const itemsOk =
+          items.length > 0 &&
+          items.every((i) => i.nombreItem.trim().length > 0 && i.cantidad > 0 && i.precioUnitarioItem > 0)
+        if (!clienteOk) {
+          setCurrentStep(1)
+          toast.error('Vuelve a seleccionar el cliente: el contacto de este borrador ya no está disponible.')
+        } else if (itemsOk) {
+          setCurrentStep(3)
+        } else {
+          setCurrentStep(2)
+        }
+      }
     }
-  }, [draftData, contactos])
+  }, [draftData, contactos, loadingContactos, pendingResume, items])
 
   // Reference Info state (E33/E34)
   const [ncfModificado, setNcfModificado] = useState('')
@@ -548,31 +562,26 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
 
-  // Por qué está apagado "Emitir e-CF". Antes el botón se deshabilitaba en
-  // silencio: el usuario llenaba todo y no tenía forma de saber qué faltaba.
-  // Cada rama es EXACTAMENTE una de las condiciones del `disabled` de abajo.
-  const emitDisabledReason: string | null = (() => {
-    if (submitting) return null
-    if (blockingReason) return null // ya se explica en el banner rojo de arriba
-    if (!isDetalleStepValid) {
-      return items.length === 0
-        ? 'Agrega al menos una línea al detalle.'
-        : 'Revisa el detalle: cada línea necesita descripción, cantidad y precio mayor que cero.'
+  // Por qué está apagado "Emitir e-CF". Antes se deshabilitaba en silencio: el
+  // usuario llenaba todo y no tenía forma de saber qué faltaba. Se listan TODAS
+  // las faltas, no solo la primera, para no arreglar de a una a ciegas.
+  const emitDisabledReasons: string[] = (() => {
+    if (submitting) return []
+    if (blockingReason) return [] // ya se explica en el banner rojo de arriba
+    const faltas: string[] = []
+    if (items.length === 0) faltas.push('Agrega al menos una línea al detalle.')
+    else if (!isDetalleStepValid) faltas.push('Cada línea del detalle necesita nombre, cantidad y precio mayor que cero.')
+    if (emitirConComprobante && selectedCliente === null && tipoECF !== 'E43' && !isE32UnderLimit) faltas.push('Selecciona un cliente.')
+    else if (!isRncValid) faltas.push(`El cliente necesita RNC o cédula para un ${tipoECF}.`)
+    if (emitirConComprobante && !isTipoIngresoValid) faltas.push('Selecciona el Tipo de ingreso.')
+    if (!isFechaLimiteValid) faltas.push('Con pago a CRÉDITO indica la fecha límite de pago.')
+    if (!isReferenciaValid) faltas.push('Completa la referencia: NCF modificado, su fecha y el código de modificación.')
+    if (!isIdentificadorExtranjeroValid) faltas.push('Falta el identificador extranjero del comprador.')
+    if (!isPaisCompradorValid) faltas.push('Falta el país del comprador.')
+    if (faltas.length === 0 && facturacionMode !== 'rapido' && currentStep < 3) {
+      faltas.push('Avanza hasta el paso Confirmar para emitir.')
     }
-    if (!isClienteStepValid) {
-      if (emitirConComprobante && !isTipoIngresoValid) return 'Selecciona el Tipo de ingreso en el paso Cliente.'
-      if (!isFechaLimiteValid) return 'Con pago a CRÉDITO debes indicar la fecha límite de pago.'
-      if (!isReferenciaValid) return 'Completa la información de referencia (NCF modificado, fecha y código de modificación).'
-      if (emitirConComprobante && selectedCliente === null && tipoECF !== 'E43' && !isE32UnderLimit) return 'Selecciona un cliente en el paso Cliente.'
-      if (!isRncValid) return `El cliente necesita RNC o cédula para un ${tipoECF}.`
-      if (!isIdentificadorExtranjeroValid) return 'Falta el identificador extranjero del comprador.'
-      if (!isPaisCompradorValid) return 'Falta el país del comprador.'
-      return 'Faltan datos del cliente.'
-    }
-    if (facturacionMode !== 'rapido' && currentStep < 3) {
-      return 'Avanza hasta el paso Resumen para emitir.'
-    }
-    return null
+    return faltas
   })()
 
   // Reglas de validez (isClienteStepValid/isDetalleStepValid) se recalculan en
@@ -1205,16 +1214,19 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </div>
                 )}
                 {/* Emitir e-CF Button (solo fiscal) */}
-                {esFiscal && emitDisabledReason && (
-                  <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-left leading-snug font-sans mb-1">
-                    {emitDisabledReason}
-                  </p>
+                {esFiscal && emitDisabledReasons.length > 0 && (
+                  <div className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-left leading-snug font-sans mb-1">
+                    <p className="font-bold mb-1">Para emitir falta:</p>
+                    <ul className="list-disc pl-4 space-y-0.5 font-normal">
+                      {emitDisabledReasons.map((r) => <li key={r}>{r}</li>)}
+                    </ul>
+                  </div>
                 )}
                 {esFiscal && (
                   <button
                     type="button"
                     disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason}
-                    title={emitDisabledReason ?? 'Emitir e-CF a la DGII'}
+                    title={emitDisabledReasons.join(' ') || 'Emitir e-CF a la DGII'}
                     onClick={() => handleSubmit(true)}
                     className={cn(
                       "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",
