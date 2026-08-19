@@ -92,7 +92,7 @@ export function EditarClienteModal({ open, onClose, contacto, onSave }: EditarCl
     } else {
       setMunicipio('')
     }
-  }, [provincia])
+  }, [provincia, contacto, open])
 
   function reset(): void {
     setNombre('')

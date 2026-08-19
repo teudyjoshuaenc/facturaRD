@@ -182,8 +182,8 @@ export function CotizacionForm(): JSX.Element {
             setFolio(c.folio || 'COT-2026-0048')
           }
           
-          setFechaEmision(c.createdAt ? c.createdAt.split('T')[0] : fechaEmision)
-          setFechaVencimiento(c.fechaVigencia ? c.fechaVigencia.split('T')[0] : fechaVencimiento)
+          setFechaEmision((prev) => (c.createdAt ? c.createdAt.split('T')[0] : prev))
+          setFechaVencimiento((prev) => (c.fechaVigencia ? c.fechaVigencia.split('T')[0] : prev))
           setTerminosCondiciones(c.notas || '')
           
           // Items

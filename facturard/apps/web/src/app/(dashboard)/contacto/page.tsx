@@ -273,7 +273,7 @@ export default function ContactosPage(): JSX.Element {
     }
 
     return list
-  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter])
+  }, [contactos, soloSinRnc, tipoFiscalFilter, validacionFilter, origenFilter, localStatusOverrides])
 
   function handleAbrirSincronizarGhl(): void {
     if (!conectado) {
