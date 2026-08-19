@@ -368,6 +368,38 @@ APP_URL=http://localhost:3000
     cotizaciones (15 POST en paralelo) tira `read ECONNRESET` de forma intermitente — **no es una
     regresión**, se reproduce igual sin cambios. Con `connection_limit=5` la suite completa pasa en verde.
 
+- ✅ **🐞 Fix — el mismo bug del ITBIS, ahora en la LÍNEA DE FACTURA (2026-08-19).** El fix anterior cubría
+  el catálogo, pero **el flujo de facturas seguía roto**: editar una línea en `/nueva-factura` volvía a
+  hundir el precio. La línea vive en memoria (`ItemRow`), no en la DB, así que `precioIncluyeItbis`/
+  `precioCaptura` de `Producto` no la alcanzaban: `StepDetalle.tsx` armaba el "producto" para el modal
+  **sin el modo de captura** → el modal abría con la base y el check apagado → re-marcarlo dividía otra vez.
+  - **Fix:** `ItemRow` lleva `precioIncluyeItbis?` y `precioCaptura?` (memoria pura, **NO viajan al DTO**;
+    `precioUnitarioItem` sigue siendo la base sin ITBIS). Se propagan en los 3 puntos: `addFromProduct`
+    (el producto del catálogo arrastra su modo a la línea), `editingAsProducto` (al abrir el modal) y
+    `handleEditItem` (al guardar). Mismo modal, misma regla que el catálogo.
+  - **Lista de `/producto`:** la columna "Precio final" usa `precioCaptura` cuando aplica — enseñaba
+    14,999.99 donde el usuario puso 15,000.
+
+### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
+Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.
+- **Causa:** `packages/ecf-engine/src/xml/calculator.ts` calcula el ITBIS sobre el monto YA redondeado:
+  `montoITBIS = r2(r2(cantidad × precio) × 0.18)`.
+- **Es matemáticamente imposible con 2 decimales**, no es cuestión de elegir mejor la base:
+  `12,711.86 → ITBIS 2,288.13 → 14,999.99` y `12,711.87 → ITBIS 2,288.13 → 15,000.01`. Ninguna base de 2
+  decimales cae en 15,000.00.
+- **Se probó subir el precio a 4 decimales** (el XSD lo permite: `PrecioUnitarioItem` es
+  `Decimal20D1or4ValidationType`, `fractionDigits=4`) y **NO lo arregla**: `montoItem` se redondea a 2
+  antes de aplicar el ITBIS, así que el total sigue en 14,999.99. El cambio se **revirtió** (tocaba
+  columnas fiscales sin ganar nada).
+- **El único arreglo real** es calcular el ITBIS sobre la base SIN redondear
+  (`r2(cantidad × precio × 0.18)` → 2,288.14 → total 15,000.00). **No se hizo**: cambia el monto que se le
+  declara a la DGII y hay riesgo de rechazo si su validador recalcula
+  `TotalITBIS1 = round(MontoGravadoI1 × 0.18)` = 2,288.13. **Requiere decisión explícita.**
+- Mientras tanto: la UI enseña el precio capturado (15,000) y el **total real** de la factura es
+  14,999.99. Fijado en `precio-incluye-itbis.e2e-spec.ts` para que el día que se cambie sea a propósito.
+
+**276 e2e + 118 ecf-engine, build API y web en 0.**
+
 ---
 
 ## 8. PRÓXIMOS PASOS (en orden de prioridad)

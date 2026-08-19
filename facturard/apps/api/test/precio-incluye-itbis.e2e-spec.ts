@@ -101,6 +101,28 @@ describe('Producto — precioIncluyeItbis (e2e)', () => {
     expect(Number(upd.body.precioUnitario)).toBe(20000)
   })
 
+  // EL CENTAVO — documentado, NO arreglado (decisión fiscal pendiente).
+  // `calculator.ts` calcula el ITBIS sobre el monto YA redondeado:
+  //   montoITBIS = r2(r2(cantidad × precio) × 0.18)
+  // Con eso NINGUNA base de 2 decimales da 15,000.00 exacto:
+  //   12,711.86 → ITBIS 2,288.13 → 14,999.99
+  //   12,711.87 → ITBIS 2,288.13 → 15,000.01
+  // Arreglarlo exige calcular el ITBIS sobre la base SIN redondear, y eso cambia
+  // el monto que se le declara a la DGII → no se toca sin decisión explícita.
+  it('EL CENTAVO: capturar 15,000 con ITBIS incluido da un total de 14,999.99', async () => {
+    const prod = await request(srv()).post('/api/v1/productos').set(auth())
+      .send({ tipo: 'SERVICIO', nombre: 'Quince mil', precioUnitario: BASE_15K, precioIncluyeItbis: true, precioCaptura: 15000 })
+      .expect(201)
+
+    const comp = await request(srv()).post('/api/v1/comprobantes').set(auth()).send({
+      tipoECF: 'E31', emitir: false, fechaEmision: '01-07-2026', fechaVencimiento: '31-12-2028',
+      rncComprador: '131880681', razonSocialComprador: 'CLIENTE SRL',
+      items: [{ numeroLinea: 1, productoId: prod.body.id, cantidad: 1 }],
+    }).expect(201)
+
+    expect(Number(comp.body.montoTotal)).toBe(14999.99)
+  })
+
   it('el modo de captura se puede cambiar por PATCH', async () => {
     const res = await request(srv()).post('/api/v1/productos').set(auth())
       .send({ tipo: 'BIEN', nombre: 'Cambia modo', precioUnitario: 1000 }).expect(201)
