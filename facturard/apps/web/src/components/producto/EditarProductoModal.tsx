@@ -8,7 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { Select } from '@/components/ui/select'
-import { formatCurrency, MAX_NOMBRE_ITEM, MAX_DESCRIPCION_ITEM, precioBaseSinItbis } from '@/lib/comprobantes'
+import {
+  formatCurrency,
+  MAX_NOMBRE_ITEM,
+  MAX_DESCRIPCION_ITEM,
+  precioBaseSinItbis,
+  precioSegunCaptura,
+} from '@/lib/comprobantes'
 
 interface Producto {
   id: string
@@ -21,6 +27,9 @@ interface Producto {
   estado: string
   descripcion?: string
   unidadMedida?: number
+  borrador?: boolean
+  precioIncluyeItbis?: boolean
+  precioCaptura?: number | null
 }
 
 interface EditarProductoModalProps {
@@ -136,15 +145,21 @@ export function EditarProductoModal({
       setTipo(producto.tipo)
       const rawCode = producto.codigo.split(' · ')[0] || producto.codigo
       setCodigo(rawCode === 'GEN-001' || rawCode === 'SRV-001' || rawCode === 'SRV-002' || rawCode === 'SRV-003' ? '' : rawCode)
-      setPrecio(String(producto.precio))
-      setIndicadorFacturacion(
+      const indicador =
         producto.indicadorFacturacion === 'EXENTO' || producto.indicadorFacturacion === 'E'
           ? 'I4'
-          : (producto.indicadorFacturacion as any)
-      )
-      setPrecioIncluyeItbis(false)
-      // El precio guardado es SIEMPRE base sin ITBIS, por eso el check arranca
-      // apagado. Descripción y unidad sí se rellenan: antes se limpiaban en cada
+          : (producto.indicadorFacturacion as 'I1' | 'I2' | 'I3' | 'I4')
+      setIndicadorFacturacion(indicador)
+      // El precio guardado es SIEMPRE base sin ITBIS, pero se muestra EN EL MODO
+      // EN QUE SE CAPTURÓ: si el producto se cotizó con ITBIS incluido, el input
+      // vuelve a enseñar el total (15,000), no la base (12,711.86). Antes se
+      // enseñaba la base con el check apagado; re-marcarlo volvía a dividir un
+      // precio ya dividido y el monto se hundía en cada edición.
+      const incluye = producto.precioIncluyeItbis === true
+      const rateProducto = ITBIS_RATES[indicador === 'I4' ? 'E' : indicador] ?? 0.18
+      setPrecioIncluyeItbis(incluye)
+      setPrecio(String(precioSegunCaptura(producto.precio, rateProducto, incluye, producto.precioCaptura)))
+      // Descripción y unidad sí se rellenan: antes se limpiaban en cada
       // apertura y el texto escrito desaparecía al guardar.
       setDescripcion(producto.descripcion ?? '')
       setUnidadMedida(producto.unidadMedida !== undefined ? String(producto.unidadMedida) : '')
@@ -168,18 +183,26 @@ export function EditarProductoModal({
   const rateKey = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
   const rate = ITBIS_RATES[rateKey] ?? 0.18
 
-  function handleSave(): void {
-    if (!producto || !nombre.trim() || !precio) return
+  // `borrador`: undefined → conserva el estado actual; false → PUBLICA el borrador.
+  function handleSave(borrador?: boolean): void {
+    if (!producto || !nombre.trim()) return
+    const quedaBorrador = borrador ?? producto.borrador === true
+    if (!quedaBorrador && !precio) return
     onSave(producto.id, {
+      ...(borrador !== undefined ? { borrador } : {}),
       nombre,
       tipo,
       codigo: codigo || undefined,
       // Se guarda la base sin ITBIS: con "el precio incluye ITBIS" marcado el
       // monto tecleado es el TOTAL, así que se desagrega aquí. Antes el flag se
       // ignoraba al guardar y el 18% terminaba sumándose por encima del total.
+      // Se guarda la base sin ITBIS y TAMBIÉN el modo de captura, para que la
+      // próxima apertura reconstruya exactamente este mismo número.
       precio: precioBaseSinItbis(Number(precio), rate, precioIncluyeItbis),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
+      // null al desmarcar el check: si no, quedaría un monto de captura viejo.
+      precioCaptura: precioIncluyeItbis && Number(precio) > 0 ? Number(precio) : null,
       // Cadena vacía (no undefined) para poder BORRAR la descripción al editar.
       descripcion: descripcion.trim(),
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
@@ -193,7 +216,10 @@ export function EditarProductoModal({
     onClose()
   }
 
+  const esBorrador = producto?.borrador === true
   const isValid = nombre.trim().length > 0 && Number(precio) > 0
+  // Editando un borrador basta el nombre para volver a guardarlo como borrador.
+  const isDraftValid = nombre.trim().length > 0
 
   const showNombreError = nombreTouched && !nombre.trim()
   const showPrecioError = precioTouched && (!precio || Number(precio) <= 0)
@@ -238,14 +264,26 @@ export function EditarProductoModal({
             >
               Cancelar
             </Button>
+            {esBorrador && (
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={!isDraftValid}
+                onClick={() => handleSave(true)}
+                className="h-[42px] px-4 rounded-[10px] border-[#E2E8F0] text-[#64748B] text-[14px] font-normal whitespace-nowrap"
+              >
+                Guardar borrador
+              </Button>
+            )}
             <Button
               variant="primary"
               size="md"
               disabled={!isValid}
-              onClick={handleSave}
+              onClick={() => handleSave(esBorrador ? false : undefined)}
+              title={esBorrador ? 'Publica el producto: a partir de aquí se puede facturar' : undefined}
               className="flex items-center justify-center gap-1 h-[42px] w-[168px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
             >
-              Guardar Cambios
+              {esBorrador ? 'Publicar' : 'Guardar Cambios'}
             </Button>
           </div>
         </>

@@ -15,7 +15,7 @@ export class ProductosController {
   constructor(private readonly service: ProductosService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crea un producto/servicio en el catálogo del tenant' })
+  @ApiOperation({ summary: 'Crea un producto/servicio en el catálogo (borrador:true lo guarda sin terminar)' })
   crear(@CurrentTenant() tenantId: string, @Body() dto: CreateProductoDto) {
     return this.service.crear(tenantId, dto)
   }
@@ -26,6 +26,7 @@ export class ProductosController {
   @ApiQuery({ name: 'categoria', required: false })
   @ApiQuery({ name: 'tipo', enum: ['BIEN', 'SERVICIO'], required: false })
   @ApiQuery({ name: 'activo', type: Boolean, required: false })
+  @ApiQuery({ name: 'clase', enum: ['publicado', 'borrador', 'todos'], required: false })
   @ApiQuery({ name: 'page', type: Number, required: false })
   @ApiQuery({ name: 'limit', type: Number, required: false })
   findAll(@CurrentTenant() tenantId: string, @Query() query: ListProductosDto) {

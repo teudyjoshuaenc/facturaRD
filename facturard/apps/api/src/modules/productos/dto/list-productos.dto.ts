@@ -24,6 +24,16 @@ export class ListProductosDto {
   @IsOptional()
   activo?: boolean
 
+  @ApiPropertyOptional({
+    enum: ['publicado', 'borrador', 'todos'],
+    description:
+        'Clase de producto. Omitir → sólo PUBLICADOS (los borradores nunca se cuelan en el selector de emisión); ' +
+        'borrador → sólo borradores; todos → ambos (gestión del catálogo).',
+  })
+  @IsIn(['publicado', 'borrador', 'todos'])
+  @IsOptional()
+  clase?: 'publicado' | 'borrador' | 'todos'
+
   @ApiPropertyOptional({ default: 1 })
   @Type(() => Number)
   @IsNumber()

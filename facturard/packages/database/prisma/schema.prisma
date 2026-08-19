@@ -287,6 +287,22 @@ model Producto {
   codigo           String?
   categoria        String?
   activo           Boolean  @default(true)
+  // Borrador de catálogo: producto guardado a medias (puede no tener precio).
+  // NO se puede facturar hasta publicarlo (borrador=false). Espejo del DRAFT
+  // de Comprobante: mismo concepto, "guardado sin terminar".
+  borrador         Boolean  @default(false)
+  // MODO DE CAPTURA, no un monto: true = el usuario cotiza este producto con el
+  // ITBIS incluido. `precioUnitario` SIGUE siendo siempre la base sin ITBIS (lo
+  // que viaja al DTO/XML/PDF); esto sólo sirve para devolverle al formulario el
+  // precio como lo escribió. Sin persistirlo, re-marcar el check volvía a dividir
+  // un precio ya dividido y el monto bajaba en cada edición.
+  precioIncluyeItbis Boolean @default(false)
+  // El monto EXACTO que tecleó el usuario cuando capturó con ITBIS incluido
+  // (15,000.00). No es redundante con precioUnitario: la base se redondea a 2
+  // decimales (15000/1.18 = 12,711.8644… → 12,711.86) y reconstruir desde ahí
+  // devolvía 14,999.99. Sólo se usa para RE-MOSTRAR el precio; nunca sale hacia
+  // el DTO/XML/PDF, que siguen usando precioUnitario.
+  precioCaptura    Decimal? @db.Decimal(18, 2)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -294,6 +310,7 @@ model Producto {
 
   @@unique([tenantId, codigo])
   @@index([tenantId, activo])
+  @@index([tenantId, borrador])
   @@map("productos")
 }
 
