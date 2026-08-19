@@ -548,6 +548,33 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
 
   const isEmitEnabled = isClienteStepValid && isDetalleStepValid
 
+  // Por qué está apagado "Emitir e-CF". Antes el botón se deshabilitaba en
+  // silencio: el usuario llenaba todo y no tenía forma de saber qué faltaba.
+  // Cada rama es EXACTAMENTE una de las condiciones del `disabled` de abajo.
+  const emitDisabledReason: string | null = (() => {
+    if (submitting) return null
+    if (blockingReason) return null // ya se explica en el banner rojo de arriba
+    if (!isDetalleStepValid) {
+      return items.length === 0
+        ? 'Agrega al menos una línea al detalle.'
+        : 'Revisa el detalle: cada línea necesita descripción, cantidad y precio mayor que cero.'
+    }
+    if (!isClienteStepValid) {
+      if (emitirConComprobante && !isTipoIngresoValid) return 'Selecciona el Tipo de ingreso en el paso Cliente.'
+      if (!isFechaLimiteValid) return 'Con pago a CRÉDITO debes indicar la fecha límite de pago.'
+      if (!isReferenciaValid) return 'Completa la información de referencia (NCF modificado, fecha y código de modificación).'
+      if (emitirConComprobante && selectedCliente === null && tipoECF !== 'E43' && !isE32UnderLimit) return 'Selecciona un cliente en el paso Cliente.'
+      if (!isRncValid) return `El cliente necesita RNC o cédula para un ${tipoECF}.`
+      if (!isIdentificadorExtranjeroValid) return 'Falta el identificador extranjero del comprador.'
+      if (!isPaisCompradorValid) return 'Falta el país del comprador.'
+      return 'Faltan datos del cliente.'
+    }
+    if (facturacionMode !== 'rapido' && currentStep < 3) {
+      return 'Avanza hasta el paso Resumen para emitir.'
+    }
+    return null
+  })()
+
   // Reglas de validez (isClienteStepValid/isDetalleStepValid) se recalculan en
   // vivo, pero currentStep es estado propio — sin esto, alternar "Nota de
   // venta" (no exige cliente) ↔ "Factura fiscal" (sí) mientras ya estás en el
@@ -1178,10 +1205,16 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
                   </div>
                 )}
                 {/* Emitir e-CF Button (solo fiscal) */}
+                {esFiscal && emitDisabledReason && (
+                  <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 text-left leading-snug font-sans mb-1">
+                    {emitDisabledReason}
+                  </p>
+                )}
                 {esFiscal && (
                   <button
                     type="button"
                     disabled={(facturacionMode !== 'rapido' && currentStep < 3) || !isEmitEnabled || submitting || !!blockingReason}
+                    title={emitDisabledReason ?? 'Emitir e-CF a la DGII'}
                     onClick={() => handleSubmit(true)}
                     className={cn(
                       "w-full h-[44px] rounded-[10px] bg-[#0379D5] text-white text-[16px] font-semibold leading-[24px] font-sans flex items-center justify-center gap-2 transition-all duration-200 select-none shadow-sm",

@@ -28,7 +28,7 @@ export function TopBar({
   const router = useRouter()
   const { facturacionMode, setFacturacionMode, globalSearch, setGlobalSearch } = useUI()
 
-  const isDashboardOrEmitir = pageTitle === 'Tablero de Facturación' || pageTitle === 'Crear factura'
+  const isDashboardOrEmitir = pageTitle === 'Tablero' || pageTitle === 'Crear factura'
   const isEmitir = pageTitle === 'Crear factura'
 
   return (
