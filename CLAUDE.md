@@ -14,7 +14,7 @@ la Ley 32-23 de la DGII, con integración directa a GoHighLevel.
 - Cache/Colas: Redis 7 + BullMQ
 - Frontend: Next.js 16.2 (pendiente)
 - Deploy: Railway (api) + Vercel (web)
-- API Client: openapi-typescript + openapi-fetch
+- API Clients: openapi-typescript + openapi-fetch
 
 ---
 
