@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { Select } from '@/components/ui/select'
-import { formatCurrency, MAX_NOMBRE_ITEM } from '@/lib/comprobantes'
+import { formatCurrency, MAX_NOMBRE_ITEM, MAX_DESCRIPCION_ITEM, precioBaseSinItbis } from '@/lib/comprobantes'
 
 interface Producto {
   id: string
@@ -19,6 +19,8 @@ interface Producto {
   indicadorFacturacion: string
   precioFinal: number
   estado: string
+  descripcion?: string
+  unidadMedida?: number
 }
 
 interface EditarProductoModalProps {
@@ -141,7 +143,11 @@ export function EditarProductoModal({
           : (producto.indicadorFacturacion as any)
       )
       setPrecioIncluyeItbis(false)
-      setDescripcion('')
+      // El precio guardado es SIEMPRE base sin ITBIS, por eso el check arranca
+      // apagado. Descripción y unidad sí se rellenan: antes se limpiaban en cada
+      // apertura y el texto escrito desaparecía al guardar.
+      setDescripcion(producto.descripcion ?? '')
+      setUnidadMedida(producto.unidadMedida !== undefined ? String(producto.unidadMedida) : '')
     }
   }, [producto, open])
 
@@ -159,16 +165,23 @@ export function EditarProductoModal({
     setDescripcion('')
   }
 
+  const rateKey = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
+  const rate = ITBIS_RATES[rateKey] ?? 0.18
+
   function handleSave(): void {
     if (!producto || !nombre.trim() || !precio) return
     onSave(producto.id, {
       nombre,
       tipo,
       codigo: codigo || undefined,
-      precio: Number(precio),
+      // Se guarda la base sin ITBIS: con "el precio incluye ITBIS" marcado el
+      // monto tecleado es el TOTAL, así que se desagrega aquí. Antes el flag se
+      // ignoraba al guardar y el 18% terminaba sumándose por encima del total.
+      precio: precioBaseSinItbis(Number(precio), rate, precioIncluyeItbis),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
-      descripcion: descripcion || undefined,
+      // Cadena vacía (no undefined) para poder BORRAR la descripción al editar.
+      descripcion: descripcion.trim(),
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
     })
     reset()
@@ -186,8 +199,6 @@ export function EditarProductoModal({
   const showPrecioError = precioTouched && (!precio || Number(precio) <= 0)
 
   // Calculations for real-time preview
-  const rateKey = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
-  const rate = ITBIS_RATES[rateKey] ?? 0.18
   const itbisLabel = rateKey === 'I1' ? '18%' : rateKey === 'I2' ? '16%' : rateKey === 'I3' ? '0%' : 'Exento'
 
   const inputPrice = Number(precio) || 0
@@ -346,6 +357,7 @@ export function EditarProductoModal({
                 placeholder="Detalles adicionales del producto o servicio"
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
+                maxLength={MAX_DESCRIPCION_ITEM}
                 rows={3}
                 className="w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white pl-10 pr-4 py-2.5 resize-none min-h-[80px] font-sans"
               />

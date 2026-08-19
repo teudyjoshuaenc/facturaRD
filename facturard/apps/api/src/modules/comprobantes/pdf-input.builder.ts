@@ -52,6 +52,9 @@ export function buildEcfPdfInput(
     const valor = calcularMontoItem(item)
     return {
       descripcion: item.nombreItem ?? '',
+      ...(item.descripcion !== undefined && item.descripcion !== ''
+        ? { detalle: item.descripcion }
+        : {}),
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitarioItem ?? 0,
       valor,

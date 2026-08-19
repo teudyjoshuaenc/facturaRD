@@ -11,6 +11,8 @@ export interface ItemRow {
   precioUnitarioItem: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   indicadorBienoServicio: 1 | 2
+  /** Detalle libre de la línea → DescripcionItem del e-CF (máx 1000). */
+  descripcion?: string
   unidadMedida?: number
   descuento?: number
   itbisRetenido?: number
@@ -86,6 +88,7 @@ export function useNuevaFactura() {
           indicadorBienoServicio: item.indicadorBienoServicio,
           cantidad: item.cantidad,
           precioUnitarioItem: item.precioUnitarioItem,
+          ...(item.descripcion?.trim() && { descripcion: item.descripcion.trim() }),
           ...(item.unidadMedida && { unidadMedida: item.unidadMedida }),
           ...(item.descuento && { descuento: item.descuento }),
           ...(item.itbisRetenido && { itbisRetenido: item.itbisRetenido }),
@@ -137,6 +140,7 @@ export function useNuevaFactura() {
           indicadorBienoServicio: item.indicadorBienoServicio,
           cantidad: item.cantidad,
           precioUnitarioItem: item.precioUnitarioItem,
+          ...(item.descripcion?.trim() && { descripcion: item.descripcion.trim() }),
           ...(item.unidadMedida && { unidadMedida: item.unidadMedida }),
           ...(item.descuento && { descuento: item.descuento }),
           ...(item.itbisRetenido && { itbisRetenido: item.itbisRetenido }),

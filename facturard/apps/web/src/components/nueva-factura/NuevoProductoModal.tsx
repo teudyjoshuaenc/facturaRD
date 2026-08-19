@@ -11,7 +11,7 @@ import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { NuevoProductoData } from '@/hooks/useProductos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { Select } from '@/components/ui/select'
-import { MAX_NOMBRE_ITEM } from '@/lib/comprobantes'
+import { MAX_NOMBRE_ITEM, MAX_DESCRIPCION_ITEM, precioBaseSinItbis } from '@/lib/comprobantes'
 import { formatCurrency } from '@/lib/comprobantes'
 
 interface NuevoProductoModalProps {
@@ -133,16 +133,22 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
     setDescripcion('')
   }
 
+  const rateKeySave = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
+  const rate = ITBIS_RATES[rateKeySave] ?? 0.18
+
   function handleSave(): void {
     if (!nombre.trim() || !precio) return
     onSave({
       nombre,
       tipo,
       codigo,
-      precio: Number(precio),
+      // El precio que viaja SIEMPRE es la base sin ITBIS: si el usuario marcó
+      // "el precio incluye ITBIS", se desagrega aquí (una sola vez, en el punto
+      // de captura). Antes el flag se ignoraba y el 18% se sumaba por encima.
+      precio: precioBaseSinItbis(Number(precio), rate, precioIncluyeItbis),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
-      ...(descripcion ? { descripcion } : {}),
+      ...(descripcion.trim() ? { descripcion: descripcion.trim() } : {}),
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
     })
     reset()
@@ -160,8 +166,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
   const showPrecioError = precioTouched && (!precio || Number(precio) <= 0)
 
   // Calculations for preview
-  const rateKey = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
-  const rate = ITBIS_RATES[rateKey] ?? 0.18
+  const rateKey = rateKeySave
   const itbisLabel = rateKey === 'I1' ? '18%' : rateKey === 'I2' ? '16%' : rateKey === 'I3' ? '0%' : 'Exento'
 
   const inputPrice = Number(precio) || 0
@@ -324,6 +329,7 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
                 placeholder="Detalles adicionales del producto o servicio"
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
+                maxLength={MAX_DESCRIPCION_ITEM}
                 rows={3}
                 className="w-full rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:bg-white pl-10 pr-4 py-2.5 resize-none min-h-[80px] font-sans"
               />
