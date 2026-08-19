@@ -371,6 +371,13 @@ export class ComprobantesService {
 
     const producto = await prisma.producto.findFirst({ where: { id: item.productoId, tenantId } })
     if (!producto) throw new BadRequestException(`Producto ${item.productoId} no encontrado`)
+    // Un borrador de catálogo está a medias (puede no tener precio): no se factura
+    // hasta publicarlo. Segunda defensa — el selector ya los excluye.
+    if (producto.borrador) {
+      throw new BadRequestException(
+          `El producto "${producto.nombre}" es un borrador del catálogo; publícalo antes de facturarlo`,
+      )
+    }
 
     const unidadProducto =
         producto.unidadMedida != null && producto.unidadMedida !== '' && !Number.isNaN(Number(producto.unidadMedida))
@@ -422,7 +429,17 @@ export class ComprobantesService {
     }
 
     const datosActuales = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
-    const merged = { ...datosActuales, ...dto } as CreateComprobanteDto
+
+    // Cambiar de contacto DEBE cambiar la identidad del comprador. Si se mezclan
+    // los datos viejos sin más, la razón social/RNC del cliente ANTERIOR ganan
+    // (en `resolverDto` el valor explícito manda sobre el del contacto) y el
+    // borrador queda con el contacto nuevo pero el nombre del viejo — que es lo
+    // que imprime el PDF y lo que viajaría a la DGII. Por eso, al cambiar de
+    // contacto se descartan los campos de comprador heredados, salvo los que el
+    // propio PATCH mande explícitos.
+    const cambiaContacto = dto.contactoId !== undefined && dto.contactoId !== datosActuales.contactoId
+    const base = cambiaContacto ? this.sinDatosComprador(datosActuales) : datosActuales
+    const merged = { ...base, ...dto } as CreateComprobanteDto
     const datos = await this.resolverDto(tenantId, merged)
     const totales = calcularTotales(datos.items)
 
@@ -437,6 +454,23 @@ export class ComprobantesService {
         datos: JSON.parse(JSON.stringify(datos)) as object,
       },
     })
+  }
+
+  /**
+   * Quita del snapshot los campos de identidad del comprador. Se usa al cambiar
+   * de contacto en un borrador: lo que no venga en el PATCH lo vuelve a resolver
+   * `resolverDto` desde el contacto NUEVO, en vez de arrastrar al anterior.
+   */
+  private sinDatosComprador(datos: CreateComprobanteDto): CreateComprobanteDto {
+    const {
+      rncComprador: _rnc,
+      razonSocialComprador: _razon,
+      direccionComprador: _dir,
+      identificadorExtranjero: _ext,
+      paisComprador: _pais,
+      ...resto
+    } = datos
+    return resto as CreateComprobanteDto
   }
 
   /**

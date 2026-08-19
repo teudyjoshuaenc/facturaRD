@@ -233,8 +233,15 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
   // Match and select the client once contacts are loaded
   useEffect(() => {
     if (draftData && contactos.length > 0) {
+      // Se busca primero por contactoId (identidad exacta) y sólo después por RNC
+      // (compatibilidad con borradores viejos, guardados antes de que se mandara
+      // el contactoId). El RNC vacío NO cuenta como coincidencia: si no, cualquier
+      // contacto sin RNC hacía match con cualquier otro.
+      const contactoIdGuardado = draftData.datos?.contactoId || draftData.contactoId
       const rncComp = draftData.datos?.rncComprador || draftData.rnc
-      const clientMatch = contactos.find((contact) => contact.rnc === rncComp || contact.id === draftData.contactoId)
+      const clientMatch =
+        (contactoIdGuardado ? contactos.find((contact) => contact.id === contactoIdGuardado) : undefined) ??
+        (rncComp ? contactos.find((contact) => contact.rnc === rncComp) : undefined)
       if (clientMatch) {
         setSelectedCliente(clientMatch)
       }
@@ -420,6 +427,9 @@ export function ComprobanteForm({ onSubmit, onError }: Props): JSX.Element {
     try {
       await onSubmit({
         tipoECF,
+        // La identidad del cliente es el contacto, no su RNC: sin esto un cliente
+        // sin RNC (consumidor final) se perdía al reabrir el borrador.
+        ...(selectedCliente?.id ? { contactoId: selectedCliente.id } : {}),
         rncComprador: selectedCliente?.rnc ?? '',
         identificadorExtranjero: isForeignerType ? identificadorExtranjero : (selectedCliente?.idExtranjero ?? ''),
         razonSocialComprador: selectedCliente?.nombre ?? '',

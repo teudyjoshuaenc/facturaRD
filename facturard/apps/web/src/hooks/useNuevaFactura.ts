@@ -21,6 +21,13 @@ export interface ItemRow {
 
 export interface ComprobanteFormData {
   tipoECF: TipoECF
+  /**
+   * Contacto elegido. Se manda SIEMPRE que exista (también en borradores): el
+   * RNC no alcanza como identidad —un consumidor final o un contacto sin RNC
+   * viaja con rnc:'' y al reabrir el borrador no había forma de reencontrarlo,
+   * así que el cliente aparecía vacío y había que elegirlo de nuevo.
+   */
+  contactoId?: string
   rncComprador: string
   identificadorExtranjero: string
   razonSocialComprador: string
@@ -75,6 +82,7 @@ export function useNuevaFactura() {
         ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
         ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
+        ...(!tiposSinComprador.includes(data.tipoECF) && data.contactoId && { contactoId: data.contactoId }),
         ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),
         ...(!tiposSinComprador.includes(data.tipoECF) && { razonSocialComprador: data.razonSocialComprador }),
         ...(data.identificadorExtranjero && { identificadorExtranjero: data.identificadorExtranjero }),
@@ -127,6 +135,7 @@ export function useNuevaFactura() {
         ...(data.terminoPago && { terminoPago: data.terminoPago }),
         fechaEmision: toDDMMYYYY(data.fechaEmision),
         ...(data.fechaVencimiento && { fechaVencimiento: toDDMMYYYY(data.fechaVencimiento) }),
+        ...(!tiposSinComprador.includes(data.tipoECF) && data.contactoId && { contactoId: data.contactoId }),
         ...(!tiposSinComprador.includes(data.tipoECF) && data.rncComprador && { rncComprador: data.rncComprador }),
         ...(!tiposSinComprador.includes(data.tipoECF) && { razonSocialComprador: data.razonSocialComprador }),
         ...(data.identificadorExtranjero && { identificadorExtranjero: data.identificadorExtranjero }),

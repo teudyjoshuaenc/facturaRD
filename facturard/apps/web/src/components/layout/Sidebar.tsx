@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import type { TenantInfo } from '@/lib/session'
 
 const OPERACION_ITEMS = [
-  { href: '/dashboard', label: 'Tablero de Facturación', iconPath: '/assets/56c6688862abd07d5527b09c3f035232f217f5f6.svg' },
+  { href: '/dashboard', label: 'Tablero', iconPath: '/assets/56c6688862abd07d5527b09c3f035232f217f5f6.svg' },
   // "Emitir" se retiró del sidebar: la creación se inicia desde el botón
   // "Crear factura" dentro de /facturas (Fase 2).
   { href: '/facturas', label: 'Facturas', iconPath: '/assets/61733f93d0c8001a74ba5b649600aae8be315442.svg' },

@@ -48,11 +48,12 @@ const estadoOptions = [
   { value: 'todos', label: 'Estado' },
   { value: 'ACTIVO', label: 'Activo' },
   { value: 'INACTIVO', label: 'Inactivo' },
+  { value: 'BORRADOR', label: 'Borrador' },
 ]
 
 type TipoFilter = 'todos' | 'BIEN' | 'SERVICIO'
 type ItbisFilter = 'todos' | 'I1' | 'I2' | 'I3' | 'E'
-type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO'
+type EstadoFilter = 'todos' | 'ACTIVO' | 'INACTIVO' | 'BORRADOR'
 
 export default function ProductosPage(): JSX.Element {
   const { globalSearch } = useUI()
@@ -63,8 +64,12 @@ export default function ProductosPage(): JSX.Element {
   const [page, setPage] = useState(1)
 
   const useProductosParams = useMemo(() => {
-    const params: { activo?: boolean } = {}
-    if (estadoFilter !== 'todos') {
+    // El catálogo SÍ gestiona borradores → clase 'todos'. El selector de emisión
+    // usa el default del hook (sólo publicados) y nunca los ve.
+    const params: { activo?: boolean; clase?: 'publicado' | 'borrador' | 'todos' } = { clase: 'todos' }
+    if (estadoFilter === 'BORRADOR') {
+      params.clase = 'borrador'
+    } else if (estadoFilter !== 'todos') {
       params.activo = estadoFilter === 'ACTIVO'
     }
     return params
@@ -177,7 +182,13 @@ export default function ProductosPage(): JSX.Element {
         indicadorFacturacion: p.indicadorFacturacion,
         precioFinal: p.precio * (p.indicadorFacturacion === 'I1' ? 1.18 : 1),
         uso: 5,
-        estado: p.activo ? 'ACTIVO' : 'INACTIVO',
+        // Un borrador es un estado propio: aún no se puede facturar.
+        estado: p.borrador ? 'BORRADOR' : p.activo ? 'ACTIVO' : 'INACTIVO',
+        borrador: p.borrador === true,
+        // Modo de captura: sin esto el modal de edición reabría en "sin ITBIS" y
+        // re-marcar el check hundía el precio en cada guardado.
+        precioIncluyeItbis: p.precioIncluyeItbis === true,
+        precioCaptura: p.precioCaptura ?? null,
         ...(p.descripcion !== undefined && { descripcion: p.descripcion }),
         ...(p.unidadMedida !== undefined && { unidadMedida: p.unidadMedida }),
       })),
@@ -538,6 +549,16 @@ export default function ProductosPage(): JSX.Element {
                         </td>
 
                         <td className="px-4 py-3.5">
+                          {/* Un borrador no se activa/desactiva: se publica desde el modal de edición. */}
+                          {p.estado === 'BORRADOR' ? (
+                            <span
+                              title="Guardado sin terminar. Publícalo para poder facturarlo."
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 text-ui-xs font-semibold text-amber-700"
+                            >
+                              <AlertTriangle size={11} className="text-amber-600" />
+                              Borrador
+                            </span>
+                          ) : (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -558,6 +579,7 @@ export default function ProductosPage(): JSX.Element {
                               </span>
                             )}
                           </button>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3.5">
@@ -675,6 +697,7 @@ export default function ProductosPage(): JSX.Element {
         open={openModal}
         onClose={() => setOpenModal(false)}
         onSave={crearProducto}
+        allowDraft
       />
 
       <Modal

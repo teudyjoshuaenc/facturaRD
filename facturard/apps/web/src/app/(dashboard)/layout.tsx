@@ -13,7 +13,7 @@ import { useCertificadoStatus } from '@/hooks/useCertificado'
 import { etiquetaIdentificacion } from '@/lib/comprobantes'
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
-  '/dashboard': { title: 'Tablero de Facturación', subtitle: 'Resumen de tu operación del mes' },
+  '/dashboard': { title: 'Tablero', subtitle: 'Resumen de tu operación del mes' },
   '/facturas': { title: 'Facturas', subtitle: 'Historial de comprobantes fiscales electrónicos' },
   '/cotizaciones': { title: 'Cotizaciones', subtitle: 'Presupuestos y cotizaciones de clientes' },
   '/finanzas': { title: 'Finanzas', subtitle: 'Flujo de caja: ingresos, egresos y capital' },
