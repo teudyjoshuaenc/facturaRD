@@ -106,6 +106,27 @@ export function precioBaseSinItbis(precio: number, rate: number, incluye = true)
 }
 
 /**
+ * Inversa de `precioBaseSinItbis`: reconstruye el precio TAL COMO LO ESCRIBIÓ el
+ * usuario a partir de la base guardada. Necesaria al reabrir un formulario: si
+ * el producto se capturó "con ITBIS incluido" hay que mostrar el total, no la
+ * base. Sin esto el input mostraba la base con el check apagado y volver a
+ * marcarlo dividía un precio YA dividido — el monto bajaba en cada edición.
+ */
+export function precioSegunCaptura(
+  base: number,
+  rate: number,
+  incluye = false,
+  precioCaptura?: number | null,
+): number {
+  if (!incluye || !rate || !Number.isFinite(base)) return base
+  // El monto tecleado manda: reconstruirlo desde la base pierde un centavo
+  // (15,000 → 12,711.86 → 14,999.99). Sólo se recalcula si no lo tenemos
+  // (productos capturados antes de que se guardara).
+  if (precioCaptura != null && Number.isFinite(precioCaptura) && precioCaptura > 0) return precioCaptura
+  return Math.round(base * (1 + rate) * 100) / 100
+}
+
+/**
  * Identificador visible del documento: e-NCF si es fiscal, folio NV- si es nota
  * de venta. Espejo de `EnvioComprobanteService.referencia()` en el backend.
  */

@@ -13,6 +13,8 @@ export interface Producto {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  /** Monto exacto tecleado si se capturó con ITBIS incluido. Sólo para re-mostrar. */
+  precioCaptura?: number | null
   activo?: boolean
   unidadMedida?: number
   descuento?: number
@@ -20,6 +22,8 @@ export interface Producto {
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
   descripcion?: string
+  /** true → guardado sin terminar: no se puede facturar hasta publicarlo. */
+  borrador?: boolean
 }
 
 export interface NuevoProductoData {
@@ -29,16 +33,20 @@ export interface NuevoProductoData {
   precio: number
   indicadorFacturacion: 'I1' | 'I2' | 'I3' | 'I4' | 'E'
   precioIncluyeItbis: boolean
+  precioCaptura?: number | null
   unidadMedida?: number
   descuento?: number
   itbisRetenido?: number
   isrRetenido?: number
   aplicarPropinaLegal?: boolean
   descripcion?: string
+  borrador?: boolean
 }
 
 export interface UseProductosParams {
   activo?: boolean
+  /** Omitir → sólo publicados (selector de emisión). 'todos' → gestión del catálogo. */
+  clase?: 'publicado' | 'borrador' | 'todos'
 }
 
 // options.activo controla el filtro de 3 estados del backend:
@@ -50,12 +58,13 @@ export function useProductos(options?: UseProductosParams) {
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data: productos = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['productos', searchQuery, options?.activo],
+    queryKey: ['productos', searchQuery, options?.activo, options?.clase],
     queryFn: async () => {
       const res = await api.get('/productos', {
         params: {
           search: searchQuery.trim() || undefined,
           activo: options?.activo,
+          clase: options?.clase,
           limit: 100,
         },
       })
@@ -68,8 +77,10 @@ export function useProductos(options?: UseProductosParams) {
           codigo: p.codigo || '',
           precio: Number(p.precioUnitario),
           indicadorFacturacion: p.tratamientoITBIS === 'EXENTO' ? 'E' : (p.tratamientoITBIS || 'I1'),
-          precioIncluyeItbis: false,
+          precioIncluyeItbis: p.precioIncluyeItbis === true,
+          precioCaptura: p.precioCaptura != null ? Number(p.precioCaptura) : null,
           activo: p.activo !== false,
+          borrador: p.borrador === true,
           ...(p.descripcion ? { descripcion: p.descripcion as string } : {}),
         }
         if (p.unidadMedida) {
@@ -82,10 +93,16 @@ export function useProductos(options?: UseProductosParams) {
 
   const crearProductoMutation = useMutation({
     mutationFn: async (data: NuevoProductoData) => {
+      const esBorrador = data.borrador === true
       const body = {
         tipo: data.tipo,
         nombre: data.nombre,
-        precioUnitario: data.precio,
+        // Un borrador puede guardarse sin precio; el backend no lo exige.
+        ...(esBorrador && !(data.precio > 0) ? {} : { precioUnitario: data.precio }),
+        ...(esBorrador ? { borrador: true } : {}),
+        // Modo de captura: el precio que va arriba YA es la base sin ITBIS.
+        precioIncluyeItbis: data.precioIncluyeItbis === true,
+        ...(data.precioCaptura != null ? { precioCaptura: data.precioCaptura } : {}),
         tratamientoITBIS: data.indicadorFacturacion === 'E' || data.indicadorFacturacion === 'I4' ? 'EXENTO' : data.indicadorFacturacion,
         unidadMedida: data.unidadMedida ? String(data.unidadMedida) : undefined,
         codigo: data.codigo || undefined,
@@ -94,9 +111,9 @@ export function useProductos(options?: UseProductosParams) {
       const res = await api.post('/productos', body)
       return res.data
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['productos'] })
-      toast.success('Producto creado correctamente')
+      toast.success(vars.borrador === true ? 'Borrador guardado' : 'Producto creado correctamente')
     },
     onError: (err: any) => {
       const msg = getErrorMessage(err)
@@ -114,8 +131,10 @@ export function useProductos(options?: UseProductosParams) {
         codigo: result.codigo || '',
         precio: Number(result.precioUnitario),
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
-        precioIncluyeItbis: false,
+        precioIncluyeItbis: result.precioIncluyeItbis === true,
+        precioCaptura: result.precioCaptura != null ? Number(result.precioCaptura) : null,
         activo: result.activo !== false,
+        borrador: result.borrador === true,
         ...(result.descripcion ? { descripcion: result.descripcion as string } : {}),
       }
       if (result.unidadMedida) {
@@ -127,7 +146,7 @@ export function useProductos(options?: UseProductosParams) {
   )
 
   const actualizarProductoMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<NuevoProductoData> & { activo?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<NuevoProductoData> & { activo?: boolean; borrador?: boolean } }) => {
       const body = {
         ...(data.tipo !== undefined && { tipo: data.tipo }),
         ...(data.nombre !== undefined && { nombre: data.nombre }),
@@ -139,6 +158,9 @@ export function useProductos(options?: UseProductosParams) {
         ...(data.codigo !== undefined && { codigo: data.codigo || null }),
         ...(data.descripcion !== undefined && { descripcion: data.descripcion }),
         ...(data.activo !== undefined && { activo: data.activo }),
+        ...(data.borrador !== undefined && { borrador: data.borrador }),
+        ...(data.precioIncluyeItbis !== undefined && { precioIncluyeItbis: data.precioIncluyeItbis }),
+        ...(data.precioCaptura !== undefined && { precioCaptura: data.precioCaptura }),
       }
       const res = await api.patch(`/productos/${id}`, body)
       return res.data
@@ -154,7 +176,7 @@ export function useProductos(options?: UseProductosParams) {
   })
 
   const actualizarProducto = useCallback(
-    async (id: string, data: Partial<NuevoProductoData> & { activo?: boolean }): Promise<Producto> => {
+    async (id: string, data: Partial<NuevoProductoData> & { activo?: boolean; borrador?: boolean }): Promise<Producto> => {
       const result = await actualizarProductoMutation.mutateAsync({ id, data })
       const p: Producto = {
         id: result.id,
@@ -163,8 +185,10 @@ export function useProductos(options?: UseProductosParams) {
         codigo: result.codigo || '',
         precio: Number(result.precioUnitario),
         indicadorFacturacion: result.tratamientoITBIS === 'EXENTO' ? 'E' : (result.tratamientoITBIS || 'I1'),
-        precioIncluyeItbis: false,
+        precioIncluyeItbis: result.precioIncluyeItbis === true,
+        precioCaptura: result.precioCaptura != null ? Number(result.precioCaptura) : null,
         activo: result.activo !== false,
+        borrador: result.borrador === true,
         ...(result.descripcion ? { descripcion: result.descripcion as string } : {}),
       }
       if (result.unidadMedida) {

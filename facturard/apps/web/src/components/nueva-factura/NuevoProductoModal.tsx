@@ -19,6 +19,11 @@ interface NuevoProductoModalProps {
   onClose: () => void
   onSave: (data: NuevoProductoData) => void
   tipoECF?: TipoECF | undefined
+  /**
+   * Habilita "Guardar borrador" (catálogo). En el flujo de emisión NO se ofrece:
+   * un borrador no se puede facturar, así que ahí no tiene sentido.
+   */
+  allowDraft?: boolean
 }
 
 const TIPO_OPTIONS = [
@@ -102,7 +107,7 @@ const UNIDADES_MEDIDA = [
   { value: '58', label: 'Servicio' },
 ]
 
-export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProductoModalProps): JSX.Element {
+export function NuevoProductoModal({ open, onClose, onSave, tipoECF, allowDraft = false }: NuevoProductoModalProps): JSX.Element {
   const [nombre, setNombre] = useState('')
   const [nombreTouched, setNombreTouched] = useState(false)
   const [tipo, setTipo] = useState<'BIEN' | 'SERVICIO'>('BIEN')
@@ -136,9 +141,12 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
   const rateKeySave = indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion
   const rate = ITBIS_RATES[rateKeySave] ?? 0.18
 
-  function handleSave(): void {
-    if (!nombre.trim() || !precio) return
+  function handleSave(borrador = false): void {
+    // Publicar exige nombre + precio; un borrador se guarda con sólo el nombre.
+    if (!nombre.trim()) return
+    if (!borrador && !precio) return
     onSave({
+      ...(borrador ? { borrador: true } : {}),
       nombre,
       tipo,
       codigo,
@@ -148,6 +156,8 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
       precio: precioBaseSinItbis(Number(precio), rate, precioIncluyeItbis),
       indicadorFacturacion: indicadorFacturacion === 'I4' ? 'E' : indicadorFacturacion,
       precioIncluyeItbis,
+      // Monto tecleado tal cual: reconstruirlo desde la base perdería un centavo.
+      ...(precioIncluyeItbis && Number(precio) > 0 ? { precioCaptura: Number(precio) } : {}),
       ...(descripcion.trim() ? { descripcion: descripcion.trim() } : {}),
       ...(unidadMedida ? { unidadMedida: Number(unidadMedida) } : {}),
     })
@@ -161,6 +171,8 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
   }
 
   const isValid = nombre.trim().length > 0 && Number(precio) > 0
+  // Para guardar un borrador basta el nombre: es "guardado sin terminar".
+  const isDraftValid = nombre.trim().length > 0
 
   const showNombreError = nombreTouched && !nombre.trim()
   const showPrecioError = precioTouched && (!precio || Number(precio) <= 0)
@@ -206,11 +218,23 @@ export function NuevoProductoModal({ open, onClose, onSave, tipoECF }: NuevoProd
             >
               Cancelar
             </Button>
+            {allowDraft && (
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={!isDraftValid}
+                onClick={() => handleSave(true)}
+                title="Guarda el producto sin terminar. No se puede facturar hasta publicarlo."
+                className="h-[42px] px-4 rounded-[10px] border-[#E2E8F0] text-[#64748B] text-[14px] font-normal whitespace-nowrap"
+              >
+                Guardar borrador
+              </Button>
+            )}
             <Button
               variant="primary"
               size="md"
               disabled={!isValid}
-              onClick={handleSave}
+              onClick={() => handleSave(false)}
               className="flex items-center justify-center gap-1 h-[42px] w-[168px] rounded-[10px] bg-[#0379D5] text-white text-[14px] font-normal"
             >
               Agregar

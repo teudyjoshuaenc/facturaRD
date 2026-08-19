@@ -296,6 +296,78 @@ APP_URL=http://localhost:3000
     gana sobre el catálogo, >1000 → 400, el PATCH del borrador la conserva). **252 e2e + 118 ecf-engine,
     build API y web en 0.**
 
+- ✅ **Borrador de catálogo en Productos (2026-08-19).** Un producto se puede guardar **sin terminar**,
+  igual que un comprobante DRAFT: se guarda a medias, no se puede facturar hasta publicarlo. Migración
+  aditiva `20260819130000_add_producto_borrador`: `Producto.borrador Boolean @default(false)` +
+  `@@index([tenantId, borrador])`. Cero `ALTER` sobre columnas fiscales.
+  - **Backend:** `POST /productos` con `borrador:true` → `precioUnitario` **opcional** (se persiste 0 como
+    marcador; `@ValidateIf` en el DTO). **Sin el flag no se relajó nada**: precio obligatorio y > 0 como
+    siempre. `GET /productos?clase=publicado|borrador|todos`; **el default excluye borradores**, así el
+    selector de emisión y todo caller viejo siguen limpios sin tocarles una línea. `PATCH` con
+    `borrador:false` = **publicar**, y exige precio > 0 + nombre (400 si no) — un publicado sin precio
+    rompería la emisión río abajo. Editar un borrador NO exige precio.
+  - **Barrera de emisión:** `ComprobantesService.resolverItem` rechaza con **400** una línea cuyo
+    `productoId` sea borrador, **antes de consumir e-NCF**. Doble defensa: el selector ya no los lista.
+  - **Frontend:** `NuevoProductoModal` con prop `allowDraft` (ON en `/producto`, **OFF en emisión** — un
+    borrador no se factura, ahí no tiene sentido): botón *Guardar borrador*, habilitado con sólo el
+    nombre. `EditarProductoModal` sobre un borrador muestra *Guardar borrador* y su primaria pasa a
+    *Publicar*. `/producto`: badge ámbar **Borrador** (no togglea activo/inactivo — se publica desde el
+    modal) + opción "Borrador" en el filtro Estado; la página pide `clase=todos`.
+  - **NO es autosave:** cerrar la ventana sigue sin guardar nada (tampoco en `/nueva-factura`). El
+    guardado es el botón explícito, igual que "Guardar borrador" de factura. Autosave = pendiente.
+  - **Tests:** `producto-borrador.e2e-spec.ts` (10 casos: guarda sin precio, borrador con precio,
+    publicado sin precio → 400, default sin borradores, `clase=borrador|todos`, no facturable → 400 sin
+    gastar e-NCF, publicar exige precio, publicado ya factura, editable sin precio, regresión producto
+    normal). **262 e2e + 118 ecf-engine, build API y web en 0.**
+
+  - ⚠️ **e2e local:** el contenedor `ecp-postgres` (otro proyecto) ocupa el puerto **5433**, el mismo de
+    `pnpm --filter @facturard/api test:e2e` → falla con `P1000 Authentication failed` (engañoso: no es la
+    password, es que Prisma pega contra la BD equivocada). Bájalo, o corre jest a mano contra otro puerto.
+
+- ✅ **🐞 Fix — "El precio incluye ITBIS" hundía el precio en cada edición (2026-08-19).** Reportado en
+  producción: escribes 15,000 con el check marcado y en cada guardado el precio baja
+  (15,000 → 12,711.86 → 10,772.76 → …). **Causa:** el check era sólo modo de captura y **no se
+  persistía**; al reabrir, el input mostraba la BASE con el check apagado, y volver a marcarlo hacía que
+  `precioBaseSinItbis` dividiera un precio **ya dividido**. No era idempotente.
+  - **Fix:** se persiste el modo de captura y el formulario devuelve el precio **como lo escribiste**.
+    Migraciones aditivas `20260819160000_add_producto_precio_incluye_itbis`
+    (`Producto.precioIncluyeItbis Boolean @default(false)`) y `20260819170000_add_producto_precio_captura`
+    (`Producto.precioCaptura Decimal(18,2)?`). **Invariante intacto:** `precioUnitario` SIGUE siendo la
+    base sin ITBIS — es lo único que viaja al DTO/XML/PDF/totales. Los dos campos nuevos son sólo para
+    RE-MOSTRAR.
+  - **Por qué DOS columnas y no una:** reconstruir el precio desde la base pierde un centavo
+    (15,000/1.18 = 12,711.8644… → se guarda `12,711.86` → ×1.18 = **14,999.99**). El test lo cazó. Por eso
+    `precioCaptura` guarda el monto tecleado EXACTO; `precioSegunCaptura()` (`lib/comprobantes.ts`) lo usa
+    y sólo recalcula si falta (productos viejos). Al desmarcar el check, `precioCaptura` se pone a **null**
+    (si no, quedaría un monto viejo contradiciendo el precio).
+  - **Sin backfill:** los productos que ya se hundieron por este bug quedaron con el precio bajo — hay que
+    corregirlos a mano.
+  - **Tests:** `precio-incluye-itbis.e2e-spec.ts` (7 casos: persiste el modo, la base no se toca, ida y
+    vuelta exacta a 15,000, **3 ciclos abrir→guardar sin que baje** [idempotencia], default sin flag,
+    desmarcar borra el monto de captura, cambio de modo por PATCH).
+
+- ✅ **🐞 Fix — el CLIENTE no sobrevivía en un borrador (2026-08-19).** Al reabrir un borrador había que
+  volver a elegir el cliente. **Causa:** el formulario mandaba sólo `rncComprador` + `razonSocialComprador`
+  — **nunca el `contactoId`** (el backend sí lo soportaba, `comprobantes.service.ts`), y al reabrir el
+  match era **por RNC** (`ComprobanteForm.tsx`). Cualquier cliente **sin RNC** (consumidor final, contacto
+  sin RNC) viajaba con `rnc:''` y era imposible de reencontrar.
+  - **Fix:** `contactoId` se manda siempre que haya cliente, en `POST` **y** en el `PATCH` del borrador
+    (`useNuevaFactura.ts`). Al reabrir se busca **primero por `contactoId`** (identidad exacta) y sólo
+    después por RNC — compatibilidad con borradores viejos. Un RNC vacío ya **no** cuenta como
+    coincidencia (antes cualquier contacto sin RNC podía hacer match con otro).
+  - **🐞 Tercer bug destapado por el test — cambiar de cliente NO cambiaba la razón social.**
+    `actualizarDraft` hacía `{...datosActuales, ...dto}` y en `resolverDto` el valor explícito gana sobre
+    el del contacto: el borrador quedaba con el **contacto nuevo** y el **nombre/RNC del anterior** — que
+    es lo que imprime el PDF y lo que viajaría a la DGII. Ahora, si el PATCH cambia de contacto, se
+    descartan los campos de comprador heredados (`sinDatosComprador`) salvo los que el propio PATCH mande.
+  - **Tests:** `draft-cliente.e2e-spec.ts` (5 casos: guarda `contactoId`, **cliente sin RNC sobrevive**,
+    el PATCH lo conserva si no se toca, el PATCH lo cambia ENTERO [nombre + RNC], regresión de borradores
+    viejos sólo con RNC). **274 e2e + 118 ecf-engine, build API y web en 0.**
+
+  - ⚠️ **e2e local (2):** con `connection_limit=1` (el que trae el script) la prueba de concurrencia de
+    cotizaciones (15 POST en paralelo) tira `read ECONNRESET` de forma intermitente — **no es una
+    regresión**, se reproduce igual sin cambios. Con `connection_limit=5` la suite completa pasa en verde.
+
 ---
 
 ## 8. PRÓXIMOS PASOS (en orden de prioridad)
@@ -542,6 +614,10 @@ POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
 /dashboard       → métricas del mes + facturas recientes
 /facturas        → lista paginada con filtros por estado y búsqueda. Descarga de PDF disponible para
                    cualquier estado sin error (aceptado = e-CF fiscal; borrador/pendiente = vista previa)
+/producto        → catálogo de productos/servicios. Estados Activo/Inactivo + **Borrador** (badge ámbar,
+                   filtro "Borrador"): producto guardado sin terminar, puede no tener precio y NO se
+                   puede facturar; se publica desde el modal de edición (*Publicar*). El selector de
+                   emisión nunca lista borradores (default de GET /productos)
 /empresa         → datos del emisor (ACTIVO en prod): editable dirección/teléfono/correo + logo por URL
                    (vista previa + validación); RNC/razón social solo-lectura (vienen de DGII);
                    "Vista previa" con datos reales. PATCH /tenants/empresa

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common'
 import { Prisma, prisma } from '@facturard/database'
 import type { Producto } from '@facturard/database'
 import type { CreateProductoDto } from './dto/create-producto.dto'
@@ -10,13 +10,22 @@ import type { PaginatedResponse } from '@facturard/shared'
 export class ProductosService {
   async crear(tenantId: string, dto: CreateProductoDto): Promise<Producto> {
     await this.assertCodigoLibre(tenantId, dto.codigo)
+    const borrador = dto.borrador === true
+    // Un borrador puede no traer precio (se guarda 0 como marcador); uno publicado
+    // SIEMPRE lo trae — el DTO ya lo exige, esto sólo cierra el tipo.
+    if (!borrador && dto.precioUnitario === undefined) {
+      throw new BadRequestException('precioUnitario es obligatorio salvo que el producto se guarde como borrador')
+    }
     return prisma.producto.create({
       data: {
         tenantId,
+        borrador,
         tipo: dto.tipo,
         nombre: dto.nombre,
-        precioUnitario: dto.precioUnitario,
+        precioUnitario: dto.precioUnitario ?? 0,
         tratamientoITBIS: dto.tratamientoITBIS ?? 'I1',
+        ...(dto.precioIncluyeItbis !== undefined && { precioIncluyeItbis: dto.precioIncluyeItbis }),
+        ...(dto.precioCaptura !== undefined && { precioCaptura: dto.precioCaptura }),
         ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
         ...(dto.unidadMedida !== undefined && { unidadMedida: dto.unidadMedida }),
         ...(dto.codigo !== undefined && { codigo: dto.codigo }),
@@ -35,6 +44,9 @@ export class ProductosService {
       // Filtro de 3 estados: sin parámetro → todos (activos e inactivos);
       // activo=true → sólo activos; activo=false → sólo inactivos (soft-deleted).
       ...(query.activo !== undefined && { activo: query.activo }),
+      // Por defecto los BORRADORES no se listan: así el selector de emisión
+      // (y cualquier caller viejo) nunca los ve sin pedirlos explícitamente.
+      ...(query.clase === 'todos' ? {} : { borrador: query.clase === 'borrador' }),
       ...(query.tipo !== undefined && { tipo: query.tipo }),
       ...(query.categoria !== undefined && { categoria: query.categoria }),
       ...(query.search !== undefined && query.search.trim() !== ''
@@ -63,8 +75,22 @@ export class ProductosService {
   }
 
   async actualizar(tenantId: string, id: string, dto: UpdateProductoDto): Promise<Producto> {
-    await this.findOne(tenantId, id) // 404 si no es del tenant
+    const actual = await this.findOne(tenantId, id) // 404 si no es del tenant
     if (dto.codigo !== undefined) await this.assertCodigoLibre(tenantId, dto.codigo, id)
+
+    // PUBLICAR (borrador=false) exige que el producto ya esté completo: un producto
+    // publicado sin precio rompería la emisión río abajo.
+    const quedaBorrador = dto.borrador ?? actual.borrador
+    if (!quedaBorrador) {
+      const precioFinal = dto.precioUnitario ?? Number(actual.precioUnitario)
+      if (!(precioFinal > 0)) {
+        throw new BadRequestException('Para publicar el producto necesitas un precio mayor que 0')
+      }
+      const nombreFinal = dto.nombre ?? actual.nombre
+      if (nombreFinal.trim() === '') {
+        throw new BadRequestException('Para publicar el producto necesitas un nombre')
+      }
+    }
 
     return prisma.producto.update({
       where: { id },
@@ -74,10 +100,19 @@ export class ProductosService {
         ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
         ...(dto.precioUnitario !== undefined && { precioUnitario: dto.precioUnitario }),
         ...(dto.tratamientoITBIS !== undefined && { tratamientoITBIS: dto.tratamientoITBIS }),
+        ...(dto.precioIncluyeItbis !== undefined && { precioIncluyeItbis: dto.precioIncluyeItbis }),
+        // null explícito al pasar a captura "sin ITBIS": si no, quedaría un monto
+        // de captura viejo contradiciendo el precio.
+        ...(dto.precioCaptura !== undefined
+            ? { precioCaptura: dto.precioCaptura }
+            : dto.precioIncluyeItbis === false
+              ? { precioCaptura: null }
+              : {}),
         ...(dto.unidadMedida !== undefined && { unidadMedida: dto.unidadMedida }),
         ...(dto.codigo !== undefined && { codigo: dto.codigo }),
         ...(dto.categoria !== undefined && { categoria: dto.categoria }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
+        ...(dto.borrador !== undefined && { borrador: dto.borrador }),
       },
     })
   }
