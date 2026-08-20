@@ -128,6 +128,7 @@ const GRAY_ROW    = '#f5f5f5';
 const TEXT        = '#111111';
 const MUTED       = '#555555';
 const BORDER      = '#cccccc';
+const LINK        = '#0b57d0';
 
 const UM_MAP: Record<string, string> = {
   '55': 'UND', '23': 'UND',
@@ -469,18 +470,31 @@ export async function generarRepresentacionImpresa(
       doc.image(qrBuffer, margin, curY, { width: QR_SIZE });
 
       const qrLabelY = curY + QR_SIZE + 4;
-      doc.font('Helvetica').fontSize(6.5).fillColor(MUTED);
-      // Mostrar URL del timbre bajo el QR (truncada para que entre en el espacio)
-      const qrUrl = qrContent;
-      const urlCorta = qrUrl.length > 80 ? qrUrl.substring(0, 77) + '...' : qrUrl;
-      doc.text(urlCorta, margin, qrLabelY, { width: 180 });
+      const URL_W = 180;
+      // Bajo el QR va una ETIQUETA CLICKABLE, no la URL escrita. Antes se imprimía
+      // la URL cortada a 77 chars + '...': un link inservible que no se podía ni
+      // escanear ni teclear. La URL completa vive en el hipervínculo (y en el QR);
+      // el texto sólo dice a dónde lleva.
+      const TIMBRE_LABEL = 'Verificar comprobante en DGII';
+      doc.font('Helvetica').fontSize(7).fillColor(LINK);
+      const urlH = doc.heightOfString(TIMBRE_LABEL, { width: URL_W });
+      doc.text(TIMBRE_LABEL, margin, qrLabelY, {
+        width: URL_W,
+        link: qrContent,
+        underline: true,
+      });
+      // pdfkit deja `underline`/`link` pegados al estado del doc: sin resetear,
+      // el Cód. Seguridad de abajo saldría subrayado y apuntando al mismo link.
+      doc.fillColor(MUTED);
+      let metaY = qrLabelY + urlH + 4;
       if (ecf.codigoSeguridad) {
         doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-           .text(`Cód. Seguridad: ${ecf.codigoSeguridad}`, margin, qrLabelY + 20, { width: 180 });
+           .text(`Cód. Seguridad: ${ecf.codigoSeguridad}`, margin, metaY, { width: URL_W });
+        metaY += 11;
       }
       if (ecf.fechaHoraFirma) {
         doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-           .text(`Fecha Firma: ${ecf.fechaHoraFirma}`, margin, qrLabelY + 31, { width: 180 });
+           .text(`Fecha Firma: ${ecf.fechaHoraFirma}`, margin, metaY, { width: URL_W });
       }
     }
 
