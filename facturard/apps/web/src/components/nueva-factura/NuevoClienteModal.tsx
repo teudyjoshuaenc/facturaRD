@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select'
 import { useRncValidation } from '@/hooks/useRncValidation'
 import { Spinner } from '@/components/ui/spinner'
 import { PROVINCIAS_MUNICIPIOS } from '@/lib/provincias-rd'
+import { TIPO_CONTACTO_OPTIONS, esOcasional, AYUDA_RNC_OCASIONAL } from '@/lib/contactos'
 
 interface NuevoClienteModalProps {
   open: boolean
@@ -92,7 +93,7 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
   }
 
   const cleanRnc = rnc.replace(/\D/g, '')
-  const isEligibleForValidation = tipo !== 'CONSUMIDOR_FINAL' && (cleanRnc.length === 9 || cleanRnc.length === 11)
+  const isEligibleForValidation = !esOcasional(tipo) && (cleanRnc.length === 9 || cleanRnc.length === 11)
   const { status: rncStatus, razonSocial: validatedRazonSocial, error: rncError } = useRncValidation(
     isEligibleForValidation ? cleanRnc : ''
   )
@@ -129,10 +130,10 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
   }
 
   const isRncOrIdExtranjeroValid = rnc.replace(/\D/g, '').length >= 9 || idExtranjero.trim().length > 0
-  const isValid = nombre.trim().length > 0 && (tipo === 'CONSUMIDOR_FINAL' || isRncOrIdExtranjeroValid)
+  const isValid = nombre.trim().length > 0 && (esOcasional(tipo) || isRncOrIdExtranjeroValid)
   
-  const showRncError = rncTouched && tipo !== 'CONSUMIDOR_FINAL' && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
-  const validationError = tipo !== 'CONSUMIDOR_FINAL' && rncStatus === 'invalid' ? rncError : ''
+  const showRncError = rncTouched && !esOcasional(tipo) && !idExtranjero.trim() && rnc.replace(/\D/g, '').length < 9
+  const validationError = !esOcasional(tipo) && rncStatus === 'invalid' ? rncError : ''
   const displayRncError = showRncError ? "Campo Requerido" : validationError
   const showNombreError = nombreTouched && !nombre.trim()
 
@@ -188,11 +189,7 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
           <Select
             value={tipo}
             onChange={(val) => setTipo(val as any)}
-            options={[
-              { value: 'CLIENTE', label: 'Cliente' },
-              { value: 'PROVEEDOR', label: 'Proveedor' },
-              { value: 'CONSUMIDOR_FINAL', label: 'Consumidor Final' },
-            ]}
+            options={TIPO_CONTACTO_OPTIONS}
             placeholder="Seleccionar tipo"
           />
         </div>
@@ -204,7 +201,7 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
           <div className="flex flex-col gap-4">
             {/* Rnc / Cédula */}
             <Input
-              label={tipo === 'CONSUMIDOR_FINAL' ? "Rnc / Cédula" : "Rnc / Cédula *"}
+              label={esOcasional(tipo) ? "Rnc / Cédula" : "Rnc / Cédula *"}
               placeholder="Ej: 130-56789-1"
               leftIcon={<CreditCard size={16} className="text-[#64748B]" />}
               rightIcon={
@@ -225,6 +222,9 @@ export function NuevoClienteModal({ open, onClose, onSave, defaultTipo = 'CLIENT
               {...(displayRncError ? { error: displayRncError } : {})}
               className="h-11 rounded-[10px] bg-[#F8FAFC] border-[#E2E8F0] text-[12px] text-[#333333] placeholder:text-[#64748B]/70 focus:border-brand-500 focus:bg-white"
             />
+            {esOcasional(tipo) && (
+              <p className="-mt-2.5 text-[11px] leading-4 text-[#64748B]">{AYUDA_RNC_OCASIONAL}</p>
+            )}
 
             {/* ID Extranjero */}
             <Input

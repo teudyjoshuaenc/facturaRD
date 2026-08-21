@@ -57,6 +57,16 @@ export class ContactosController {
     return this.service.findAll(tenantId, query)
   }
 
+  // Ruta literal declarada ANTES de las rutas ':id' (si no, 'recientes' entra
+  // como id y devuelve 404).
+  @Get('recientes')
+  @ApiOperation({ summary: 'Clientes a los que se les facturó más recientemente (sección "Recientes" del selector de emisión)' })
+  @ApiQuery({ name: 'limit', type: Number, required: false, description: 'Default 5, máximo 10' })
+  recientes(@CurrentTenant() tenantId: string, @Query('limit') limit?: string) {
+    const parsed = limit !== undefined ? Number(limit) : undefined
+    return this.service.recientes(tenantId, Number.isFinite(parsed) ? parsed : undefined)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalle de un contacto' })
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {

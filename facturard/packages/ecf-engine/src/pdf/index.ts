@@ -312,9 +312,16 @@ export async function generarRepresentacionImpresa(
       curY += cH + 3;
     }
 
-    doc.font('Helvetica').fontSize(9).fillColor(TEXT)
-       .text(`Fecha Emisión: ${ecf.fechaEmision}`, margin, curY, { width: LEFT_W });
-    const leftEndY = curY + 13;
+    // En cotización / nota de venta la fecha se imprime en el bloque DERECHO,
+    // pegada al folio, que es donde se busca en un documento sin e-NCF. En los
+    // fiscales se queda donde siempre (no se toca su representación impresa).
+    const fechaVaALaDerecha = modo === 'COTIZACION' || modo === 'INTERNO';
+    let leftEndY = curY;
+    if (!fechaVaALaDerecha) {
+      doc.font('Helvetica').fontSize(9).fillColor(TEXT)
+         .text(`Fecha Emisión: ${ecf.fechaEmision}`, margin, curY, { width: LEFT_W });
+      leftEndY = curY + 13;
+    }
 
     // ── HEADER RIGHT: (Logo) + Tipo + e-NCF ───────────────────────────────────
     // Título del documento según el modo. En cotización/borrador NO se llama al
@@ -349,6 +356,10 @@ export async function generarRepresentacionImpresa(
       const etiquetaFolio = modo === 'INTERNO' ? 'Factura de Consumo No.' : 'Cotización No.';
       doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
          .text(`${etiquetaFolio}: ${ecf.folio ?? '—'}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
+      rY += 13;
+
+      doc.font('Helvetica').fontSize(9).fillColor(TEXT)
+         .text(`Fecha: ${ecf.fechaEmision}`, RIGHT_X, rY, { width: RIGHT_W, align: 'right' });
       rY += 13;
     } else {
       doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
