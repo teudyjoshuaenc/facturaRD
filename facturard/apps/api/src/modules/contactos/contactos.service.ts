@@ -11,6 +11,13 @@ import type { PaginatedResponse } from '@facturard/shared'
 // respondió) sin bloquear la operación.
 export type ContactoConAviso = Contacto & { warning?: string }
 
+// Contacto del selector de emisión enriquecido con la fecha del último
+// comprobante que se le hizo. Sólo lectura: no toca nada fiscal.
+export type ContactoReciente = Contacto & { ultimaFacturaAt: Date }
+
+// Tope de contactos "recientes" que devuelve el endpoint. La UI pinta 5.
+const MAX_RECIENTES = 10
+
 @Injectable()
 export class ContactosService {
   constructor(private readonly dgii: DgiiContribuyentesService) {}
@@ -88,6 +95,86 @@ export class ContactosService {
     ])
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) }
+  }
+
+  /**
+   * Clientes a los que MÁS RECIENTEMENTE se les facturó (no los recién creados,
+   * que es lo que da findAll con orderBy createdAt). Alimenta la sección
+   * "Recientes" del selector de emisión.
+   *
+   * Cuenta CUALQUIER comprobante no eliminado — fiscal, borrador o nota de venta:
+   * para el selector lo que importa es a quién le estuviste facturando, no si el
+   * documento llegó a la DGII.
+   *
+   * Dos fuentes porque el histórico no es homogéneo:
+   *  (a) comprobantes con contactoId → identidad exacta;
+   *  (b) comprobantes VIEJOS sin contactoId (antes del fix de draft-cliente) →
+   *      se reconstruye por RNC del comprador. Un RNC vacío no hace match: si no
+   *      cualquier consumidor final sin RNC arrastraría a otro contacto.
+   * Si un contacto aparece por ambas vías gana la fecha más reciente.
+   *
+   * Sólo devuelve contactos ACTIVOS: el selector no factura a dados de baja.
+   */
+  async recientes(tenantId: string, limit?: number): Promise<ContactoReciente[]> {
+    const take = Math.min(Math.max(limit ?? 5, 1), MAX_RECIENTES)
+    // Se pide de más en cada fuente porque al resolver se cae lo inactivo, lo
+    // borrado y lo duplicado entre ambas vías.
+    const holgura = take * 4
+
+    const [porContacto, porRnc] = await prisma.$transaction([
+      prisma.comprobante.groupBy({
+        by: ['contactoId'],
+        where: { tenantId, eliminado: false, contactoId: { not: null } },
+        _max: { createdAt: true },
+        orderBy: { _max: { createdAt: 'desc' } },
+        take: holgura,
+      }),
+      prisma.comprobante.groupBy({
+        by: ['rnc'],
+        where: { tenantId, eliminado: false, contactoId: null, rnc: { not: '' } },
+        _max: { createdAt: true },
+        orderBy: { _max: { createdAt: 'desc' } },
+        take: holgura,
+      }),
+    ])
+
+    const ids = porContacto.map((g) => g.contactoId).filter((id): id is string => id !== null)
+    const rncs = porRnc.map((g) => g.rnc)
+    if (ids.length === 0 && rncs.length === 0) return []
+
+    const contactos = await prisma.contacto.findMany({
+      where: {
+        tenantId,
+        activo: true,
+        OR: [
+          ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+          ...(rncs.length > 0 ? [{ rnc: { in: rncs } }] : []),
+        ],
+      },
+    })
+
+    const porId = new Map(contactos.map((c) => [c.id, c]))
+    // Varios contactos pueden compartir RNC; se elige el más antiguo, la misma
+    // regla que usa el envío para resolver el contacto de un comprobante.
+    const primeroPorRnc = new Map<string, Contacto>()
+    for (const c of [...contactos].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+      if (c.rnc && !primeroPorRnc.has(c.rnc)) primeroPorRnc.set(c.rnc, c)
+    }
+
+    const fechas = new Map<string, { contacto: Contacto; ultimaFacturaAt: Date }>()
+    const registrar = (contacto: Contacto | undefined, fecha: Date | null | undefined): void => {
+      if (!contacto || !fecha) return
+      const previo = fechas.get(contacto.id)
+      if (!previo || fecha > previo.ultimaFacturaAt) fechas.set(contacto.id, { contacto, ultimaFacturaAt: fecha })
+    }
+
+    for (const g of porContacto) registrar(g.contactoId ? porId.get(g.contactoId) : undefined, g._max?.createdAt)
+    for (const g of porRnc) registrar(primeroPorRnc.get(g.rnc), g._max?.createdAt)
+
+    return [...fechas.values()]
+      .sort((a, b) => b.ultimaFacturaAt.getTime() - a.ultimaFacturaAt.getTime())
+      .slice(0, take)
+      .map(({ contacto, ultimaFacturaAt }) => ({ ...contacto, ultimaFacturaAt }))
   }
 
   async findOne(tenantId: string, id: string): Promise<Contacto> {
