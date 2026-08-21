@@ -1,5 +1,6 @@
 'use client'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { api, getErrorMessage } from '@/lib/api'
 
 export type TipoECF = 'E31' | 'E32' | 'E33' | 'E34' | 'E41' | 'E43' | 'E44' | 'E45' | 'E46' | 'E47'
@@ -63,6 +64,8 @@ function toDDMMYYYY(iso: string): string {
 }
 
 export function useNuevaFactura() {
+  const queryClient = useQueryClient()
+
   async function createComprobante(
     data: ComprobanteFormData,
   ): Promise<{ id: string; eNCF: string; montoTotal: number; razonSocial?: string; createdAt?: string }> {
@@ -112,6 +115,10 @@ export function useNuevaFactura() {
           ...(item.isrRetenido && { isrRetenido: item.isrRetenido }),
         })),
       })
+      // La sección "Recientes" del selector se ordena por último comprobante:
+      // recién creado uno, la lista cacheada quedó vieja.
+      void queryClient.invalidateQueries({ queryKey: ['contactos', 'recientes'] })
+
       return res.data
     } catch (err) {
       throw new Error(getErrorMessage(err))

@@ -165,6 +165,21 @@ describe('Notas de venta internas (esFiscal=false) — e2e', () => {
     expect(row?.eliminado).toBe(true)
   })
 
+  // Regresión: el formulario manda emitir:false también al crear una nota (su
+  // botón no emite nada). Con la rama del borrador declarada primero, TODA nota
+  // creada desde la UI nacía DRAFT y SIN folio NV — y el PDF salía con el
+  // número en blanco.
+  it('una nota con emitir:false es INTERNO CON folio, no un DRAFT', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/comprobantes').set(auth(tenantA))
+      .send({ ...notaBody, emitir: false }).expect(201)
+
+    expect(res.body.estado).toBe('INTERNO')
+    expect(res.body.esFiscal).toBe(false)
+    expect(res.body.folioInterno).toMatch(/^NV-\d{6}$/)
+    expect(res.body.eNCF ?? null).toBeNull()
+  })
+
   it('un BORRADOR fiscal (DRAFT, sin e-NCF) SÍ es eliminable (soft delete)', async () => {
     // Un draft fiscal no consumió e-NCF ni tocó la DGII: descartarlo es seguro.
     const created = await request(app.getHttpServer())

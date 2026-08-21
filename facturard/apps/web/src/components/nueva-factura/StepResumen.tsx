@@ -63,6 +63,7 @@ export function StepResumen({
   condicionPago,
   items,
   notas,
+  fechaEmision,
   fechaLimite,
   terminoPago,
   onBack,
@@ -165,6 +166,12 @@ export function StepResumen({
           <div className="flex flex-col gap-[4px] flex-1">
             <span className="text-[#94a3b8] text-[12px]">Método Pago</span>
             <span className="text-[#333] text-[14px] font-normal">{PAGO_LABELS[condicionPago] || condicionPago}</span>
+          </div>
+          {/* La fecha del documento se captura arriba en el formulario pero no
+              se veía en el resumen: es dato de la factura, no sólo del PDF. */}
+          <div className="flex flex-col gap-[4px] flex-1">
+            <span className="text-[#94a3b8] text-[12px]">Fecha de Emisión</span>
+            <span className="text-[#333] text-[14px] font-normal">{formatDateSpanish(fechaEmision)}</span>
           </div>
         </div>
 

@@ -82,6 +82,30 @@ function validarIdentificacionE32(dto: CreateComprobanteDto, montoTotal: number)
   }
 }
 
+// Tipos donde `RNCComprador` es OBLIGATORIO según el Formato e-CF v1.0 de la
+// DGII (tabla de obligatoriedad: E31, E41 y E45 = 1).
+const TIPOS_RNC_COMPRADOR_OBLIGATORIO: readonly string[] = ['E31', 'E41', 'E45']
+
+/**
+ * Lanza 400 si un tipo que EXIGE RNC del comprador viene sin él.
+ *
+ * Sin esta barrera el comprobante se emitía igual, el XML no validaba contra el
+ * XSD y la emisión reventaba en el worker — DESPUÉS de haber quemado el e-NCF
+ * (mismo patrón que el nombre de ítem >80). Se valida ANTES de consumir la
+ * secuencia. Ganó relevancia con los "clientes ocasionales", que por definición
+ * no tienen RNC y sólo se facturan por E32.
+ */
+function validarRncCompradorObligatorio(dto: CreateComprobanteDto): void {
+  if (!TIPOS_RNC_COMPRADOR_OBLIGATORIO.includes(dto.tipoECF)) return
+  const tieneRnc = dto.rncComprador !== undefined && dto.rncComprador.trim() !== ''
+  if (!tieneRnc) {
+    throw new BadRequestException(
+        `El comprobante ${dto.tipoECF} exige el RNC/Cédula del comprador. ` +
+        'Un cliente ocasional (sin RNC) sólo se puede facturar por Factura de Consumo (E32).',
+    )
+  }
+}
+
 function hoyDDMMYYYY(): string {
   const d = new Date()
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
@@ -216,28 +240,11 @@ export class ComprobantesService {
     const dto = await this.resolverDto(tenantId, dtoOriginal)
     const totales = calcularTotales(dto.items)
 
-    // emitir=false → borrador: no consume secuencia, no encola, no toca la DGII.
-    if (dto.emitir === false) {
-      return prisma.comprobante.create({
-        data: {
-          tenantId,
-          eNCF: null,
-          esFiscal: dto.esFiscal ?? true,
-          tipoECF: dto.tipoECF ?? 'E32',
-          estado: 'DRAFT',
-          montoTotal: totales.montoTotal,
-          rnc: dto.rncComprador ?? '',
-          razonSocial: dto.razonSocialComprador ?? '',
-          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
-          datos: JSON.parse(JSON.stringify(dto)) as object,
-        },
-      })
-    }
-
     // esFiscal=false → "Nota de venta" interna: documento NO fiscal. NO consume
     // e-NCF, NO firma, NO encola, NO toca la DGII y queda fuera de 606/607/608.
     // Numeración interna propia (NV-000001). No exige certificado ni campos
-    // fiscales. Esta rama corre ANTES que cualquier lógica de emisión.
+    // fiscales. Esta rama corre ANTES que cualquier lógica de emisión,
+    // incluida la del borrador: una nota nunca es un DRAFT fiscal.
     if (dto.esFiscal === false) {
       const folioInterno = await this.documentoFolioService.siguienteFolio(tenantId)
       return prisma.comprobante.create({
@@ -259,9 +266,31 @@ export class ComprobantesService {
       })
     }
 
+    // emitir=false → borrador FISCAL: no consume secuencia, no encola, no toca
+    // la DGII. Va DESPUÉS de la nota de venta a propósito: el formulario manda
+    // emitir=false también al crear una nota (su botón no emite nada), y con
+    // esta rama primero toda nota nacía DRAFT y SIN folio NV.
+    if (dto.emitir === false) {
+      return prisma.comprobante.create({
+        data: {
+          tenantId,
+          eNCF: null,
+          esFiscal: dto.esFiscal ?? true,
+          tipoECF: dto.tipoECF ?? 'E32',
+          estado: 'DRAFT',
+          montoTotal: totales.montoTotal,
+          rnc: dto.rncComprador ?? '',
+          razonSocial: dto.razonSocialComprador ?? '',
+          ...(dto.contactoId !== undefined && { contactoId: dto.contactoId }),
+          datos: JSON.parse(JSON.stringify(dto)) as object,
+        },
+      })
+    }
+
     // emitir=true (default) → comportamiento de producción, sin cambios.
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(dto, totales.montoTotal)
+    validarRncCompradorObligatorio(dto)
 
     // 1. Verificar que el tenant tiene certificado activo (barrera de emisión).
     await this.assertPuedeEmitir(tenantId)
@@ -522,6 +551,7 @@ export class ComprobantesService {
     const datos = (comprobante.datos ?? {}) as unknown as CreateComprobanteDto
     // Validación DGII: E32 >= RD$250,000 requiere identificación del comprador.
     validarIdentificacionE32(datos, Number(comprobante.montoTotal))
+    validarRncCompradorObligatorio(datos)
     // Un borrador guardado antes de esta validación (o por otro camino) podría
     // traer un NombreItem >80: se atrapa aquí, antes de quemar el e-NCF.
     this.assertNombresItemValidos(datos.items ?? [])
