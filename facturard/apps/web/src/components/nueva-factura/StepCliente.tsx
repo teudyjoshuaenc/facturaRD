@@ -5,7 +5,8 @@ import type { JSX } from 'react'
 import { Search, Plus, ChevronRight, ChevronDown, Building2, User, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NuevoClienteModal } from './NuevoClienteModal'
-import { useContactos } from '@/hooks/useContactos'
+import { useContactos, useContactosRecientes } from '@/hooks/useContactos'
+import { TIPO_OCASIONAL } from '@/lib/contactos'
 import type { Contacto, NuevoContactoData } from '@/hooks/useContactos'
 import type { TipoECF } from '@/hooks/useNuevaFactura'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,88 @@ function formatDateSpanish(isoDate: string): string {
   if (parts.length !== 3) return isoDate
   const [year, month, day] = parts
   return `${day}-${month}-${year}`
+}
+
+// "hace X" corto para la sección Recientes del selector. Sin librería: es una
+// sola etiqueta y no vale traerse date-fns por esto.
+function hace(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return ''
+  const min = Math.floor(ms / 60000)
+  if (min < 1) return 'hace un momento'
+  if (min < 60) return `hace ${min} min`
+  const horas = Math.floor(min / 60)
+  if (horas < 24) return `hace ${horas} h`
+  const dias = Math.floor(horas / 24)
+  if (dias === 1) return 'ayer'
+  if (dias < 30) return `hace ${dias} días`
+  const meses = Math.floor(dias / 30)
+  if (meses < 12) return `hace ${meses} ${meses === 1 ? 'mes' : 'meses'}`
+  const anios = Math.floor(meses / 12)
+  return `hace ${anios} ${anios === 1 ? 'año' : 'años'}`
+}
+
+
+function SeccionHeader({ label }: { label: string }): JSX.Element {
+  return (
+    <div className="sticky top-0 z-10 bg-white px-4 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] border-b border-[#F3F4F6]">
+      {label}
+    </div>
+  )
+}
+
+// Fila del dropdown de clientes. Extraída para que "Recientes" y "Guardados"
+// sean literalmente la misma fila (antes el markup estaba inline una sola vez).
+// `meta` es la línea extra opcional ("hace 3 días") que sólo usan los recientes.
+function ClienteRow({
+  contacto,
+  isSelected,
+  meta,
+  onPick,
+}: {
+  contacto: Contacto
+  isSelected: boolean
+  meta?: string
+  onPick: (c: Contacto) => void
+}): JSX.Element {
+  const rncFormateado =
+    contacto.rnc.trim() === ''
+      ? 'Sin RNC'
+      : `RNC: ${
+          contacto.rnc.length === 9
+            ? contacto.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
+            : contacto.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')
+        }`
+
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(contacto)}
+      className={cn(
+        'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[67px] border-b border-[#F3F4F6] last:border-none',
+        isSelected ? 'bg-[#F0F5FF]' : 'bg-white hover:bg-[#F0F5FF]/50',
+      )}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className={cn(
+            'h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors',
+            isSelected ? 'bg-[#EFF4FF] text-[#0379D5]' : 'bg-[#F3F4F6] text-[#6A7282]',
+          )}
+        >
+          {contacto.tipo === 'EMPRESA' ? <Building2 size={16} /> : <User size={16} />}
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-[16px] font-semibold text-[#333333] leading-6 truncate">{contacto.nombre}</span>
+          <span className="text-[13px] font-normal text-[#99A1AF] leading-[20px] mt-0.5 truncate">
+            {rncFormateado}
+            {meta ? ` · ${meta}` : ''}
+          </span>
+        </div>
+      </div>
+      {isSelected && <Check size={18} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />}
+    </button>
+  )
 }
 
 const tipoIngresoOptions = [
@@ -131,6 +214,8 @@ export function StepCliente({
   esFiscal = true,
 }: StepClienteProps): JSX.Element {
   const { contactos: rawContactos, crearContacto, searchQuery, setSearchQuery } = useContactos()
+  const { recientes } = useContactosRecientes(5)
+  const [creandoRapido, setCreandoRapido] = useState(false)
   const contactos = (rawContactos as Contacto[]).filter(c => c.estado === 'ACTIVO')
   const [showNuevoCliente, setShowNuevoCliente] = useState(false)
   const [clienteFocused, setClienteFocused] = useState(false)
@@ -190,6 +275,57 @@ export function StepCliente({
   // ya viene filtrada por el hook; sin texto, mostramos un tope de clientes activos.
   const showSearch = clienteFocused
   const clientesVisibles = contactos.slice(0, 15)
+
+  // Con búsqueda escrita se muestra UNA lista plana ya filtrada por el hook:
+  // separar en secciones mientras se teclea esconde matches. Sin búsqueda, el
+  // dropdown se parte en "Recientes" (a quien más recientemente le facturaste,
+  // del backend) y "Guardados" (el resto del directorio), sin repetir a nadie.
+  const hayBusqueda = searchQuery.trim().length > 0
+  const recientesVisibles = hayBusqueda ? [] : recientes.filter((c) => c.estado === 'ACTIVO')
+  const idsRecientes = new Set(recientesVisibles.map((c) => c.id))
+  const guardadosVisibles = clientesVisibles.filter((c) => !idsRecientes.has(c.id))
+  const listaPrincipal = hayBusqueda ? clientesVisibles : guardadosVisibles
+
+  const pickCliente = (c: Contacto): void => {
+    onSelectCliente(c)
+    setSearchQuery('')
+    setClienteFocused(false)
+  }
+
+  // Alta rápida: el caso común es un cliente ocasional que sólo se factura una
+  // vez. Escribes el nombre en el mismo buscador y lo creas de una fila, sin
+  // abrir el modal de 10 campos. Ocasional = CONSUMIDOR_FINAL: no lleva RNC.
+  const nombreRapido = searchQuery.trim()
+  // Si lo escrito son puros dígitos es un RNC, no un nombre: ahí manda la
+  // búsqueda en la DGII, no el alta rápida.
+  const pareceNombre = /\p{L}/u.test(nombreRapido)
+  const yaExisteConEseNombre = contactos.some((c) => c.nombre.trim().toLowerCase() === nombreRapido.toLowerCase())
+  const puedeAgregarRapido = hayBusqueda && pareceNombre && !yaExisteConEseNombre
+  // Un ocasional no tiene RNC, así que no sirve para los tipos que lo exigen.
+  // Se muestra igual pero apagado y CON EL MOTIVO — el backend lo rechazaría.
+  const ocasionalBloqueado = esFiscal && isRncRequired
+  const motivoOcasionalBloqueado = isE32OverLimit
+    ? 'Esta factura pasa de RD$250,000 y la DGII exige identificar al comprador.'
+    : `${tipoECF} exige el RNC del comprador — un cliente ocasional sólo aplica a Factura de Consumo (E32).`
+
+  async function handleAgregarOcasional(): Promise<void> {
+    if (creandoRapido) return
+    setCreandoRapido(true)
+    try {
+      const nuevo = await crearContacto({
+        nombre: nombreRapido,
+        rnc: '',
+        email: '',
+        telefono: '',
+        tipo: TIPO_OCASIONAL,
+      })
+      pickCliente(nuevo)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCreandoRapido(false)
+    }
+  }
 
   // Sin match local y lo escrito es un RNC completo (9 dígitos) → se busca en
   // la DGII para no obligar a abrir "+ Nuevo Cliente" a mano. Al usarlo se
@@ -266,47 +402,30 @@ export function StepCliente({
                 {/* Dropdown: se abre al enfocar; tope de clientes activos, filtra al teclear */}
                 {showSearch && (
                   <div className="absolute left-0 right-0 z-50 mt-1.5 max-h-[337px] w-full overflow-y-auto rounded-[14px] border border-neutral-100 bg-white shadow-[0px_25px_50px_-5px_rgba(0,0,0,0.25)] py-0 animate-in fade-in-50 duration-150">
-                    {clientesVisibles.map((c: Contacto) => {
-                      const isSelected = selectedCliente?.id === c.id
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            onSelectCliente(c)
-                            setSearchQuery('')
-                            setClienteFocused(false)
-                          }}
-                          className={cn(
-                            "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors focus:bg-[#F0F5FF] focus:outline-none h-[67px] border-b border-[#F3F4F6] last:border-none",
-                            isSelected ? "bg-[#F0F5FF]" : "bg-white hover:bg-[#F0F5FF]/50"
-                          )}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
-                              isSelected ? "bg-[#EFF4FF] text-[#0379D5]" : "bg-[#F3F4F6] text-[#6A7282]"
-                            )}>
-                              {c.tipo === 'EMPRESA' ? <Building2 size={16} /> : <User size={16} />}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[16px] font-semibold text-[#333333] leading-6 truncate">
-                                {c.nombre}
-                              </span>
-                              <span className="text-[13px] font-normal text-[#99A1AF] leading-[20px] mt-0.5">
-                                RNC: {c.rnc.length === 9
-                                  ? c.rnc.replace(/(\d{3})(\d{5})(\d{1})/, '$1-$2-$3')
-                                  : c.rnc.replace(/(\d{3})(\d{7})(\d{1})/, '$1-$2-$3')}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <Check size={18} className="text-[#0379D5] flex-shrink-0 stroke-[2.5]" />
-                          )}
-                        </button>
-                      )
-                    })}
-                    {clientesVisibles.length === 0 && (
+                    {!hayBusqueda && recientesVisibles.length > 0 && (
+                      <>
+                        <SeccionHeader label="Recientes" />
+                        {recientesVisibles.map((c) => (
+                          <ClienteRow
+                            key={`reciente-${c.id}`}
+                            contacto={c}
+                            isSelected={selectedCliente?.id === c.id}
+                            meta={hace(c.ultimaFacturaAt)}
+                            onPick={pickCliente}
+                          />
+                        ))}
+                        {guardadosVisibles.length > 0 && <SeccionHeader label="Guardados" />}
+                      </>
+                    )}
+                    {listaPrincipal.map((c: Contacto) => (
+                      <ClienteRow
+                        key={c.id}
+                        contacto={c}
+                        isSelected={selectedCliente?.id === c.id}
+                        onPick={pickCliente}
+                      />
+                    ))}
+                    {clientesVisibles.length === 0 && recientesVisibles.length === 0 && (
                       searchDigits.length === 11 ? (
                         <div className="px-4 py-4 text-center text-body-sm text-text-secondary">
                           No se encontraron clientes.
@@ -349,6 +468,31 @@ export function StepCliente({
                           )}
                         </div>
                       )
+                    )}
+                    {puedeAgregarRapido && (
+                      <button
+                        type="button"
+                        disabled={ocasionalBloqueado || creandoRapido}
+                        onClick={() => void handleAgregarOcasional()}
+                        className={cn(
+                          'flex w-full items-center gap-3 px-4 py-3 text-left border-t border-[#F3F4F6] transition-colors',
+                          ocasionalBloqueado
+                            ? 'cursor-not-allowed bg-white opacity-70'
+                            : 'bg-white hover:bg-[#F0F5FF]/50 focus:bg-[#F0F5FF] focus:outline-none',
+                        )}
+                      >
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[#EFF4FF] text-[#0379D5]">
+                          {creandoRapido ? <Spinner size={16} /> : <Plus size={16} />}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[14px] font-semibold text-[#333333] leading-5 truncate">
+                            Agregar &quot;{nombreRapido}&quot; como cliente ocasional
+                          </span>
+                          <span className="text-[12px] font-normal text-[#99A1AF] leading-[18px] mt-0.5">
+                            {ocasionalBloqueado ? motivoOcasionalBloqueado : 'Sin RNC · se guarda y se selecciona al instante'}
+                          </span>
+                        </div>
+                      </button>
                     )}
                   </div>
                 )}

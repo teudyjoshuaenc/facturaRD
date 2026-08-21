@@ -46,19 +46,14 @@ import {
   ExportActionButton,
   NewActionButton
 } from '@/components/ui/table-actions'
+import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_OPTIONS } from '@/lib/contactos'
 
 const tipoOptions = [
   { value: 'todos', label: 'Tipo' },
-  { value: 'CLIENTE', label: 'CLIENTE' },
-  { value: 'PROVEEDOR', label: 'PROVEEDOR' },
-  { value: 'CONSUMIDOR_FINAL', label: 'CONSUMIDOR_FINAL' },
+  ...TIPO_CONTACTO_OPTIONS.map((o) => ({ value: o.value as string, label: TIPO_CONTACTO_LABELS[o.value] })),
 ]
 
-const TIPO_LABEL: Record<string, string> = {
-  CLIENTE: 'Cliente',
-  PROVEEDOR: 'Proveedor',
-  CONSUMIDOR_FINAL: 'Consumidor Final',
-}
+const TIPO_LABEL: Record<string, string> = TIPO_CONTACTO_LABELS
 
 const origenOptions = [
   { value: 'todos', label: 'Origen' },
