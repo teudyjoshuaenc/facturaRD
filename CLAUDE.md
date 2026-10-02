@@ -49,7 +49,7 @@ pnpm --filter @facturard/database studio
 pnpm --filter @facturard/database seed
 
 # Tests
-pnpm --filter @facturard/ecf-engine test   # 112 tests
+pnpm --filter @facturard/ecf-engine test   # 148 tests
 
 # OpenAPI
 pnpm generate:api   # genera packages/api-client/src/generated.ts
@@ -380,6 +380,32 @@ APP_URL=http://localhost:3000
   - **Lista de `/producto`:** la columna "Precio final" usa `precioCaptura` cuando aplica — enseñaba
     14,999.99 donde el usuario puso 15,000.
 
+- ✅ **Detección automática de secuencias desde la DGII (2026-10-02).** Un emisor que ya usó e-NCF (otro
+  proveedor, o reinstalación con base vacía) arrancaba en 1 y la DGII rechazaba por secuencia repetida.
+  - **Fuente:** servicio oficial *Consulta TrackIds* (`GET {base}/ConsultaTrackIds/api/TrackIds/Consulta
+    ?RncEmisor&Encf`, Bearer con el P12 del tenant) → `consultarTrackIds()` en `ecf-engine/src/dgii/trackids.ts`.
+    `estado:"No encontrado"` = libre; CUALQUIER otro estado (incl. Rechazado) = usado (lado seguro). Cualquier
+    respuesta no-200/no-JSON **lanza** — un error nunca se interpreta como "libre".
+  - **Algoritmo** (`secuencia-detector.ts`, puro): galope 1,2,4… + binaria + ventana de 10 para huecos (e-NCF
+    quemados localmente). ~2·log2(N)+10 consultas. Hueco > 10 se queda corto (documentado en test).
+  - **API:** `POST /secuencias/detectar-dgii` → `SecuenciasDgiiService` (red aislada en `DgiiTrackIdsClient`,
+    reemplazable en e2e; **`createTestApp` lo stubea por defecto para que ningún test toque la DGII**).
+    Aplica con `SecuenciasService.avanzarHasta` = UPDATE condicional `ultimaSecuencia < n` → **nunca
+    retrocede**, atómico frente a emisiones concurrentes. Sin cert → 409; auth DGII falla → 502 sin tocar
+    nada; error en un tipo → ese tipo queda igual (`estado:'error'`), los demás siguen.
+  - **Límites:** E32 < RD$250k va por RFCE (otro servicio, su consulta exige código de seguridad) → puede no
+    verse; se devuelve `nota`. La DGII **no** expone la FechaVencimientoSecuencia → sigue siendo manual. La
+    Descripción Técnica sólo publica TrackIds para testecf/ecf: en `certecf` puede responder error (se reporta).
+  - **Web:** `SecuenciasStep detectar` consulta al abrir, muestra "E31 continúa en E310000000014", prellena
+    los números y pasa a "Sí, ya emitía". Se abre solo tras subir el P12 en Configuración → Certificación fiscal
+    (`handleUpload` ahora devuelve boolean) y en el paso de secuencias del onboarding.
+  - **Tests:** `secuencias-dgii.e2e-spec.ts` (10) + `ecf-engine/test/secuencia-detector.test.ts` (30).
+- ✅ **Prellenado del emisor desde GoHighLevel (2026-10-02).** El enlace del menú personalizado puede pasar
+  `email={{location.email}}&phone={{location.phone}}&address={{location.full_address}}` (variables oficiales
+  de GHL); `useGhlInit` las reenvía a `/onboarding` y `CrearCuentaStep` arranca con ellas (editables).
+  Variables no reemplazadas (`{{…}}` literal) se descartan (`lib/ghl-prefill.ts`). Sin token de GHL: no hay
+  llamada a la API de GHL.
+
 ### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
 Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.
 - **Causa:** `packages/ecf-engine/src/xml/calculator.ts` calcula el ITBIS sobre el monto YA redondeado:
@@ -398,7 +424,7 @@ Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 1
 - Mientras tanto: la UI enseña el precio capturado (15,000) y el **total real** de la factura es
   14,999.99. Fijado en `precio-incluye-itbis.e2e-spec.ts` para que el día que se cambie sea a propósito.
 
-**276 e2e + 118 ecf-engine, build API y web en 0.**
+**276 e2e + 118 ecf-engine, build API y web en 0.** → tras la detección de secuencias: **301 e2e (33 suites) + 148 ecf-engine**, build API y web en 0.
 
 ---
 
@@ -689,13 +715,14 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1   # en el VPS se fija en el bui
 `docker-compose.prod.yml` (api + web + postgres 16 + redis 7 con AOF; api/web publicados SÓLO en
 127.0.0.1:`API_PORT`/`WEB_PORT`), `nginx/facturard.conf` (nginx del host + certbot hace TLS,
 `APP_DOMAIN`→web, `API_DOMAIN`→api; sin `X-Frame-Options` por el iframe de GHL), `.env.example` (se copia a `deploy/.env`),
-`backup.sh` (pg_dump diario) y `README.md` (guía). Web: `apps/web/Dockerfile` (Next `output:
+`backup.sh` (pg_dump diario), **`setup.sh`** (instalación/actualización en un comando: deps, `.env` con
+secretos generados, contenedores, nginx con tus dominios, certbot, cron de backup) y `README.md` (guía). Web: `apps/web/Dockerfile` (Next `output:
 'standalone'`) + `Dockerfile.dockerignore` (el `.dockerignore` raíz excluye `apps/web`).
 `NEXT_PUBLIC_API_URL` se incrusta en el build (cambiarla exige `--build`). Arranque en limpio: base
 vacía, `ENCRYPTION_KEY` nueva — **no perderla ni cambiarla** una vez haya datos; NO correr el seed en
 prod. pnpm fijado a `9.15.0` en los Dockerfiles (el latest falla con
 `ERR_PNPM_PNPM_ENGINE_NO_NATIVE_BINARY`). Build local desde el disco externo falla por los `._*` de
-macOS: construir desde una copia limpia. CI = sólo build + tests; deploy manual (`git pull` + `up -d --build`).
+macOS: construir desde una copia limpia. CI = sólo build + tests; actualizar = `git pull && sudo deploy/setup.sh`.
 
 **Arquitectura clave:**
 - Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)
