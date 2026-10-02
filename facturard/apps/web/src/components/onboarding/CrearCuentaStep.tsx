@@ -10,6 +10,7 @@ import { api, getErrorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/context/AuthContext'
 import type { TenantInfo } from '@/lib/session'
 import type { TipoIdentificacion } from './IdentificacionStep'
+import type { GhlPrefill } from '@/lib/ghl-prefill'
 
 interface Props {
   locationId: string
@@ -21,6 +22,8 @@ interface Props {
   /** null → se crea el tenant SIN certificado (podrá certificarse después). */
   file: File | null
   passphrase: string
+  /** Contacto del emisor que llegó desde GoHighLevel; el usuario puede editarlo. */
+  prefill?: GhlPrefill
   onCreated: (tenant: TenantInfo) => void
   /** Volver: al paso de certificado (con cert) o al de elección (sin cert). */
   onBack: () => void
@@ -34,15 +37,16 @@ export function CrearCuentaStep({
   razonSocialManual,
   file,
   passphrase,
+  prefill,
   onCreated,
   onBack,
 }: Props): JSX.Element {
   const { setAuth } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [email, setEmail] = useState('')
+  const [direccion, setDireccion] = useState(prefill?.direccion ?? '')
+  const [telefono, setTelefono] = useState(prefill?.telefono ?? '')
+  const [email, setEmail] = useState(prefill?.email ?? '')
 
   const conCertificado = file !== null
   const emailInvalid = email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())

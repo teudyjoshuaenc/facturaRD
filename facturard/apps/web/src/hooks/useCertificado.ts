@@ -56,8 +56,9 @@ export function useCertificado() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleUpload(): Promise<void> {
-    if (!file || !passphrase) return
+  /** Devuelve true si el certificado quedó guardado. */
+  async function handleUpload(): Promise<boolean> {
+    if (!file || !passphrase) return false
     setSubmitting(true)
     setError('')
     try {
@@ -72,10 +73,12 @@ export function useCertificado() {
       setFile(null)
       setPassphrase('')
       toast.success('Certificado cargado correctamente')
+      return true
     } catch (err) {
       const msg = getErrorMessage(err)
       setError(msg)
       toast.error('Error al subir el certificado', { description: msg })
+      return false
     } finally {
       setSubmitting(false)
     }

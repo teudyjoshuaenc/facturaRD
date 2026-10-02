@@ -11,6 +11,7 @@ import { IdentificacionStep, type IdentificacionResult } from '@/components/onbo
 import { CertificacionChoiceStep } from '@/components/onboarding/CertificacionChoiceStep'
 import { CertificadoStep } from '@/components/onboarding/CertificadoStep'
 import { CrearCuentaStep } from '@/components/onboarding/CrearCuentaStep'
+import { leerGhlPrefill } from '@/lib/ghl-prefill'
 import { SecuenciasStep } from '@/components/onboarding/SecuenciasStep'
 import { FinanzasStep } from '@/components/onboarding/FinanzasStep'
 import { SuccessStep } from '@/components/onboarding/SuccessStep'
@@ -77,6 +78,7 @@ function OnboardingContent(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const locationId = searchParams.get('location_id') ?? ''
+  const prefill = leerGhlPrefill(searchParams)
 
   const [step, setStep] = useState<Step>('ident')
   const [ident, setIdent] = useState<IdentificacionResult | null>(null)
@@ -156,6 +158,7 @@ function OnboardingContent(): JSX.Element {
                 razonSocialManual={ident.manual}
                 file={certificando ? file : null}
                 passphrase={passphrase}
+                prefill={prefill}
                 onCreated={(t) => {
                   setTenant(t)
                   // Con certificado → configurar secuencias primero; ambos caminos pasan por Finanzas.
@@ -165,7 +168,7 @@ function OnboardingContent(): JSX.Element {
               />
             )}
 
-            {step === 'secuencias' && <SecuenciasStep onDone={() => setStep('finanzas')} />}
+            {step === 'secuencias' && <SecuenciasStep detectar onDone={() => setStep('finanzas')} />}
 
             {step === 'finanzas' && <FinanzasStep onDone={() => setStep('exito')} />}
 

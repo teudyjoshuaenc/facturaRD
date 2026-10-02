@@ -4,6 +4,7 @@ import { getQueueToken } from '@nestjs/bullmq'
 import { prisma } from '@facturard/database'
 import { AppModule } from '../../src/app.module'
 import { EcfEmissionProcessor } from '../../src/modules/comprobantes/ecf-emission.processor'
+import { DgiiTrackIdsClient } from '../../src/modules/secuencias/dgii-trackids.client'
 import { resetDatabase } from './reset-db'
 
 export interface TestContext {
@@ -35,6 +36,12 @@ export async function createTestApp(overrides: ProviderOverride[] = []): Promise
     .useValue({ add: queueAdd })
     .overrideProvider(EcfEmissionProcessor)
     .useValue({})
+  // La detección de secuencias consulta a la DGII: por defecto falla en voz alta
+  // (nunca red real). Los specs que la prueban pasan su propio DgiiTrackIdsClient.
+  if (!overrides.some((o) => o.provide === DgiiTrackIdsClient)) {
+    const sinRed = () => Promise.reject(new Error('DGII deshabilitada en e2e'))
+    builder = builder.overrideProvider(DgiiTrackIdsClient).useValue({ autenticar: sinRed, recibido: sinRed })
+  }
   for (const o of overrides) {
     builder = builder.overrideProvider(o.provide).useValue(o.useValue)
   }

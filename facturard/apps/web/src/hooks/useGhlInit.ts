@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { saveLocationId } from '@/lib/session'
+import { reenviarGhlPrefill } from '@/lib/ghl-prefill'
 import { useAuth } from '@/lib/context/AuthContext'
 import type { TenantInfo } from '@/lib/session'
 
@@ -40,7 +41,11 @@ export function useGhlInit(): UseGhlInitResult {
         const data = res.data
 
         if (data.onboarding) {
-          router.replace(`/onboarding?location_id=${encodeURIComponent(locationId)}`)
+          // Se reenvían los datos de contacto que GHL haya puesto en el enlace
+          // (email/phone/address/city) para prellenar el alta.
+          const qs = new URLSearchParams({ location_id: locationId })
+          reenviarGhlPrefill(searchParams, qs)
+          router.replace(`/onboarding?${qs.toString()}`)
           return
         }
 

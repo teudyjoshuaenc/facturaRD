@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
+import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ToggleGroup } from '@/components/ui/toggle-group'
@@ -23,16 +24,67 @@ const TIPOS: { tipo: string; label: string; requiereFecha: boolean }[] = [
   { tipo: 'E47', label: 'E47 · Pagos al exterior', requiereFecha: true },
 ]
 
-interface Props {
-  onDone: () => void
+// Respuesta de POST /secuencias/detectar-dgii (los contadores YA quedaron aplicados).
+interface DeteccionTipo {
+  tipoECF: string
+  antes: number
+  detectada: number | null
+  despues: number
+  proximoENCF: string
+  estado: 'actualizada' | 'sinCambios' | 'error'
+  error?: string
+  nota?: string
 }
 
-export function SecuenciasStep({ onDone }: Props): JSX.Element {
+type Deteccion =
+  | { estado: 'idle' }
+  | { estado: 'cargando' }
+  | { estado: 'listo'; tipos: DeteccionTipo[] }
+  | { estado: 'error'; mensaje: string }
+
+interface Props {
+  onDone: () => void
+  /**
+   * Con certificado activo: al abrir, consulta a la DGII el último e-NCF recibido
+   * por tipo, avanza los contadores (nunca retrocede) y prellena el formulario.
+   */
+  detectar?: boolean
+}
+
+export function SecuenciasStep({ onDone, detectar = false }: Props): JSX.Element {
   const [modo, setModo] = useState<'no' | 'si'>('no')
   const [valores, setValores] = useState<Record<string, string>>({})
   const [fechas, setFechas] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [deteccion, setDeteccion] = useState<Deteccion>({ estado: 'idle' })
+  const detectado = useRef(false)
+
+  useEffect(() => {
+    if (!detectar || detectado.current) return
+    detectado.current = true
+    setDeteccion({ estado: 'cargando' })
+    api
+      .post<{ tipos: DeteccionTipo[] }>('/secuencias/detectar-dgii')
+      .then(({ data }) => {
+        setDeteccion({ estado: 'listo', tipos: data.tipos })
+        const usados = data.tipos.filter((t) => t.despues > 0)
+        if (usados.length > 0) {
+          setValores((v) => {
+            const next = { ...v }
+            for (const t of usados) next[t.tipoECF] = String(t.despues)
+            return next
+          })
+          setModo('si')
+        }
+      })
+      .catch((err: unknown) => {
+        setDeteccion({
+          estado: 'error',
+          mensaje: getErrorMessage(err, 'No pudimos consultar tu numeración en la DGII.'),
+        })
+      })
+  }, [detectar])
 
   function setValor(tipo: string, raw: string): void {
     setValores((v) => ({ ...v, [tipo]: raw.replace(/\D/g, '') }))
@@ -93,6 +145,8 @@ export function SecuenciasStep({ onDone }: Props): JSX.Element {
         </p>
       </div>
 
+      <DeteccionAviso deteccion={deteccion} />
+
       <ToggleGroup
         value={modo}
         onChange={setModo}
@@ -147,13 +201,73 @@ export function SecuenciasStep({ onDone }: Props): JSX.Element {
       {error && <p className="text-ui-sm text-danger-600">{error}</p>}
 
       <div className="flex flex-col gap-3">
-        <Button variant="primary" size="lg" className="w-full" disabled={submitting} onClick={modo === 'si' ? guardar : onDone}>
+        <Button variant="primary" size="lg" className="w-full" disabled={submitting || deteccion.estado === 'cargando'} onClick={modo === 'si' ? guardar : onDone}>
           {submitting ? <Spinner size={18} className="text-white" /> : modo === 'si' ? 'Guardar y continuar' : 'Continuar'}
         </Button>
         <Button variant="ghost" size="md" className="w-full" disabled={submitting} onClick={onDone}>
           Omitir por ahora
         </Button>
       </div>
+    </div>
+  )
+}
+
+function DeteccionAviso({ deteccion }: { deteccion: Deteccion }): JSX.Element | null {
+  if (deteccion.estado === 'idle') return null
+
+  if (deteccion.estado === 'cargando') {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-border-subtle bg-background-canvas px-4 py-3 text-body-sm text-text-secondary">
+        <Spinner size={18} />
+        Consultando tu numeración en la DGII…
+      </div>
+    )
+  }
+
+  if (deteccion.estado === 'error') {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+        <span>{deteccion.mensaje} Si ya emitías e-CF, escribe tu última secuencia abajo.</span>
+      </div>
+    )
+  }
+
+  const usados = deteccion.tipos.filter((t) => t.despues > 0)
+  const errores = deteccion.tipos.filter((t) => t.estado === 'error')
+  const notaE32 = deteccion.tipos.find((t) => t.tipoECF === 'E32')?.nota
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-success-500/40 bg-success-500/10 px-4 py-3 text-body-sm text-text-primary">
+      <div className="flex items-start gap-2">
+        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success-500" />
+        <span>
+          {usados.length > 0
+            ? 'Encontramos tu numeración en la DGII y ya la aplicamos. Tus próximos comprobantes:'
+            : 'La DGII no tiene e-CF emitidos con tu RNC: empezarás desde el número 1.'}
+        </span>
+      </div>
+      {usados.length > 0 && (
+        <ul className="ml-7 flex flex-col gap-0.5 text-ui-sm">
+          {usados.map((t) => (
+            <li key={t.tipoECF}>
+              <strong>{t.tipoECF}</strong> continúa en <span className="font-mono">{t.proximoENCF}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {errores.length > 0 && (
+        <p className="ml-7 text-ui-sm text-warning-700">
+          No pudimos verificar {errores.map((t) => t.tipoECF).join(', ')}. Si los usabas, escribe la última
+          secuencia abajo.
+        </p>
+      )}
+      {notaE32 && <p className="ml-7 text-ui-xs text-text-secondary">{notaE32}</p>}
+      {usados.length > 0 && (
+        <p className="ml-7 text-ui-xs text-text-secondary">
+          Completa la fecha de vencimiento de cada tipo (la DGII no la expone en esta consulta).
+        </p>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, UseGuards, ParseArrayPipe } from '@nestjs/common'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiBody } from '@nestjs/swagger'
 import { SecuenciasService } from './secuencias.service'
+import { SecuenciasDgiiService } from './secuencias-dgii.service'
 import { InicializarSecuenciasDto } from './dto/inicializar-secuencia.dto'
 import { SincronizarSecuenciaItemDto } from './dto/sincronizar-secuencias.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
@@ -16,7 +17,10 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy'
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('secuencias')
 export class SecuenciasController {
-  constructor(private readonly service: SecuenciasService) {}
+  constructor(
+    private readonly service: SecuenciasService,
+    private readonly dgii: SecuenciasDgiiService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Lista todas las secuencias del tenant actual' })
@@ -56,6 +60,14 @@ export class SecuenciasController {
   @ApiOperation({ summary: 'Inicializa todos los tipos de e-CF para el tenant (SUPER_ADMIN)' })
   inicializarTodos(@CurrentUser() user: JwtPayload) {
     return this.service.inicializarTodosLosTipos(user.tenantId)
+  }
+
+  @Post('detectar-dgii')
+  @ApiOperation({
+    summary: 'Consulta a la DGII el último e-NCF recibido por tipo y avanza los contadores (nunca retrocede)',
+  })
+  detectarDgii(@CurrentUser() user: JwtPayload) {
+    return this.dgii.detectarYAplicar(user.tenantId)
   }
 
   @Post('sincronizar')

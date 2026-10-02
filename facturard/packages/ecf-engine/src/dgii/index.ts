@@ -1,6 +1,10 @@
 export { autenticar } from './auth';
 export { enviarECF, enviarResumenFC } from './sender';
 export { consultarEstado } from './status';
+export { consultarTrackIds } from './trackids';
+export type { DgiiTrackIdDetalle, ConsultaTrackIdsResultado } from './trackids';
+export { detectarUltimaSecuencia, MAX_SECUENCIA } from './secuencia-detector';
+export type { DetectarSecuenciaOpciones, DetectarSecuenciaResultado } from './secuencia-detector';
 export { enviarAprobacionComercial, buildAprobacionXml } from './approval';
 export type {
   DgiiClientConfig,

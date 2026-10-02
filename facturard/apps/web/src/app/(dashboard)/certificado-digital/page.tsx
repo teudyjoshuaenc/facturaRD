@@ -596,7 +596,7 @@ export default function CertificadoDigitalPage(): JSX.Element {
                 variant="primary"
                 size="md"
                 disabled={!file || !passphrase || submitting}
-                onClick={handleUpload}
+                onClick={() => void handleUpload()}
                 className={cn(
                   "flex items-center justify-center gap-[4px] h-[42px] px-[20px] rounded-[10px] text-white text-[14px] font-normal whitespace-nowrap",
                   file && passphrase && !submitting

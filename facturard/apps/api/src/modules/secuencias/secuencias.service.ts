@@ -16,7 +16,7 @@ const TIPO_PREFIJO: Record<TipoECF, string> = {
   E45: '45', E46: '46', E47: '47',
 }
 
-function formatENCF(tipoECF: TipoECF, secuencia: number): string {
+export function formatENCF(tipoECF: TipoECF, secuencia: number): string {
   return `E${TIPO_PREFIJO[tipoECF]}${String(secuencia).padStart(10, '0')}`
 }
 
@@ -116,6 +116,22 @@ export class SecuenciasService {
       }
       return results
     })
+  }
+
+  /**
+   * Avanza el contador a `ultimaSecuencia` SÓLO si hoy está por debajo; nunca
+   * retrocede. Un único UPDATE condicional → atómico frente a una emisión
+   * concurrente (si ésta ya pasó el valor, no se toca). Devuelve el valor final.
+   */
+  async avanzarHasta(tenantId: string, tipoECF: TipoECF, ultimaSecuencia: number): Promise<number> {
+    await prisma.secuencia.updateMany({
+      where: { tenantId, tipoECF, ultimaSecuencia: { lt: ultimaSecuencia } },
+      data: { ultimaSecuencia },
+    })
+    const seq = await prisma.secuencia.findUniqueOrThrow({
+      where: { tenantId_tipoECF: { tenantId, tipoECF } },
+    })
+    return seq.ultimaSecuencia
   }
 
   async inicializarSecuencias(

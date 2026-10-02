@@ -14,6 +14,8 @@ export interface DgiiEndpoints {
   fc: string;
   /** Servicio de aprobación comercial (Paso 3 certificación) */
   aprobacion: string;
+  /** Consulta de TrackIds por e-NCF (¿la DGII ya recibió este número?) */
+  trackids: string;
 }
 
 /** Ambiente de certificación (certecf) */
@@ -23,6 +25,9 @@ export const ENDPOINTS_CERTECF: DgiiEndpoints = {
   consulta:   'https://ecf.dgii.gov.do/CerteCF/ConsultaResultado',
   fc:         'https://fc.dgii.gov.do/CerteCF/RecepcionFC',
   aprobacion: 'https://ecf.dgii.gov.do/CerteCF/AprobacionComercial',
+  // La Descripción Técnica sólo publica testecf y ecf para este servicio; en
+  // certificación puede no estar disponible (el detector lo reporta, no falla).
+  trackids:   'https://ecf.dgii.gov.do/CerteCF/ConsultaTrackIds',
 };
 
 /** Ambiente de producción (ecf) */
@@ -32,6 +37,7 @@ export const ENDPOINTS_ECF: DgiiEndpoints = {
   consulta:   'https://ecf.dgii.gov.do/ECF/ConsultaResultado',
   fc:         'https://fc.dgii.gov.do/ECF/RecepcionFC',
   aprobacion: 'https://ecf.dgii.gov.do/ECF/AprobacionComercial',
+  trackids:   'https://ecf.dgii.gov.do/ECF/ConsultaTrackIds',
 };
 
 export type DgiiEnv = 'certecf' | 'ecf';

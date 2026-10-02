@@ -138,7 +138,15 @@ export function CertificacionFiscalCard(): JSX.Element {
                   <Button variant="secondary" onClick={handleCancel} disabled={submitting}>
                     Cancelar
                   </Button>
-                  <Button variant="primary" disabled={!file || !passphrase || submitting} onClick={handleUpload}>
+                  <Button
+                    variant="primary"
+                    disabled={!file || !passphrase || submitting}
+                    onClick={async () => {
+                      // Con el certificado nuevo, abrir Secuencias: ahí se detecta sola la
+                      // numeración que la DGII ya tiene de este emisor.
+                      if (await handleUpload()) setShowSecuencias(true)
+                    }}
+                  >
                     {submitting ? <Spinner size={18} className="text-white" /> : 'Guardar certificado'}
                   </Button>
                 </div>
@@ -162,6 +170,7 @@ export function CertificacionFiscalCard(): JSX.Element {
               </div>
               {showSecuencias && (
                 <SecuenciasStep
+                  detectar={activo && !vencido}
                   onDone={() => {
                     setShowSecuencias(false)
                     toast.success('Secuencias actualizadas')
