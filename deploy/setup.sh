@@ -150,7 +150,10 @@ ok "HTTPS activo (certbot renueva solo)"
 info "Backups"
 chmod +x "$DEPLOY_DIR/backup.sh"
 CRON="15 3 * * * $DEPLOY_DIR/backup.sh >> /var/log/facturard-backup.log 2>&1"
-( crontab -l 2>/dev/null | grep -vF "$DEPLOY_DIR/backup.sh"; echo "$CRON" ) | crontab -
+# `crontab -l` falla si el usuario aún no tiene crontab, y grep -v sale 1 sin líneas:
+# con pipefail eso abortaba el script en silencio. Ambos se toleran.
+ACTUAL=$(crontab -l 2>/dev/null || true)
+{ printf '%s\n' "$ACTUAL" | grep -vF "$DEPLOY_DIR/backup.sh" | sed '/^$/d' || true; echo "$CRON"; } | crontab -
 ok "pg_dump diario a las 03:15 → ${BACKUP_DIR:-/var/backups/facturard} (cópialo fuera del VPS: la DGII exige 10 años)"
 
 # ── 6. Listo ─────────────────────────────────────────────────────────────────
