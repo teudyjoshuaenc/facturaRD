@@ -13,7 +13,7 @@ la Ley 32-23 de la DGII, con integración directa a GoHighLevel.
 - ORM: Prisma 6 + PostgreSQL 16
 - Cache/Colas: Redis 7 + BullMQ
 - Frontend: Next.js 16.2 (pendiente)
-- Deploy: Railway (api) + Vercel (web)
+- Deploy: VPS propio con Docker Compose (api + web + postgres + redis) detrás del nginx del host — ver `deploy/README.md`
 - API Clients: openapi-typescript + openapi-fetch
 
 ---
@@ -682,13 +682,20 @@ pnpm --filter @facturard/web build  # build producción
 
 **Variables de entorno (`apps/web/.env.local`):**
 ```env
-NEXT_PUBLIC_API_URL=https://better-invoice-production.up.railway.app/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1   # en el VPS se fija en el build: https://API_DOMAIN/api/v1
 ```
 
-**Deploy:** Vercel — root directory en Vercel debe ser `facturard/apps/web` (no la raíz del monorepo).
-El `vercel.json` en `apps/web/` usa `cd ../.. && pnpm install` / `cd ../.. && pnpm --filter @facturard/web build`
-para instalar y construir desde la raíz del workspace, y fija `outputDirectory: ".next"` explícito
-(la auto-detección de Vercel para monorepos Turborepo duplicaba el path a `apps/web/apps/web/.next`).
+**Deploy (VPS, 2026-10-02 — Railway y Vercel eliminados):** todo en `deploy/` —
+`docker-compose.prod.yml` (api + web + postgres 16 + redis 7 con AOF; api/web publicados SÓLO en
+127.0.0.1:`API_PORT`/`WEB_PORT`), `nginx/facturard.conf` (nginx del host + certbot hace TLS,
+`APP_DOMAIN`→web, `API_DOMAIN`→api; sin `X-Frame-Options` por el iframe de GHL), `.env.example` (se copia a `deploy/.env`),
+`backup.sh` (pg_dump diario) y `README.md` (guía). Web: `apps/web/Dockerfile` (Next `output:
+'standalone'`) + `Dockerfile.dockerignore` (el `.dockerignore` raíz excluye `apps/web`).
+`NEXT_PUBLIC_API_URL` se incrusta en el build (cambiarla exige `--build`). Arranque en limpio: base
+vacía, `ENCRYPTION_KEY` nueva — **no perderla ni cambiarla** una vez haya datos; NO correr el seed en
+prod. pnpm fijado a `9.15.0` en los Dockerfiles (el latest falla con
+`ERR_PNPM_PNPM_ENGINE_NO_NATIVE_BINARY`). Build local desde el disco externo falla por los `._*` de
+macOS: construir desde una copia limpia. CI = sólo build + tests; deploy manual (`git pull` + `up -d --build`).
 
 **Arquitectura clave:**
 - Autenticación: GHL iframe → GET /ghl/init → JWT en localStorage (`frd_token`)

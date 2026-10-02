@@ -152,7 +152,7 @@ export class ComprobantesController {
   ): Promise<void> {
     // Se regenera al vuelo desde los datos persistidos (no se sirve un PDF viejo
     // de disco): así el QR lleva siempre el consultatimbre correcto y no depende
-    // del /tmp efímero de Railway. Ver ComprobantesService.regenerarPdfBuffer.
+    // del /tmp efímero del contenedor. Ver ComprobantesService.regenerarPdfBuffer.
     const { buffer, filename } = await this.service.regenerarPdfBuffer(tenantId, id)
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.send(buffer)

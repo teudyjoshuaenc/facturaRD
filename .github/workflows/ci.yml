@@ -1,4 +1,4 @@
-name: CI/CD FacturaRD
+name: CI FacturaRD
 
 on:
   push:
@@ -42,22 +42,3 @@ jobs:
         run: pnpm --filter @facturard/ecf-engine test
         env:
           NODE_ENV: test
-
-  deploy:
-    name: Deploy to Railway
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    defaults:
-      run:
-        working-directory: ./facturard
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: railway up --service api
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

@@ -27,7 +27,7 @@ export type ComprobanteConContacto = Comprobante & { contactoEmail: string | nul
 
 // fechaDesde/fechaHasta son fechas calendario en hora de RD (UTC-4 fijo, sin DST).
 // Se anclan explícitamente a ese offset — usar setHours() dependería de la zona
-// horaria del proceso (en Railway corre en UTC, no UTC-4), excluyendo facturas
+// horaria del proceso (el contenedor corre en UTC, no UTC-4), excluyendo facturas
 // del mismo día creadas por la noche en RD.
 function inicioDia(date: string): Date {
   return new Date(`${date}T00:00:00.000-04:00`)
@@ -763,7 +763,7 @@ export class ComprobantesService {
   /**
    * Regenera el PDF del comprobante AL VUELO desde los datos persistidos
    * (`datos` + `xmlFirmado`), en vez de servir el archivo guardado en disco.
-   * Motivos: (a) el /tmp de Railway es efímero (se borra en cada redeploy), y
+   * Motivos: (a) el /tmp del contenedor es efímero (se borra en cada redeploy), y
    * (b) así el QR/consultatimbre lleva siempre el set correcto (e-NCF en MAYÚS,
    * fechafirma y codigoseguridad), sin depender de PDFs viejos ya horneados ni
    * reemitir el e-CF. No consume secuencia ni contacta a la DGII.

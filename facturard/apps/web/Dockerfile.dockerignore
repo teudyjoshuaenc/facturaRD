@@ -1,0 +1,16 @@
+# El .dockerignore de la raíz excluye apps/web (lo usa la imagen de la API).
+# BuildKit toma este archivo en su lugar cuando se construye con este Dockerfile.
+**/node_modules
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+.git
+.env
+**/.env
+**/.env.local
+*.log
+facturard/apps/api
+facturard/packages/ecf-engine
+facturard/packages/database
+facturard/dgii-cert
+facturard/certs/

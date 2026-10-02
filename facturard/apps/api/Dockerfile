@@ -1,5 +1,5 @@
 FROM node:20-alpine AS base
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.0
 # Forzar pnpm a usar un store local al contenedor.
 # Docker Desktop (VirtioFS) monta el home del Mac en el contenedor;
 # sin esto, pnpm usa /Users/wilmer/Library/pnpm/store y trae binarios Mach-O.

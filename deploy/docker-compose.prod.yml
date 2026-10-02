@@ -1,0 +1,94 @@
+# FacturaRD — stack de producción en el VPS.
+#   cd deploy && docker compose -f docker-compose.prod.yml up -d --build   (lee deploy/.env)
+# Guía completa: deploy/README.md. El TLS y los dominios los maneja el nginx del host.
+name: facturard
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: facturard/apps/api/Dockerfile
+    restart: unless-stopped
+    # Sólo en loopback: el nginx del host hace de proxy (deploy/nginx/facturard.conf).
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    # start:prod corre `prisma migrate deploy` antes de levantar la API.
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      SENDGRID_FROM: ${SENDGRID_FROM}
+      APP_URL: https://${APP_DOMAIN}
+      ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      DGII_ENV: ${DGII_ENV:-certification}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/v1/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    build:
+      context: ..
+      dockerfile: facturard/apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN}/api/v1
+        NEXT_PUBLIC_SHOW_WIP_TABS: ${NEXT_PUBLIC_SHOW_WIP_TABS:-}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3001}:3001"
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Sin `ports:` a propósito: la BD sólo es alcanzable dentro de la red de Docker.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # AOF: los jobs de BullMQ (emisiones en vuelo) sobreviven a un reinicio.
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+volumes:
+  postgres_data:
+  redis_data:
