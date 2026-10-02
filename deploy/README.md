@@ -12,6 +12,10 @@ Internet ─▶ nginx del host (80/443, TLS con certbot)
 ufw, por eso no se publican en 0.0.0.0). Postgres y Redis **no exponen puertos**: sólo se alcanzan
 dentro de la red de Docker.
 
+**Un solo dominio:** si `API_DOMAIN` = `APP_DOMAIN`, `setup.sh` usa `nginx/facturard-single.conf`:
+`/api/*`, `/fe/*` y `/docs` van a la API y el resto al frontend (un solo registro DNS y un solo
+certificado). Es el modo de `facturard.dmaia.io`.
+
 ## Requisitos del VPS
 
 - Ubuntu 22.04/24.04 (o similar), **mínimo 2 vCPU / 4 GB RAM** (el build de Next y de la API

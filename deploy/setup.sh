@@ -50,8 +50,12 @@ if [ -f "$ENV_FILE" ]; then
 else
   info "Configuración — se guarda en $ENV_FILE"
   ask APP_DOMAIN "Dominio de la app (ej. app.facturard.do)"
-  ask API_DOMAIN "Dominio de la API (ej. api.facturard.do)"
-  ask ACME_EMAIL "Correo para Let's Encrypt (avisos de certificados)"
+  ask API_DOMAIN "Dominio de la API (el mismo = todo en un dominio: /api y /fe van a la API)" "$APP_DOMAIN"
+  if ls /etc/letsencrypt/accounts/*/directory/* >/dev/null 2>&1; then
+    ACME_EMAIL=""   # certbot ya tiene cuenta en este servidor: se reutiliza
+  else
+    ask ACME_EMAIL "Correo para Let's Encrypt (avisos de vencimiento de certificados)"
+  fi
   ask SENDGRID_API_KEY "SendGrid API key" "" secreto
   ask SENDGRID_FROM "Remitente de correos" "noreply@$APP_DOMAIN"
   ask CLOUDINARY_CLOUD_NAME "Cloudinary cloud name"
@@ -108,14 +112,20 @@ ok "API saludable, migraciones aplicadas"
 
 # ── 4. nginx + HTTPS ─────────────────────────────────────────────────────────
 info "nginx"
+if [ "$APP_DOMAIN" = "$API_DOMAIN" ]; then
+  TEMPLATE="$DEPLOY_DIR/nginx/facturard-single.conf"; DOMINIOS=("$APP_DOMAIN")
+else
+  TEMPLATE="$DEPLOY_DIR/nginx/facturard.conf"; DOMINIOS=("$APP_DOMAIN" "$API_DOMAIN")
+fi
+install -m 644 "$DEPLOY_DIR/nginx/facturard-proxy.conf" /etc/nginx/snippets/facturard-proxy.conf
 sed -e "s/app\.facturard\.do/$APP_DOMAIN/g" \
     -e "s/api\.facturard\.do/$API_DOMAIN/g" \
     -e "s#127\.0\.0\.1:3000#127.0.0.1:$API_PORT#" \
     -e "s#127\.0\.0\.1:3001#127.0.0.1:$WEB_PORT#" \
-    "$DEPLOY_DIR/nginx/facturard.conf" > "$SITE.tmp"
-# Si otro sitio ya define $connection_upgrade, quitar nuestro `map` para no duplicarlo.
+    "$TEMPLATE" > "$SITE.tmp"
+# Si otro archivo ya define $connection_upgrade, quitar nuestro `map` para no duplicarlo.
 if grep -rqs --exclude=facturard.conf 'map \$http_upgrade \$connection_upgrade' /etc/nginx/; then
-  sed -i '/^# Necesario para el header Connection/,/^}/d' "$SITE.tmp"
+  sed -i '/^map \$http_upgrade \$connection_upgrade/,/^}/d' "$SITE.tmp"
 fi
 # certbot ya agregó el bloque 443 en una corrida anterior: no pisarlo.
 if [ -f "$SITE" ] && grep -q 'managed by Certbot' "$SITE"; then
@@ -126,12 +136,14 @@ fi
 ln -sf "$SITE" /etc/nginx/sites-enabled/facturard.conf
 nginx -t && systemctl reload nginx
 
-for d in "$APP_DOMAIN" "$API_DOMAIN"; do
+CERTBOT_D=()
+for d in "${DOMINIOS[@]}"; do
   ip=$(getent ahostsv4 "$d" | awk 'NR==1{print $1}')
   [ -n "$ip" ] || die "El DNS de $d no resuelve todavía. Crea el registro A hacia este VPS y vuelve a correr."
+  CERTBOT_D+=(-d "$d")
 done
-certbot --nginx --non-interactive --agree-tos --redirect -m "${ACME_EMAIL:-admin@$APP_DOMAIN}" \
-  -d "$APP_DOMAIN" -d "$API_DOMAIN" --keep-until-expiring
+certbot --nginx --non-interactive --agree-tos --redirect ${ACME_EMAIL:+-m "$ACME_EMAIL"} \
+  "${CERTBOT_D[@]}" --keep-until-expiring
 ok "HTTPS activo (certbot renueva solo)"
 
 # ── 5. Backups diarios ───────────────────────────────────────────────────────
