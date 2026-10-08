@@ -14,7 +14,7 @@ export interface EcfItem {
   valor: number;
 }
 
-export type DgiiAmbiente = 'certecf' | 'ecf';
+export type DgiiAmbiente = 'testecf' | 'certecf' | 'ecf';
 
 /**
  * Modo de la representación impresa:

@@ -30,6 +30,19 @@ export const ENDPOINTS_CERTECF: DgiiEndpoints = {
   trackids:   'https://ecf.dgii.gov.do/CerteCF/ConsultaTrackIds',
 };
 
+/**
+ * Ambiente de pruebas libres (testecf / pre-certificación): flujo real contra la
+ * DGII, sin valor fiscal y sin afectar el proceso de certificación.
+ */
+export const ENDPOINTS_TESTECF: DgiiEndpoints = {
+  auth:       'https://ecf.dgii.gov.do/TesteCF/Autenticacion',
+  recepcion:  'https://ecf.dgii.gov.do/TesteCF/Recepcion',
+  consulta:   'https://ecf.dgii.gov.do/TesteCF/ConsultaResultado',
+  fc:         'https://fc.dgii.gov.do/TesteCF/RecepcionFC',
+  aprobacion: 'https://ecf.dgii.gov.do/TesteCF/AprobacionComercial',
+  trackids:   'https://ecf.dgii.gov.do/TesteCF/ConsultaTrackIds',
+};
+
 /** Ambiente de producción (ecf) */
 export const ENDPOINTS_ECF: DgiiEndpoints = {
   auth:       'https://ecf.dgii.gov.do/ECF/Autenticacion',
@@ -40,7 +53,7 @@ export const ENDPOINTS_ECF: DgiiEndpoints = {
   trackids:   'https://ecf.dgii.gov.do/ECF/ConsultaTrackIds',
 };
 
-export type DgiiEnv = 'certecf' | 'ecf';
+export type DgiiEnv = 'testecf' | 'certecf' | 'ecf';
 
 export interface DgiiClientConfig {
   /** Ruta al P12 en disco — usar certPath O p12Buffer, no ambos */
@@ -49,21 +62,26 @@ export interface DgiiClientConfig {
   p12Buffer?: Buffer;
   /** Passphrase del P12 */
   passphrase: string;
-  /** Ambiente: 'certecf' (default) o 'ecf' */
+  /** Ambiente: 'certecf' (default), 'testecf' o 'ecf' */
   env?: DgiiEnv;
 }
 
 export function resolveEndpoints(env: DgiiEnv | undefined): DgiiEndpoints {
-  return env === 'ecf' ? ENDPOINTS_ECF : ENDPOINTS_CERTECF;
+  if (env === 'ecf') return ENDPOINTS_ECF;
+  if (env === 'testecf') return ENDPOINTS_TESTECF;
+  return ENDPOINTS_CERTECF;
 }
 
 /**
  * Resuelve el ambiente DGII desde la variable de entorno `DGII_ENV`.
- * Default seguro: 'certecf' (certificación). Solo `DGII_ENV=production`
- * activa producción ('ecf').
+ * Default seguro: 'certecf' (certificación). `DGII_ENV=production` activa
+ * producción ('ecf') y `DGII_ENV=test` el ambiente de pruebas libres ('testecf').
  */
 export function resolveDgiiEnv(): DgiiEnv {
-  return process.env['DGII_ENV'] === 'production' ? 'ecf' : 'certecf';
+  const v = process.env['DGII_ENV'];
+  if (v === 'production') return 'ecf';
+  if (v === 'test') return 'testecf';
+  return 'certecf';
 }
 
 // ── Autenticación ─────────────────────────────────────────────────────────────
