@@ -276,4 +276,57 @@ describe('Comprobantes — draft + emisión (e2e)', () => {
       .expect(201)
     expect(res.body.estado).toBe('PENDIENTE')
   })
+
+  // ── DireccionEmisor es obligatoria en el XSD (AlfNum100Type). Antes el worker
+  //    mandaba 'Santo Domingo, República Dominicana' fijo para todos los tenants;
+  //    ahora va la del tenant y sin ella no se emite (sin quemar e-NCF). ──
+  describe('DireccionEmisor: obligatoria y máx 100 caracteres', () => {
+    let sinDir: TestTenant
+
+    beforeAll(async () => {
+      sinDir = await createTenant({ direccion: null })
+      await initSequences(sinDir.tenant.id)
+      await uploadCert(app, sinDir.tenant.id, generateP12('SIN-DIRECCION'))
+    })
+
+    const emitirBody = { ...draftBody, emitir: true }
+    const ultimaE31 = async (): Promise<number> =>
+      (await prisma.secuencia.findUniqueOrThrow({
+        where: { tenantId_tipoECF: { tenantId: sinDir.tenant.id, tipoECF: 'E31' } },
+      })).ultimaSecuencia
+
+    it('sin dirección → 409 al emitir, sin encolar ni consumir secuencia', async () => {
+      ctx.queueAdd.mockClear()
+      const antes = await ultimaE31()
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(sinDir)).send(emitirBody).expect(409)
+      expect(JSON.stringify(res.body)).toContain('dirección')
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+      expect(await ultimaE31()).toBe(antes)
+    })
+
+    it('sin dirección → el borrador se guarda, pero /emitir responde 409', async () => {
+      const draft = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(sinDir)).send(draftBody).expect(201)
+      ctx.queueAdd.mockClear()
+      await request(app.getHttpServer())
+        .post(`/api/v1/comprobantes/${draft.body.id}/emitir`).set(auth(sinDir)).expect(409)
+      expect(ctx.queueAdd).not.toHaveBeenCalled()
+    })
+
+    it('PATCH /tenants/empresa rechaza una dirección de 101 caracteres', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/v1/tenants/empresa').set(auth(sinDir)).send({ direccion: 'D'.repeat(101) }).expect(400)
+    })
+
+    it('con dirección → emite normalmente', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/v1/tenants/empresa').set(auth(sinDir)).send({ direccion: 'Calle 1, Santiago' }).expect(200)
+      ctx.queueAdd.mockClear()
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/comprobantes').set(auth(sinDir)).send(emitirBody).expect(201)
+      expect(res.body.estado).toBe('PENDIENTE')
+      expect(ctx.queueAdd).toHaveBeenCalledTimes(1)
+    })
+  })
 })

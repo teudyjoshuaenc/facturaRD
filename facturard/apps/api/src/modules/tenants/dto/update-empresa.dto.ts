@@ -8,10 +8,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
  * (no hay almacenamiento de archivos hoy; ver CLAUDE.md).
  */
 export class UpdateEmpresaDto {
-  @ApiPropertyOptional({ description: 'Dirección fiscal del emisor (aparece en el PDF)' })
+  @ApiPropertyOptional({ description: 'Dirección fiscal del emisor (va en el e-CF como DireccionEmisor y en el PDF)' })
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(100) // AlfNum100Type en el XSD de la DGII
   direccion?: string
 
   @ApiPropertyOptional({ description: 'Teléfono de contacto del emisor' })

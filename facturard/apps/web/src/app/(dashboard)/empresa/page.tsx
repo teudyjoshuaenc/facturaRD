@@ -241,6 +241,7 @@ export default function EmpresaPage(): JSX.Element {
 
         <Input
           id="direccion"
+          maxLength={100}
           label="Dirección fiscal"
           leftIcon={<MapPin size={15} />}
           placeholder="Av. Winston Churchill 123, Piantini, Santo Domingo"

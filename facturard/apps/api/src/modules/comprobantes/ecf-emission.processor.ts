@@ -331,7 +331,8 @@ export class EcfEmissionProcessor extends WorkerHost {
       rnc: tenant.rnc,
       razonSocial: tenant.razonSocial,
       ...(tenant.nombreComercial !== null && { nombreComercial: tenant.nombreComercial }),
-      direccion: 'Santo Domingo, República Dominicana',
+      // assertPuedeEmitir exige la dirección antes de consumir el e-NCF; aquí no se inventa.
+      direccion: (tenant.direccion ?? '').trim(),
       fechaEmision,
     }
   }

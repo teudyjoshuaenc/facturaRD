@@ -69,6 +69,9 @@ export const UMBRAL_IDENTIFICACION_E32 = 250_000
 // nombre, así que el snapshot también puede exceder 80).
 export const MAX_NOMBRE_ITEM = 80
 
+// DireccionEmisor en el XSD de la DGII: AlfNum100Type (obligatoria, máx 100).
+export const MAX_DIRECCION_EMISOR = 100
+
 /** Lanza 400 si un E32 >= umbral no trae identificación del comprador. */
 function validarIdentificacionE32(dto: CreateComprobanteDto, montoTotal: number): void {
   if (dto.tipoECF !== 'E32' || montoTotal < UMBRAL_IDENTIFICACION_E32) return
@@ -230,6 +233,22 @@ export class ComprobantesService {
       throw new ConflictException(
           `Tu certificado digital venció el ${cert.validoHasta.toLocaleDateString('es-DO')}. ` +
           'Sube uno vigente en Configuración → Certificación fiscal para volver a emitir.',
+      )
+    }
+    // DireccionEmisor es obligatoria en el XSD (AlfNum100Type). Se valida aquí,
+    // antes de consumir la secuencia, para no quemar un e-NCF en el worker.
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { direccion: true } })
+    const direccion = tenant.direccion?.trim() ?? ''
+    if (direccion === '') {
+      throw new ConflictException(
+          'Falta la dirección fiscal de tu empresa: la DGII la exige en cada e-CF. ' +
+          'Escríbela en la sección Empresa (o guarda el comprobante como borrador).',
+      )
+    }
+    if (direccion.length > MAX_DIRECCION_EMISOR) {
+      throw new ConflictException(
+          `La dirección fiscal tiene ${direccion.length} caracteres y la DGII admite ${MAX_DIRECCION_EMISOR}. ` +
+          'Acórtala en la sección Empresa.',
       )
     }
   }

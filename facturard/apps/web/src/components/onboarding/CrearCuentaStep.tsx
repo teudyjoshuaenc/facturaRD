@@ -122,6 +122,7 @@ export function CrearCuentaStep({
         </div>
         <Input
           id="ob-direccion"
+          maxLength={100}
           leftIcon={<MapPin size={15} />}
           placeholder="Dirección fiscal"
           value={direccion}

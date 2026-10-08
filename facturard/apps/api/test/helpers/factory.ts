@@ -33,6 +33,8 @@ export async function createTenant(overrides?: Partial<Tenant>): Promise<TestTen
       rnc,
       razonSocial: overrides?.razonSocial ?? `TENANT ${rnc} SRL`,
       nombreComercial: overrides?.nombreComercial ?? null,
+      // Dirección fiscal: obligatoria para emitir (assertPuedeEmitir). `null` explícito la omite.
+      direccion: overrides?.direccion !== undefined ? overrides.direccion : 'Av. Prueba 1, Santo Domingo',
       estado: 'ACTIVO',
       planActivo: true,
     },
