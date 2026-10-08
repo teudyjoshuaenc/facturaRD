@@ -224,11 +224,18 @@ function DeteccionAviso({ deteccion }: { deteccion: Deteccion }): JSX.Element | 
     )
   }
 
-  if (deteccion.estado === 'error') {
+  // Si NINGÚN tipo se pudo consultar (p. ej. en certecf la DGII no publica TrackIds),
+  // no sabemos nada: es el mismo caso que un error de la llamada, no "empiezas en 1".
+  const sinVerificar =
+    deteccion.estado === 'listo' && deteccion.tipos.every((t) => t.estado === 'error')
+
+  if (deteccion.estado === 'error' || sinVerificar) {
+    const mensaje =
+      deteccion.estado === 'error' ? deteccion.mensaje : 'No pudimos consultar tu numeración en la DGII.'
     return (
       <div className="flex items-start gap-2 rounded-lg border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-body-sm text-warning-700">
         <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-        <span>{deteccion.mensaje} Si ya emitías e-CF, escribe tu última secuencia abajo.</span>
+        <span>{mensaje} Si ya emitías e-CF, escribe tu última secuencia abajo.</span>
       </div>
     )
   }
@@ -244,7 +251,9 @@ function DeteccionAviso({ deteccion }: { deteccion: Deteccion }): JSX.Element | 
         <span>
           {usados.length > 0
             ? 'Encontramos tu numeración en la DGII y ya la aplicamos. Tus próximos comprobantes:'
-            : 'La DGII no tiene e-CF emitidos con tu RNC: empezarás desde el número 1.'}
+            : errores.length > 0
+              ? 'En los tipos que pudimos consultar, la DGII no tiene e-CF emitidos con tu RNC: empiezan desde el número 1.'
+              : 'La DGII no tiene e-CF emitidos con tu RNC: empezarás desde el número 1.'}
         </span>
       </div>
       {usados.length > 0 && (
