@@ -79,6 +79,17 @@ export const CLASE_LABELS: Record<ClaseDocumento, string> = {
 export const ESTADOS_EN_PROCESO: readonly ComprobanteEstado[] = ['PENDIENTE', 'EN_COLA', 'ENVIANDO']
 
 /**
+ * Mientras un comprobante está en proceso, el worker lo envía a la DGII y lo
+ * cambia a ACEPTADO/RECHAZADO en segundos; las vistas re-consultan cada tanto
+ * para que el estado se actualice sin recargar la página.
+ */
+export const POLL_EN_PROCESO_MS = 3000
+
+export function enProceso(c: Pick<Comprobante, 'estado'> | null | undefined): boolean {
+  return !!c && ESTADOS_EN_PROCESO.includes(c.estado)
+}
+
+/**
  * Máximo de caracteres del nombre de un artículo. La DGII lo limita a 80
  * (`NombreItem` es `AlfNum80Type` en los XSD e-CF 31/32/33/34). El backend lo
  * rechaza con 400; el front lo tope-a aquí para no dejar teclear de más y evitar

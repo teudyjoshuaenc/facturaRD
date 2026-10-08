@@ -28,6 +28,8 @@ import {
   ESTADO_LABELS,
   formatCurrency,
   downloadComprobantePdf,
+  enProceso,
+  POLL_EN_PROCESO_MS,
 } from '@/lib/comprobantes'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -79,6 +81,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
     queryKey: ['comprobante-detalle', id],
     queryFn: () => api.get<Comprobante>(`/comprobantes/${id}`).then((res) => res.data),
     enabled: !!id,
+    refetchInterval: (query) => (enProceso(query.state.data) ? POLL_EN_PROCESO_MS : false),
   })
 
   // Fetch Tenant details

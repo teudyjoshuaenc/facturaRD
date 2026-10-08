@@ -6,7 +6,9 @@ import { toast } from 'sonner'
 import { api, getErrorMessage } from '@/lib/api'
 import {
   downloadComprobantePdf,
+  enProceso,
   estadosDeFiltro,
+  POLL_EN_PROCESO_MS,
   type ClaseFiltro,
   type Comprobante,
   type EstadoFiltro,
@@ -199,6 +201,7 @@ export function useComprobantes() {
           },
         })
         .then((res) => res.data),
+    refetchInterval: (query) => (query.state.data?.data.some(enProceso) ? POLL_EN_PROCESO_MS : false),
   })
 
   const { data: detail, isLoading: detailLoading } = useQuery({
@@ -206,6 +209,7 @@ export function useComprobantes() {
     queryFn: () =>
       api.get<Comprobante>(`/comprobantes/${selectedId}`).then((res) => res.data),
     enabled: !!selectedId,
+    refetchInterval: (query) => (enProceso(query.state.data) ? POLL_EN_PROCESO_MS : false),
   })
 
   const filtered = useMemo(() => {
