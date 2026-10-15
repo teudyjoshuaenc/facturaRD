@@ -1,0 +1,78 @@
+# Deploy a producción en cada push a la rama que corre producción.
+#
+# OJO con la rama: el VPS corre EXACTAMENTE deploy/single-domain (verificado archivo por
+# archivo el 2026-10-14); main va 20 archivos atrás. Desplegar main hoy sería un rollback.
+# Cuando deploy/single-domain se mergee a main, cambiar `branches` a [main].
+#
+# Mismas verificaciones que ci.yml antes de tocar el servidor. Después arma un tarball con
+# el repo versionado (git archive: nunca viaja deploy/.env) y lo manda por SSH a
+# `vps-ci-deploy facturard`, que es lo ÚNICO que la llave de CI puede correr en el VPS.
+# Las imágenes se construyen allá con docker compose. Script y config: repo de
+# access-panel, deploy/vps/host/ci.
+#
+# Secrets: VPS_SSH_KEY (llave ed25519 de CI de ESTE repo), VPS_KNOWN_HOSTS.
+# Variables: VPS_HOST (31.97.139.87), VPS_USER (luis).
+name: Deploy prod
+
+on:
+  push:
+    branches: [deploy/single-domain]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: facturard/pnpm-lock.yaml
+
+      - name: Verificar
+        working-directory: ./facturard
+        env:
+          NODE_ENV: test
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @facturard/database generate
+          pnpm turbo run build --filter=@facturard/api
+          sudo apt-get install -y libxml2-utils
+          pnpm --filter @facturard/ecf-engine test
+
+      - name: Armar bundle
+        run: |
+          mkdir -p bundle/stack
+          git archive --format=tar HEAD | tar -x -C bundle/stack
+          git rev-parse --short HEAD > bundle/REV
+          tar -czf bundle.tgz -C bundle .
+          ls -lh bundle.tgz
+
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          HOST: ${{ vars.VPS_HOST }}
+          USER: ${{ vars.VPS_USER }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ServerAliveInterval=30 "$USER@$HOST" deploy < bundle.tgz
