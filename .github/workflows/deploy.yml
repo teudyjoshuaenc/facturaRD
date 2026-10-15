@@ -52,7 +52,7 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm --filter @facturard/database generate
           pnpm turbo run build --filter=@facturard/api
-          sudo apt-get install -y libxml2-utils
+          sudo apt-get update -qq && sudo apt-get install -y libxml2-utils
           pnpm --filter @facturard/ecf-engine test
 
       - name: Armar bundle
