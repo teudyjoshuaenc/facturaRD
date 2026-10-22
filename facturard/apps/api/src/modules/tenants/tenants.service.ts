@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { prisma, UserRole } from '@facturard/database'
-import type { Tenant } from '@facturard/database'
+import type { AmbienteDgii, Tenant } from '@facturard/database'
 import type { CreateTenantDto } from './dto/create-tenant.dto'
 import type { BrandingDto } from './dto/branding.dto'
 import type { UpdateEmpresaDto } from './dto/update-empresa.dto'
@@ -151,6 +151,28 @@ export class TenantsService {
     const tenant = await prisma.tenant.update({
       where: { id: tenantId },
       data: { logoUrl: secureUrl, logoPublicId: publicId },
+    })
+    const [emision, finanzas] = await Promise.all([
+      this.emisionStatusMap([tenant.id]),
+      this.finanzasHabilitadoMap([tenant.id]),
+    ])
+    return this.toSafeTenant(tenant, emision.get(tenant.id)!, finanzas.get(tenant.id)!)
+  }
+
+  async updateAmbienteDgii(id: string, ambiente: AmbienteDgii | null, userId: string): Promise<SafeTenant> {
+    const actual = await prisma.tenant.findUnique({ where: { id }, select: { ambienteDgii: true } })
+    if (!actual) throw new NotFoundException(`Tenant ${id} no encontrado`)
+    const tenant = await prisma.tenant.update({ where: { id }, data: { ambienteDgii: ambiente } })
+    // El auditLog queda en el tenant afectado, con quién lo cambió y de qué a qué.
+    await prisma.auditLog.create({
+      data: {
+        tenantId: id,
+        userId,
+        accion: 'CAMBIAR_AMBIENTE_DGII',
+        entidad: 'tenant',
+        entidadId: id,
+        detalle: { antes: actual.ambienteDgii, despues: ambiente },
+      },
     })
     const [emision, finanzas] = await Promise.all([
       this.emisionStatusMap([tenant.id]),

@@ -6,9 +6,10 @@ import { tmpdir } from 'node:os'
 import { readFile, unlink } from 'node:fs/promises'
 import { Prisma, prisma } from '@facturard/database'
 import type { Comprobante } from '@facturard/database'
-import { generarRepresentacionImpresa, resolveDgiiEnv } from '@facturard/ecf-engine'
+import { generarRepresentacionImpresa } from '@facturard/ecf-engine'
 import type { EcfPdfInput } from '@facturard/ecf-engine'
 import { buildEcfPdfInput } from './pdf-input.builder'
+import { dgiiEnvDe } from '../../common/ambiente-dgii'
 import type { CreateComprobanteDto, CreateItemDto } from './dto/create-comprobante.dto'
 import type { UpdateComprobanteDto } from './dto/update-comprobante.dto'
 import type { CrearNotaDto } from './dto/crear-nota.dto'
@@ -807,11 +808,15 @@ export class ComprobantesService {
 
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     const datos = comprobante.datos as unknown as CreateComprobanteDto
+    // El QR apunta al ambiente al que SE ENVIÓ el comprobante. Uno enviado antes
+    // de existir ambienteDgii (xmlFirmado sin ambiente) iba al DGII_ENV global;
+    // uno aún no enviado usa el ambiente actual del tenant.
+    const ambiente = comprobante.ambienteDgii ?? (comprobante.xmlFirmado ? null : tenant.ambienteDgii)
     const base = buildEcfPdfInput(
         datos,
         tenant,
         comprobante.eNCF ?? '',
-        resolveDgiiEnv(),
+        dgiiEnvDe(ambiente),
         aceptadoFiscal ? (comprobante.xmlFirmado ?? undefined) : undefined,
     )
     // Sólo el aceptado fiscal se representa como e-CF (con QR/timbre). La nota de

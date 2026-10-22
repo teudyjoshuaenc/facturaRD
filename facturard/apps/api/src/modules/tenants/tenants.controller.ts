@@ -21,6 +21,7 @@ import { DgiiContribuyentesService } from './dgii-contribuyentes.service'
 import { CreateTenantDto } from './dto/create-tenant.dto'
 import { BrandingDto } from './dto/branding.dto'
 import { UpdateEmpresaDto } from './dto/update-empresa.dto'
+import { AmbienteDgiiDto } from './dto/ambiente-dgii.dto'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { SameTenantGuard } from '../../common/guards/same-tenant.guard'
@@ -117,6 +118,18 @@ export class TenantsController {
   ) {
     // El tipo MIME se valida en el servicio ANTES de tocar Cloudinary (mensaje claro).
     return this.service.updateLogo(tenantId, file.buffer, file.mimetype)
+  }
+
+  // Ambiente DGII de UN tenant (pruebas/certificación/producción) sin tocar el
+  // DGII_ENV del servidor ni reiniciar: el resto de los clientes sigue igual.
+  // Sólo SUPER_ADMIN: mandar a producción emite comprobantes fiscales reales.
+  @Patch(':id/ambiente-dgii')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Cambia el ambiente DGII de un tenant; null vuelve al DGII_ENV del servidor (solo SUPER_ADMIN)' })
+  updateAmbienteDgii(@Param('id') id: string, @Body() dto: AmbienteDgiiDto, @CurrentUser() user: JwtPayload) {
+    return this.service.updateAmbienteDgii(id, dto.ambiente ?? null, user.sub)
   }
 
   @Get(':id')

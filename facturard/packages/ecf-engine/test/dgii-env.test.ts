@@ -22,6 +22,14 @@ describe('DGII_ENV → ambiente', () => {
     expect(resolveDgiiEnv()).toBe('certecf');
   });
 
+  it('el ambiente del tenant gana sobre DGII_ENV', () => {
+    process.env['DGII_ENV'] = 'production';
+    expect(resolveDgiiEnv('testecf')).toBe('testecf');
+    expect(resolveDgiiEnv('certecf')).toBe('certecf');
+    expect(resolveDgiiEnv(null)).toBe('ecf');
+    expect(resolveDgiiEnv(undefined)).toBe('ecf');
+  });
+
   it('testecf usa las rutas /TesteCF/', () => {
     const e = resolveEndpoints('testecf');
     for (const url of Object.values(e)) expect(url).toContain('/TesteCF/');

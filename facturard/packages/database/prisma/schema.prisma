@@ -28,6 +28,15 @@ enum UserRole {
   CONTADOR
 }
 
+// Ambiente DGII al que se envían los e-CF de un tenant. En Tenant, null = el
+// ambiente global del servidor (DGII_ENV). Permite tener un cliente en
+// producción y otro en pruebas en la misma instancia.
+enum AmbienteDgii {
+  TESTECF
+  CERTECF
+  ECF
+}
+
 enum TipoECF {
   E31
   E32
@@ -116,6 +125,9 @@ model Tenant {
   telefono        String?
   email           String?
   plan            Plan         @default(BASICO)
+  // Ambiente DGII propio del tenant. null = DGII_ENV del servidor. Sólo lo
+  // cambia un SUPER_ADMIN (PATCH /tenants/:id/ambiente-dgii).
+  ambienteDgii    AmbienteDgii?
   estado          TenantEstado @default(ACTIVO)
   planActivo      Boolean      @default(true)
   trialEndsAt     DateTime?
@@ -387,6 +399,9 @@ model Comprobante {
   xmlFirmado   String?
   trackId      String?
   mensajeDGII  String?
+  // Ambiente DGII al que se envió. null = filas anteriores a este campo (iban
+  // al DGII_ENV global). El PDF regenerado usa este valor para el QR.
+  ambienteDgii AmbienteDgii?
   montoTotal   Decimal           @db.Decimal(18, 2)
   rnc          String            // RNC del comprador
   razonSocial  String            // Razón social del comprador

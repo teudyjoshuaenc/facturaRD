@@ -25,7 +25,6 @@ import {
   enviarResumenFC,
   consultarEstado,
   generarRepresentacionImpresa,
-  resolveDgiiEnv,
 } from '@facturard/ecf-engine'
 import type {
   ECF31Input,
@@ -48,6 +47,7 @@ import type {
   InformacionReferenciaOpcional,
 } from '@facturard/ecf-engine'
 import { CertificadosService } from '../certificados/certificados.service'
+import { ambienteDgiiDe, dgiiEnvDe } from '../../common/ambiente-dgii'
 import { WebhookSenderService } from '../webhooks/webhook-sender.service'
 import type { CreateComprobanteDto } from './dto/create-comprobante.dto'
 import { buildEcfPdfInput } from './pdf-input.builder'
@@ -173,8 +173,9 @@ export class EcfEmissionProcessor extends WorkerHost {
     const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
 
-    // Ambiente DGII: 'certecf' (default seguro) o 'ecf' si DGII_ENV=production.
-    const env = resolveDgiiEnv()
+    // Ambiente DGII: el propio del tenant si lo tiene; si no, DGII_ENV del
+    // servidor ('certecf' por defecto, 'ecf' si DGII_ENV=production).
+    const env = dgiiEnvDe(tenant.ambienteDgii)
 
     // E32 < RD$250,000 sigue el flujo RFCE (resumen a fc.dgii.gov.do), no el
     // flujo normal de recepción. El e-CF completo firmado se conserva igual
@@ -194,7 +195,7 @@ export class EcfEmissionProcessor extends WorkerHost {
 
     await prisma.comprobante.update({
       where: { id: comprobanteId },
-      data: { estado: 'ENVIANDO', xmlFirmado },
+      data: { estado: 'ENVIANDO', xmlFirmado, ambienteDgii: ambienteDgiiDe(env) },
     })
 
     this.logger.log(`[${comprobanteId}] Autenticando con DGII ${env}...`)

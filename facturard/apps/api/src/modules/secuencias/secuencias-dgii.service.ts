@@ -1,6 +1,7 @@
 import { BadGatewayException, ConflictException, Injectable, Logger } from '@nestjs/common'
 import { prisma, TipoECF } from '@facturard/database'
-import { detectarUltimaSecuencia, resolveDgiiEnv, type DgiiEnv } from '@facturard/ecf-engine'
+import { detectarUltimaSecuencia, type DgiiEnv } from '@facturard/ecf-engine'
+import { dgiiEnvDe } from '../../common/ambiente-dgii'
 import { CertificadosService } from '../certificados/certificados.service'
 import { DgiiTrackIdsClient } from './dgii-trackids.client'
 import { SecuenciasService, formatENCF } from './secuencias.service'
@@ -54,7 +55,7 @@ export class SecuenciasDgiiService {
   ) {}
 
   async detectarYAplicar(tenantId: string): Promise<DeteccionResultado> {
-    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { rnc: true } })
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { rnc: true, ambienteDgii: true } })
 
     let cert: { p12Buffer: Buffer; passphrase: string }
     try {
@@ -65,7 +66,7 @@ export class SecuenciasDgiiService {
       )
     }
 
-    const env = resolveDgiiEnv()
+    const env = dgiiEnvDe(tenant.ambienteDgii)
     let token: string
     try {
       token = await this.dgii.autenticar(cert.p12Buffer, cert.passphrase, env)

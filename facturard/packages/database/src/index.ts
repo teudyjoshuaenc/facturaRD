@@ -13,6 +13,7 @@ export {
   CanalEnvio,
   EstadoEnvio,
   CajaEstado,
+  AmbienteDgii,
 } from '@prisma/client'
 
 // Model types

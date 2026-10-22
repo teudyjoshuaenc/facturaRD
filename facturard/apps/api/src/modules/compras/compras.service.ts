@@ -6,10 +6,10 @@ import {
   enviarAprobacionComercial,
   autenticar,
   firmarDocumento,
-  resolveDgiiEnv,
   type EstadoAprobacion,
 } from '@facturard/ecf-engine'
 import { CertificadosService } from '../certificados/certificados.service'
+import { dgiiEnvDe } from '../../common/ambiente-dgii'
 import type { CreateCompraDto } from './dto/create-compra.dto'
 import type { UpdateCompraDto } from './dto/update-compra.dto'
 import type { ListComprasDto } from './dto/list-compras.dto'
@@ -154,7 +154,7 @@ export class ComprasService {
 
     const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } })
     const { p12Buffer, passphrase } = await this.certificados.getCertificadoParaFirmar(tenantId)
-    const env = resolveDgiiEnv()
+    const env = dgiiEnvDe(tenant.ambienteDgii)
     const estado: EstadoAprobacion = dto.decision === 'APROBADO' ? 1 : 2
 
     const xml = buildAprobacionXml({

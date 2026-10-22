@@ -73,11 +73,13 @@ export function resolveEndpoints(env: DgiiEnv | undefined): DgiiEndpoints {
 }
 
 /**
- * Resuelve el ambiente DGII desde la variable de entorno `DGII_ENV`.
+ * Resuelve el ambiente DGII. Si el tenant tiene un ambiente propio (`override`),
+ * gana ése; si no, se lee la variable de entorno `DGII_ENV`.
  * Default seguro: 'certecf' (certificación). `DGII_ENV=production` activa
  * producción ('ecf') y `DGII_ENV=test` el ambiente de pruebas libres ('testecf').
  */
-export function resolveDgiiEnv(): DgiiEnv {
+export function resolveDgiiEnv(override?: DgiiEnv | null): DgiiEnv {
+  if (override) return override;
   const v = process.env['DGII_ENV'];
   if (v === 'production') return 'ecf';
   if (v === 'test') return 'testecf';
