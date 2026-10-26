@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { ReenviarModal } from '@/components/facturas/ReenviarModal'
 import { ConfirmReemitirModal } from '@/components/facturas/ConfirmReemitirModal'
+import { CrearNotaModal, type TipoNota } from '@/components/facturas/CrearNotaModal'
 import { toast } from 'sonner'
 import { useEmissionStatus } from '@/hooks/useEmissionStatus'
 import { useEnviarComprobante, useEnviosComprobante } from '@/hooks/useComprobantes'
@@ -58,6 +59,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
   const [showConfirmReemitir, setShowConfirmReemitir] = useState(false)
   const [showConfirmReintentar, setShowConfirmReintentar] = useState(false)
   const [emitting, setEmitting] = useState(false)
+  const [notaTipo, setNotaTipo] = useState<TipoNota | null>(null)
 
   // Envío al cliente por GoHighLevel (post-emisión, no toca el estado DGII).
   const enviarComprobante = useEnviarComprobante()
@@ -126,6 +128,13 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
       </div>
     )
   }
+
+  // El backend sólo admite notas sobre un e-CF fiscal ACEPTADO (409 si no).
+  const puedeNota = comprobante.esFiscal !== false && comprobante.estado === 'ACEPTADO'
+  const motivoSinNota =
+    comprobante.esFiscal === false
+      ? 'Una nota de venta interna no admite notas de crédito/débito'
+      : 'Sólo se puede emitir una nota sobre un comprobante aceptado por la DGII'
 
   const items = comprobante.datos?.items || []
   const subtotal = items.reduce((sum: number, it: any) => sum + (it.cantidad * it.precioUnitarioItem - (it.descuento || 0)), 0)
@@ -409,7 +418,7 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => alert('Clonando comprobante...')}
+              onClick={() => router.push(`/nueva-factura?cloneId=${id}`)}
               className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[7px] flex items-center transition-all cursor-pointer"
             >
               <Copy size={14} className="shrink-0 text-[#64748b]" />
@@ -417,19 +426,23 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => alert('Generando nota de crédito E34...')}
-              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer"
+              onClick={() => setNotaTipo('E34')}
+              disabled={!puedeNota}
+              title={puedeNota ? undefined : motivoSinNota}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText size={14} className="shrink-0 text-[#64748b]" />
               <span>Crear nota de crédito E34</span>
             </Button>
             <Button
               variant="secondary"
-              onClick={() => alert('Generando nota de crédito E33...')}
-              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer"
+              onClick={() => setNotaTipo('E33')}
+              disabled={!puedeNota}
+              title={puedeNota ? undefined : motivoSinNota}
+              className="h-[40px] px-[16px] py-[10px] rounded-[10px] border border-[#e2e8f0] bg-white text-[#333] hover:bg-neutral-50 text-[12px] font-normal leading-[19.5px] gap-[6px] flex items-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText size={14} className="shrink-0 text-[#64748b]" />
-              <span>Crear nota de crédito E33</span>
+              <span>Crear nota de débito E33</span>
             </Button>
           </>
         )}
@@ -829,6 +842,19 @@ export default function FacturaDetailPage({ params }: PageProps): JSX.Element {
           handleEmitir()
         }}
       />
+
+      {notaTipo && (
+        <CrearNotaModal
+          open
+          tipo={notaTipo}
+          comprobante={comprobante}
+          onClose={() => setNotaTipo(null)}
+          onCreated={(nota) => {
+            setNotaTipo(null)
+            router.push(`/facturas/${nota.id}`)
+          }}
+        />
+      )}
 
       <ConfirmReemitirModal
         open={showConfirmReintentar}
