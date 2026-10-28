@@ -11,7 +11,7 @@ export interface GhlInitResult {
   token?: string
   tenant?: Pick<Tenant, 'rnc' | 'razonSocial' | 'plan'>
   onboarding?: boolean
-  /** La empresa tiene cuenta con contraseña: hay que iniciar sesión (no basta el location_id). */
+  /** La empresa tiene cuenta con 2FA: hay que entrar con correo + código (no basta el location_id). */
   requiereLogin?: boolean
   locationId?: string
 }
@@ -39,7 +39,7 @@ export class GhlAuthService {
 
     const ghlLocation = await prisma.ghlLocation.findUnique({
       where: { locationId },
-      include: { tenant: { include: { cuentaRegistro: { select: { passwordHash: true } } } } },
+      include: { tenant: { include: { cuentaRegistro: { select: { totpActivo: true } } } } },
     })
 
     if (!ghlLocation) {
@@ -48,10 +48,10 @@ export class GhlAuthService {
 
     const { tenant } = ghlLocation
 
-    // Empresas registradas con correo y contraseña: el location_id solo NO basta
-    // para entrar (cualquiera que lo conozca obtendría un token ADMIN). Las
+    // Empresas registradas directamente (correo + 2FA): el location_id solo NO
+    // basta para entrar (cualquiera que lo conozca obtendría un token ADMIN). Las
     // empresas antiguas, sin cuenta, siguen entrando como antes hasta migrarlas.
-    if (tenant.cuentaRegistro?.passwordHash) {
+    if (tenant.cuentaRegistro?.totpActivo) {
       return { requiereLogin: true, locationId }
     }
 

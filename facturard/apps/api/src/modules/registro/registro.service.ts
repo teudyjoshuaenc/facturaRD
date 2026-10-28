@@ -9,15 +9,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { ConfigService } from '@nestjs/config'
 import * as bcrypt from 'bcrypt'
-import { createHash, randomBytes } from 'crypto'
+import { randomBytes } from 'crypto'
 import * as QRCode from 'qrcode'
 import { prisma, UserRole } from '@facturard/database'
 import type { CuentaRegistro } from '@facturard/database'
 import { CryptoService } from '../../common/services/crypto.service'
 import { generarSecretoTotp, urlOtpauth, verificarTotp } from '../../common/services/totp'
-import { EmailService } from '../email/email.service'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { CertificadosService } from '../certificados/certificados.service'
@@ -25,14 +23,13 @@ import { AuthService, type AuthTokens } from '../auth/auth.service'
 import { municipioValido } from './geo-dgii'
 import type { ContribuyenteDto, DatosRegistroDto, OfvDto, RepresentanteDto } from './dto/registro.dto'
 
-const VERIFICACION_HORAS = 24
+const MAX_INTENTOS = 5
+const BLOQUEO_MINUTOS = 15
 
-const hash = (s: string): string => createHash('sha256').update(s).digest('hex')
 const normalizarEmail = (e: string): string => e.trim().toLowerCase()
 
 export interface EstadoRegistro {
   email: string
-  emailVerificado: boolean
   dosPasosActivo: boolean
   datosCompletos: boolean
   certificadoCargado: boolean
@@ -46,9 +43,11 @@ export interface SesionTenant extends AuthTokens {
 }
 
 /**
- * Registro directo en FacturaRD (Fase 1): correo → contraseña → 2FA → datos del
- * contribuyente y representante → certificado → acceso OFV → completar.
- * La cuenta tiene permisos básicos (sólo su registro) hasta que se crea el tenant.
+ * Registro directo en FacturaRD (Fase 1): correo → 2FA → datos del contribuyente
+ * y representante → certificado → acceso OFV → completar.
+ * FacturaRD no maneja contraseñas ni correos de confirmación: la llave de la
+ * cuenta es el código de Google Authenticator, y la contraseña del CRM la
+ * configura GoHighLevel con su propio correo al crear el usuario (Fase 4).
  */
 @Injectable()
 export class RegistroService {
@@ -56,60 +55,52 @@ export class RegistroService {
 
   constructor(
     private readonly jwt: JwtService,
-    private readonly config: ConfigService,
     private readonly crypto: CryptoService,
-    private readonly email: EmailService,
     private readonly dgii: DgiiContribuyentesService,
     private readonly secuencias: SecuenciasService,
     private readonly certificados: CertificadosService,
     private readonly auth: AuthService,
   ) {}
 
-  // ── Correo y contraseña ────────────────────────────────────────────────────
+  // ── Entrada: correo, y después correo + código 2FA ─────────────────────────
 
-  /** Respuesta siempre genérica: no revela si el correo ya existe. */
-  async iniciar(emailCrudo: string): Promise<void> {
+  /**
+   * Abre (o retoma) el registro con sólo el correo. Mientras no tenga 2FA activo
+   * se puede retomar con el correo; una vez activo, sólo con el código.
+   */
+  async iniciar(emailCrudo: string): Promise<{ tokenRegistro: string }> {
     const email = normalizarEmail(emailCrudo)
     const existente = await prisma.cuentaRegistro.findUnique({ where: { email } })
-    if (existente?.emailVerificado) return
-
-    const token = randomBytes(32).toString('hex')
-    const data = {
-      tokenVerificacionHash: hash(token),
-      tokenVerificacionExpira: new Date(Date.now() + VERIFICACION_HORAS * 3600_000),
+    if (existente?.totpActivo) {
+      throw new ConflictException('Ya existe una cuenta con ese correo. Entra con tu código de Google Authenticator.')
     }
-    await prisma.cuentaRegistro.upsert({ where: { email }, create: { email, ...data }, update: data })
-
-    const appUrl = this.config.get<string>('APP_URL', 'http://localhost:3001')
-    await this.email.sendVerificacionRegistro(email, `${appUrl}/registro/verificar?token=${token}`)
+    const cuenta = existente ?? (await prisma.cuentaRegistro.create({ data: { email } }))
+    return { tokenRegistro: this.firmarRegistro(cuenta.id) }
   }
 
-  async verificar(token: string, password: string): Promise<{ tokenRegistro: string }> {
-    const cuenta = await prisma.cuentaRegistro.findFirst({
-      where: { tokenVerificacionHash: hash(token), tokenVerificacionExpira: { gt: new Date() } },
-    })
-    if (!cuenta) throw new BadRequestException('El enlace no es válido o ya venció. Solicita uno nuevo.')
-
-    const actualizada = await prisma.cuentaRegistro.update({
-      where: { id: cuenta.id },
-      data: {
-        passwordHash: await bcrypt.hash(password, 12),
-        emailVerificado: true,
-        tokenVerificacionHash: null,
-        tokenVerificacionExpira: null,
-      },
-    })
-    return { tokenRegistro: this.firmarRegistro(actualizada.id) }
-  }
-
+  /** Entrar con correo + código de Google Authenticator (bloqueo tras 5 intentos fallidos). */
   async login(
     emailCrudo: string,
-    password: string,
+    codigo: string,
   ): Promise<{ tokenRegistro: string; sesion: SesionTenant | null }> {
     const cuenta = await prisma.cuentaRegistro.findUnique({ where: { email: normalizarEmail(emailCrudo) } })
-    if (!cuenta?.passwordHash || !(await bcrypt.compare(password, cuenta.passwordHash))) {
-      throw new UnauthorizedException('Correo o contraseña incorrectos')
+    if (!cuenta?.totpActivo || !cuenta.totpSecretCifrado) {
+      throw new UnauthorizedException('Correo o código incorrectos')
     }
+    if (cuenta.bloqueadoHasta && cuenta.bloqueadoHasta > new Date()) {
+      throw new UnauthorizedException(`Demasiados intentos. Intenta de nuevo en ${BLOQUEO_MINUTOS} minutos.`)
+    }
+    if (!verificarTotp(this.crypto.decryptString(cuenta.totpSecretCifrado), codigo)) {
+      const intentos = cuenta.intentosFallidos + 1
+      await prisma.cuentaRegistro.update({
+        where: { id: cuenta.id },
+        data: intentos >= MAX_INTENTOS
+          ? { intentosFallidos: 0, bloqueadoHasta: new Date(Date.now() + BLOQUEO_MINUTOS * 60_000) }
+          : { intentosFallidos: intentos },
+      })
+      throw new UnauthorizedException('Correo o código incorrectos')
+    }
+    await prisma.cuentaRegistro.update({ where: { id: cuenta.id }, data: { intentosFallidos: 0, bloqueadoHasta: null } })
     const sesion = cuenta.completadoEn && cuenta.tenantId ? await this.sesionTenant(cuenta) : null
     return { tokenRegistro: this.firmarRegistro(cuenta.id), sesion }
   }
@@ -167,7 +158,6 @@ export class RegistroService {
       : null
     return {
       email: cuenta.email,
-      emailVerificado: cuenta.emailVerificado,
       dosPasosActivo: cuenta.totpActivo,
       datosCompletos: Boolean(t?.perfilFiscal && t?.representante),
       certificadoCargado: Boolean(t?.certificados.length),
@@ -275,7 +265,8 @@ export class RegistroService {
           tenantId: tenant.id,
           email: cuenta.email,
           nombre: representante.nombreCompleto,
-          passwordHash: cuenta.passwordHash!,
+          // Sin contraseña utilizable: se entra con correo + 2FA o desde el CRM.
+          passwordHash: await bcrypt.hash(randomBytes(32).toString('hex'), 12),
           role: UserRole.ADMIN,
         },
       })
@@ -348,7 +339,7 @@ export class RegistroService {
 
   private async cuenta(cuentaId: string): Promise<CuentaRegistro> {
     const cuenta = await prisma.cuentaRegistro.findUnique({ where: { id: cuentaId } })
-    if (!cuenta?.emailVerificado) throw new UnauthorizedException('Sesión de registro inválida')
+    if (!cuenta) throw new UnauthorizedException('Sesión de registro inválida')
     return cuenta
   }
 

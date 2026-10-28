@@ -4,32 +4,24 @@ import { prisma } from '@facturard/database'
 import { createTestApp } from './helpers/test-app'
 import { createTenant, generateP12, nextRnc } from './helpers/factory'
 import { DgiiContribuyentesService } from '../src/modules/tenants/dgii-contribuyentes.service'
-import { EmailService } from '../src/modules/email/email.service'
 import { codigoTotp } from '../src/common/services/totp'
 
-// e2e — Registro directo en FacturaRD (Fase 1): correo → contraseña → 2FA →
-// contribuyente + representante → P12 → OFV → completar. El correo y el padrón
-// de la DGII se mockean; el P12 y los códigos 2FA son reales.
+// e2e — Registro directo en FacturaRD (Fase 1): correo → 2FA → contribuyente +
+// representante → P12 → OFV → completar. Sin contraseñas ni correos propios: se
+// entra con correo + código de Google Authenticator (la contraseña del CRM la
+// configura GoHighLevel). El padrón de la DGII se mockea; P12 y códigos son reales.
 
 const DN = { provincia: '010000', municipio: '010100' } // Distrito Nacional / Santo Domingo de Guzmán
 const SANTIAGO = { provincia: '250000', municipio: '250100' }
 
 describe('Registro directo (e2e)', () => {
   let app: INestApplication
-  const enlaces = new Map<string, string>()
   const buscarPorRNC = jest.fn()
   const http = () => request(app.getHttpServer())
 
   beforeAll(async () => {
     const ctx = await createTestApp([
       { provide: DgiiContribuyentesService, useValue: { buscarPorRNC } },
-      {
-        provide: EmailService,
-        useValue: {
-          sendVerificacionRegistro: jest.fn(async (email: string, link: string) => { enlaces.set(email, link) }),
-          sendResetPassword: jest.fn(),
-        },
-      },
     ])
     app = ctx.app
   })
@@ -41,15 +33,10 @@ describe('Registro directo (e2e)', () => {
     }))
   })
 
-  const tokenDe = (email: string) => new URL(enlaces.get(email)!).searchParams.get('token')!
   const bearer = (t: string) => ({ Authorization: `Bearer ${t}` })
 
   async function cuentaVerificada(email: string): Promise<string> {
-    await http().post('/api/v1/registro/iniciar').send({ email }).expect(202)
-    const res = await http()
-      .post('/api/v1/registro/verificar')
-      .send({ token: tokenDe(email), password: 'Clave-Segura-123' })
-      .expect(200)
+    const res = await http().post('/api/v1/registro/iniciar').send({ email }).expect(200)
     return res.body.tokenRegistro as string
   }
 
@@ -86,32 +73,41 @@ describe('Registro directo (e2e)', () => {
     },
   })
 
-  describe('correo y contraseña', () => {
-    it('envía el enlace y responde genérico; un correo ya verificado no recibe otro', async () => {
-      const res = await http().post('/api/v1/registro/iniciar').send({ email: 'Nueva@Empresa.do' }).expect(202)
-      expect(res.body.mensaje).toMatch(/Si el correo es válido/)
-      expect(enlaces.get('nueva@empresa.do')).toMatch(/\/registro\/verificar\?token=[a-f0-9]{64}$/)
+  describe('entrada con correo y código', () => {
+    it('el correo abre el registro; se puede retomar hasta activar el 2FA, luego sólo con código', async () => {
+      const t1 = await cuentaVerificada('Nueva@Empresa.do')
+      const t2 = await cuentaVerificada('nueva@empresa.do')
+      const e1 = await http().get('/api/v1/registro/estado').set(bearer(t1)).expect(200)
+      const e2 = await http().get('/api/v1/registro/estado').set(bearer(t2)).expect(200)
+      expect(e1.body.email).toBe('nueva@empresa.do')
+      expect(e2.body).toEqual(e1.body)
+      expect(await prisma.cuentaRegistro.count({ where: { email: 'nueva@empresa.do' } })).toBe(1)
 
-      await http().post('/api/v1/registro/verificar').send({ token: tokenDe('nueva@empresa.do'), password: 'Clave-Segura-123' }).expect(200)
-      enlaces.delete('nueva@empresa.do')
-      await http().post('/api/v1/registro/iniciar').send({ email: 'nueva@empresa.do' }).expect(202)
-      expect(enlaces.has('nueva@empresa.do')).toBe(false)
+      await activarDosPasos(t1)
+      const otra = await http().post('/api/v1/registro/iniciar').send({ email: 'nueva@empresa.do' }).expect(409)
+      expect(otra.body.message).toMatch(/Google Authenticator/)
     })
 
-    it('contraseña débil → 400; el enlace sirve una sola vez', async () => {
-      await http().post('/api/v1/registro/iniciar').send({ email: 'debil@x.do' }).expect(202)
-      const token = tokenDe('debil@x.do')
-      await http().post('/api/v1/registro/verificar').send({ token, password: 'corta' }).expect(400)
-      await http().post('/api/v1/registro/verificar').send({ token, password: 'Clave-Segura-123' }).expect(200)
-      await http().post('/api/v1/registro/verificar').send({ token, password: 'Clave-Segura-123' }).expect(400)
-    })
-
-    it('login: credenciales malas → 401; buenas → sesión de registro sin empresa todavía', async () => {
-      await cuentaVerificada('login@x.do')
-      await http().post('/api/v1/registro/login').send({ email: 'login@x.do', password: 'otra-Clave-1' }).expect(401)
-      const ok = await http().post('/api/v1/registro/login').send({ email: 'LOGIN@x.do', password: 'Clave-Segura-123' }).expect(200)
+    it('login: código malo → 401; bueno → sesión de registro sin empresa todavía', async () => {
+      const secreto = await activarDosPasos(await cuentaVerificada('login@x.do'))
+      await http().post('/api/v1/registro/login').send({ email: 'login@x.do', codigo: '000000' }).expect(401)
+      const ok = await http().post('/api/v1/registro/login').send({ email: 'LOGIN@x.do', codigo: codigoTotp(secreto) }).expect(200)
       expect(ok.body.tokenRegistro).toEqual(expect.any(String))
       expect(ok.body.sesion).toBeNull()
+    })
+
+    it('5 códigos incorrectos bloquean la cuenta 15 minutos (incluso con el código bueno)', async () => {
+      const secreto = await activarDosPasos(await cuentaVerificada('fuerza@x.do'))
+      for (let i = 0; i < 5; i++) {
+        await http().post('/api/v1/registro/login').send({ email: 'fuerza@x.do', codigo: '111111' }).expect(401)
+      }
+      const res = await http().post('/api/v1/registro/login').send({ email: 'fuerza@x.do', codigo: codigoTotp(secreto) }).expect(401)
+      expect(res.body.message).toMatch(/Demasiados intentos/)
+    })
+
+    it('sin 2FA activo no se puede entrar por login', async () => {
+      await cuentaVerificada('sin2fa@x.do')
+      await http().post('/api/v1/registro/login').send({ email: 'sin2fa@x.do', codigo: '123456' }).expect(401)
     })
   })
 
@@ -195,8 +191,8 @@ describe('Registro directo (e2e)', () => {
       expect(fin.body.tenant).toMatchObject({ rnc, id: tenant.id })
       await http().get('/api/v1/cumplimiento').set(bearer(fin.body.accessToken)).expect(200)
 
-      // Luego el login devuelve también la sesión de la empresa
-      const login = await http().post('/api/v1/registro/login').send({ email, password: 'Clave-Segura-123' }).expect(200)
+      // Luego el login (correo + código) devuelve también la sesión de la empresa
+      const login = await http().post('/api/v1/registro/login').send({ email, codigo: codigoTotp(secreto) }).expect(200)
       expect(login.body.sesion.tenant.rnc).toBe(rnc)
 
       // Los tokens no se cruzan

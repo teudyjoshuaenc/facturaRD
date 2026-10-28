@@ -10,7 +10,6 @@ import {
   Length,
   Matches,
   MaxLength,
-  MinLength,
   ValidateNested,
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -19,8 +18,6 @@ import { TipoECF } from '@facturard/database'
 const SOLO_DIGITOS_RNC = /^(\d{9}|\d{11})$/
 const CODIGO_GEO = /^\d{6}$/
 const TELEFONO = /^[\d\s()+-]{7,20}$/
-// 10+ caracteres con mayúscula, minúscula y número.
-const CLAVE_SEGURA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$/
 const CODIGO_2FA = /^\d{6}$/
 
 export const TIPOS_REGISTRO = ['EMISOR_ELECTRONICO', 'PROVEEDOR_SERVICIOS'] as const
@@ -32,27 +29,15 @@ export class IniciarRegistroDto {
   email!: string
 }
 
-export class VerificarRegistroDto {
-  @ApiProperty({ description: 'Token del enlace enviado por correo' })
-  @IsString()
-  @Matches(/^[a-f0-9]{64}$/)
-  token!: string
-
-  @ApiProperty({ description: 'Mínimo 10 caracteres, con mayúscula, minúscula y número' })
-  @IsString()
-  @Matches(CLAVE_SEGURA, { message: 'La contraseña debe tener al menos 10 caracteres, con mayúscula, minúscula y número' })
-  password!: string
-}
-
 export class LoginRegistroDto {
   @ApiProperty()
   @IsEmail()
   email!: string
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Código de 6 dígitos de Google Authenticator' })
   @IsString()
-  @MinLength(1)
-  password!: string
+  @Matches(CODIGO_2FA, { message: 'El código debe tener 6 dígitos' })
+  codigo!: string
 }
 
 export class CodigoDosPasosDto {

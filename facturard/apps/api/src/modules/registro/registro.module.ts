@@ -3,7 +3,6 @@ import { JwtModule } from '@nestjs/jwt'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { CryptoService } from '../../common/services/crypto.service'
 import { AuthModule } from '../auth/auth.module'
-import { EmailModule } from '../email/email.module'
 import { TenantsModule } from '../tenants/tenants.module'
 import { SecuenciasModule } from '../secuencias/secuencias.module'
 import { CertificadosModule } from '../certificados/certificados.module'
@@ -23,7 +22,6 @@ import { CatalogosController, RegistroController } from './registro.controller'
       }),
     }),
     AuthModule,
-    EmailModule,
     TenantsModule,
     SecuenciasModule,
     CertificadosModule,

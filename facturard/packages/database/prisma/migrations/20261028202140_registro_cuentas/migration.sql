@@ -2,12 +2,10 @@
 CREATE TABLE "cuentas_registro" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "passwordHash" TEXT,
-    "emailVerificado" BOOLEAN NOT NULL DEFAULT false,
-    "tokenVerificacionHash" TEXT,
-    "tokenVerificacionExpira" TIMESTAMP(3),
     "totpSecretCifrado" TEXT,
     "totpActivo" BOOLEAN NOT NULL DEFAULT false,
+    "intentosFallidos" INTEGER NOT NULL DEFAULT 0,
+    "bloqueadoHasta" TIMESTAMP(3),
     "tenantId" TEXT,
     "completadoEn" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -63,9 +61,6 @@ CREATE TABLE "credenciales_ofv" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "cuentas_registro_email_key" ON "cuentas_registro"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "cuentas_registro_tokenVerificacionHash_key" ON "cuentas_registro"("tokenVerificacionHash");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "cuentas_registro_tenantId_key" ON "cuentas_registro"("tenantId");

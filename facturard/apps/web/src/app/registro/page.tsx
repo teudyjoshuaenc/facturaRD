@@ -3,56 +3,42 @@
 import { useState } from 'react'
 import type { FormEvent, JSX } from 'react'
 import Link from 'next/link'
-import { MailCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import axios from 'axios'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { RegistroShell } from '@/components/registro/RegistroShell'
 import { registroApi } from '@/lib/registro'
 import { getErrorMessage } from '@/lib/api'
+import { saveRegistroToken } from '@/lib/session'
 
 export default function RegistroPage(): JSX.Element {
+  const router = useRouter()
   const [email, setEmail] = useState('')
-  const [enviado, setEnviado] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+  const [yaExiste, setYaExiste] = useState(false)
 
   async function enviar(e: FormEvent): Promise<void> {
     e.preventDefault()
     setError('')
+    setYaExiste(false)
     setEnviando(true)
     try {
-      await registroApi.post('/iniciar', { email: email.trim() })
-      setEnviado(true)
+      const res = await registroApi.post<{ tokenRegistro: string }>('/iniciar', { email: email.trim() })
+      saveRegistroToken(res.data.tokenRegistro)
+      router.push('/registro/configurar')
     } catch (err) {
-      setError(getErrorMessage(err, 'No pudimos enviar el correo. Intenta de nuevo.'))
-    } finally {
+      if (axios.isAxiosError(err) && err.response?.status === 409) setYaExiste(true)
+      setError(getErrorMessage(err, 'No pudimos continuar. Intenta de nuevo.'))
       setEnviando(false)
     }
-  }
-
-  if (enviado) {
-    return (
-      <RegistroShell titulo="Revisa tu correo">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-            <MailCheck size={28} />
-          </div>
-          <p className="text-body-sm text-text-secondary">
-            Te enviamos un enlace a <strong className="text-text-primary">{email}</strong> para confirmar tu correo y
-            crear tu contraseña. Vence en 24 horas.
-          </p>
-          <button type="button" className="text-ui-sm font-semibold text-brand-600 hover:underline" onClick={() => setEnviado(false)}>
-            Usar otro correo
-          </button>
-        </div>
-      </RegistroShell>
-    )
   }
 
   return (
     <RegistroShell
       titulo="Crea tu cuenta"
-      subtitulo="Empieza con tu correo. Después completas los datos de tu empresa para facturar ante la DGII."
+      subtitulo="Empieza con tu correo. Luego proteges tu cuenta con Google Authenticator y completas los datos de tu empresa."
     >
       <form onSubmit={enviar} className="flex flex-col gap-5">
         <Input
@@ -64,10 +50,16 @@ export default function RegistroPage(): JSX.Element {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          {...(error ? { error } : {})}
+          {...(error && !yaExiste ? { error } : {})}
         />
+        {yaExiste && (
+          <p className="rounded-lg bg-brand-50 px-3 py-2 text-ui-sm text-brand-800">
+            Ese correo ya tiene una cuenta.{' '}
+            <Link href="/login" className="font-semibold underline">Entra con tu código</Link>
+          </p>
+        )}
         <Button type="submit" disabled={enviando || !email.trim()} className="w-full">
-          {enviando ? 'Enviando…' : 'Continuar'}
+          {enviando ? 'Un momento…' : 'Continuar'}
         </Button>
         <p className="text-center text-ui-sm text-text-secondary">
           ¿Ya tienes cuenta?{' '}

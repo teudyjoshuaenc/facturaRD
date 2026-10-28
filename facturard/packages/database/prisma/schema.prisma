@@ -693,18 +693,18 @@ model EnvioComprobante {
 // ─── Registro directo en FacturaRD (Fase 1) ────────────────────────────────────
 // La persona se registra con su correo ANTES de tener empresa: la cuenta existe
 // sola (permisos básicos: sólo completar su registro). Al guardar los datos del
-// contribuyente se crea el Tenant + User ADMIN con el mismo correo y contraseña.
+// contribuyente se crea el Tenant + User ADMIN con el mismo correo.
 
 model CuentaRegistro {
   id                      String    @id @default(uuid())
   email                   String    @unique
-  passwordHash            String?
-  emailVerificado         Boolean   @default(false)
-  tokenVerificacionHash   String?   @unique
-  tokenVerificacionExpira DateTime?
   /// Secreto TOTP (Google Authenticator) cifrado AES-256-GCM (iv:tag:data).
+  /// Una vez activo es la llave de la cuenta: se entra con correo + código.
+  /// FacturaRD no maneja contraseñas: la del CRM la configura GoHighLevel.
   totpSecretCifrado       String?
   totpActivo              Boolean   @default(false)
+  intentosFallidos        Int       @default(0)
+  bloqueadoHasta          DateTime?
   tenantId                String?   @unique
   tenant                  Tenant?   @relation(fields: [tenantId], references: [id])
   completadoEn            DateTime?

@@ -18,7 +18,7 @@ function LoginContent(): JSX.Element {
   const params = useSearchParams()
   const { setAuth } = useAuth()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [codigo, setCodigo] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -29,7 +29,7 @@ function LoginContent(): JSX.Element {
     try {
       const res = await registroApi.post<{ tokenRegistro: string; sesion: SesionTenant | null }>('/login', {
         email: email.trim(),
-        password,
+        codigo,
       })
       saveRegistroToken(res.data.tokenRegistro)
       const locationId = params.get('location_id')
@@ -48,7 +48,7 @@ function LoginContent(): JSX.Element {
   }
 
   return (
-    <RegistroShell titulo="Inicia sesión" subtitulo="Entra con el correo y la contraseña de tu cuenta de FacturaRD.">
+    <RegistroShell titulo="Inicia sesión" subtitulo="Entra con tu correo y el código de Google Authenticator.">
       <form onSubmit={enviar} className="flex flex-col gap-5">
         <Input
           id="email"
@@ -60,16 +60,17 @@ function LoginContent(): JSX.Element {
           onChange={(e) => setEmail(e.target.value)}
         />
         <Input
-          id="password"
-          type="password"
-          label="Contraseña"
-          autoComplete="current-password"
+          id="codigo"
+          label="Código de Google Authenticator"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
           required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
         />
         {error && <p className="rounded-lg bg-danger-50 px-3 py-2 text-ui-sm text-danger-700">{error}</p>}
-        <Button type="submit" disabled={enviando || !email.trim() || !password} className="w-full">
+        <Button type="submit" disabled={enviando || !email.trim() || codigo.length !== 6} className="w-full">
           {enviando ? 'Entrando…' : 'Entrar'}
         </Button>
         <p className="text-center text-ui-sm text-text-secondary">

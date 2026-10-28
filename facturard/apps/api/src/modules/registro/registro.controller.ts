@@ -21,7 +21,6 @@ import {
   IniciarRegistroDto,
   LoginRegistroDto,
   OfvDto,
-  VerificarRegistroDto,
 } from './dto/registro.dto'
 import { PROVINCIAS_DGII } from './geo-dgii'
 
@@ -39,25 +38,17 @@ export class RegistroController {
   constructor(private readonly service: RegistroService) {}
 
   @Post('iniciar')
-  @HttpCode(202)
-  @ApiOperation({ summary: 'Envía el enlace para confirmar el correo (respuesta siempre genérica)' })
-  async iniciar(@Body() dto: IniciarRegistroDto): Promise<{ mensaje: string }> {
-    await this.service.iniciar(dto.email)
-    return { mensaje: 'Si el correo es válido, te enviamos un enlace para continuar.' }
-  }
-
-  @Post('verificar')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Confirma el correo y crea la contraseña' })
-  verificar(@Body() dto: VerificarRegistroDto) {
-    return this.service.verificar(dto.token, dto.password)
+  @ApiOperation({ summary: 'Abre (o retoma) el registro con el correo. Sin contraseña ni correo de confirmación.' })
+  iniciar(@Body() dto: IniciarRegistroDto) {
+    return this.service.iniciar(dto.email)
   }
 
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Inicia sesión; si el registro está completo devuelve también la sesión de la empresa' })
+  @ApiOperation({ summary: 'Entra con correo + código de Google Authenticator' })
   login(@Body() dto: LoginRegistroDto) {
-    return this.service.login(dto.email, dto.password)
+    return this.service.login(dto.email, dto.codigo)
   }
 
   @Get('estado')
