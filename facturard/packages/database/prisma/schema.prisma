@@ -764,3 +764,49 @@ model CredencialOfv {
 
   @@map("credenciales_ofv")
 }
+
+// ─── Panel de administración DMAIA (Fase 2) ───────────────────────────────────
+// Usuarios del equipo DMAIA: OTRO tipo de usuario, sin tenant ni GHL. Login propio
+// (correo + contraseña + 2FA obligatorio) en adminfacturard.dmaia.io.
+
+enum RolAdmin {
+  ADMIN   // todo, incluido crear otros administradores
+  SOPORTE // ver clientes, reintentar, datos sensibles con 2FA
+}
+
+model AdminUsuario {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  nombre            String
+  passwordHash      String
+  rol               RolAdmin  @default(SOPORTE)
+  activo            Boolean   @default(true)
+  /// Secreto TOTP cifrado AES-256-GCM (iv:tag:data). Obligatorio para entrar.
+  totpSecretCifrado String?
+  totpActivo        Boolean   @default(false)
+  intentosFallidos  Int       @default(0)
+  bloqueadoHasta    DateTime?
+  ultimoAcceso      DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  auditoria AdminAuditoria[]
+
+  @@map("admin_usuarios")
+}
+
+/// Bitácora del panel (append-only): quién hizo qué, sobre qué cliente y cuándo.
+model AdminAuditoria {
+  id        String        @id @default(uuid())
+  adminId   String?
+  admin     AdminUsuario? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  accion    String
+  tenantId  String?
+  detalle   Json          @default("{}")
+  ip        String?
+  createdAt DateTime      @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([adminId, createdAt])
+  @@map("admin_auditoria")
+}

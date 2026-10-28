@@ -14,11 +14,14 @@ export {
   EstadoEnvio,
   CajaEstado,
   AmbienteDgii,
+  RolAdmin,
 } from '@prisma/client'
 
 // Model types
 export type {
   Tenant,
+  AdminUsuario,
+  AdminAuditoria,
   User,
   CuentaRegistro,
   PerfilFiscal,

@@ -67,6 +67,7 @@ async function bootstrap(): Promise<void> {
       'Authorization',
       'x-api-key',
       'x-2fa', // confirmación 2FA de las secciones Empresa / Configuración
+      'x-2fa-admin', // confirmación 2FA del panel DMAIA para datos sensibles
       'ngrok-skip-browser-warning',
       'Accept',
     ],

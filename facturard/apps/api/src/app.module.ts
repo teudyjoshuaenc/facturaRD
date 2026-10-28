@@ -13,6 +13,7 @@ import { SecuenciasModule } from './modules/secuencias/secuencias.module'
 import { ReceptorModule } from './modules/receptor/receptor.module'
 import { GhlAuthModule } from './modules/ghl-auth/ghl-auth.module'
 import { RegistroModule } from './modules/registro/registro.module'
+import { AdminModule } from './modules/admin/admin.module'
 import { ProductosModule } from './modules/productos/productos.module'
 import { ContactosModule } from './modules/contactos/contactos.module'
 import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module'
@@ -58,6 +59,7 @@ import jwtConfig from './config/jwt.config'
     ReceptorModule,  // Paso 7 certificación DGII — /fe/* sin prefijo api/v1
     GhlAuthModule,
     RegistroModule,
+    AdminModule,  // Panel DMAIA (adminfacturard.dmaia.io) — usuarios propios
     ProductosModule,
     ContactosModule,
     CotizacionesModule,

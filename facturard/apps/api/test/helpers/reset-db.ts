@@ -16,6 +16,12 @@ export const E2E_TABLES = [
   'api_keys',
   'webhooks',
   'ghl_locations',
+  'credenciales_ofv',
+  'representantes',
+  'perfiles_fiscales',
+  'cuentas_registro',
+  'admin_auditoria',
+  'admin_usuarios',
   'users',
   'tenants',
 ] as const

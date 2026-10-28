@@ -63,6 +63,8 @@ RUN rm -rf node_modules/@facturard && \
     ln -sf /app/packages/ecf-engine node_modules/@facturard/ecf-engine
 
 COPY --from=builder /app/apps/api/package.json ./
+# Alta del primer usuario del panel DMAIA: node scripts/crear-admin.cjs
+COPY --from=builder /app/apps/api/scripts ./scripts
 
 # Prisma CLI y migrations (requeridos por migrate deploy en startup)
 COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma

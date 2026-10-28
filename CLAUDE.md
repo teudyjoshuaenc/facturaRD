@@ -486,6 +486,39 @@ APP_URL=http://localhost:3000
       pide `REQUEST_USER_DATA` y el servidor descifra el usuario y su rol).
   - **Tests:** `registro.e2e-spec.ts` (10) + `seguridad-2fa.e2e-spec.ts` (5). Probado de punta a punta en el navegador.
 
+- ✅ **Fase 2 — Panel DMAIA (`adminfacturard.dmaia.io`) (2026-10-28, rama `feat/registro-cuentas`).** Para el
+  equipo de DMAIA, no para los clientes. Migración aditiva `20261028212648_panel_admin` (sólo tablas nuevas:
+  `admin_usuarios` con enum `RolAdmin` ADMIN|SOPORTE, y `admin_auditoria` append-only).
+  - **Usuarios propios:** contraseña (bcrypt, 12+ con mayúscula, número y símbolo) + **2FA obligatorio**
+    (mismo TOTP de `common/services/totp.ts`); 5 fallos → bloqueo 15 min. Sin tenant ni GHL. JWT con secreto
+    `JWT_SECRET:admin` e issuer `facturard-admin`: no se cruza con el de empresa ni con el de registro.
+    Tokens: `admin-paso` (10 min, entre contraseña y código) → `admin` (8 h) → `admin-confirmado` (5 min,
+    header `x-2fa-admin`) para datos sensibles. El primer admin se crea por consola:
+    `ADMIN_EMAIL=… ADMIN_NOMBRE=… pnpm --filter @facturard/api admin:crear` (pide la contraseña oculta o
+    toma `ADMIN_PASSWORD`; `scripts/crear-admin.cjs`). Después, los ADMIN crean al resto desde el panel
+    (SOPORTE no puede).
+  - **Endpoints** (`/api/v1/admin`, `admin.controller.ts`): `auth/login`, `auth/2fa/configurar|activar`,
+    `auth/2fa`, `yo`, `confirmar`; `clientes` (búsqueda RNC/razón social/correo; filtros conErrores|
+    sinCertificado|registroIncompleto; paginado), `clientes/:id` (GET sin secretos; PATCH estado/ambienteDgii),
+    `clientes/:id/reiniciar-2fa`, `clientes/:id/sensibles` (OFV + clave del P12) y `clientes/:id/certificado`
+    (descarga del .p12) — **estos dos exigen `x-2fa-admin`**; `comprobantes/:id/reintentar` (sólo `ERROR`,
+    re-encola con el MISMO e-NCF; `RECHAZADO` → 400, el cliente emite uno nuevo); `auditoria`; `usuarios`
+    (GET/POST/PATCH, sólo ADMIN; nadie se desactiva ni se cambia el rol a sí mismo).
+  - **Todo queda auditado** en `admin_auditoria` (login, fallos, ver sensibles, descargar P12, reintentar,
+    cambios de cliente y de usuarios), visible en *Auditoría* y en el historial de cada cliente.
+  - **Web:** `app/admin/*` (login con configuración del 2FA, Clientes, detalle, Usuarios, Auditoría) +
+    `lib/admin.ts` (token en sessionStorage, confirmación sólo en memoria). `src/middleware.ts`: en el host que
+    empieza por `ADMIN_HOST_PREFIX` (default `adminfacturard.`) todo se reescribe a `/admin`; en cualquier otro
+    host `/admin` → 404 (salvo localhost). CORS: `x-2fa-admin` está en `allowedHeaders` — sin él el navegador
+    bloquea cualquier request posterior a la confirmación.
+  - **Publicar (a mano en el VPS):** DNS A `adminfacturard` → VPS, `deploy/nginx/facturard-admin.conf`
+    (instrucciones dentro) + `certbot --nginx -d adminfacturard.dmaia.io`, y crear el primer admin con
+    `docker compose -f deploy/docker-compose.prod.yml exec -e ADMIN_EMAIL=… -e ADMIN_NOMBRE="…" api node scripts/crear-admin.cjs`
+    (el script es JS plano porque la imagen no trae ts-node; el Dockerfile copia `scripts/`). La API no cambia
+    de dominio (CORS ya acepta cualquier origen).
+  - **Tests:** `admin.e2e-spec.ts` (9). `reset-db.ts` ahora vacía también las tablas de las Fases 1 y 2.
+    **347 e2e (37 suites)**; la de concurrencia de cotizaciones sigue intermitente (pasa sola).
+
 ### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
 Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.
 - **Causa:** `packages/ecf-engine/src/xml/calculator.ts` calcula el ITBIS sobre el monto YA redondeado:
