@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
+import { Requiere2FA } from '@/components/seguridad/Requiere2FA'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Building,
@@ -44,7 +45,16 @@ const LOGO_MAX_BYTES = 2 * 1024 * 1024
 const isHttpUrl = (v: string): boolean => /^https?:\/\/.+/i.test(v.trim())
 const isEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
+// Sección sensible: pide el código de Google Authenticator al entrar.
 export default function EmpresaPage(): JSX.Element {
+  return (
+    <Requiere2FA seccion="Empresa">
+      <EmpresaPageContenido />
+    </Requiere2FA>
+  )
+}
+
+function EmpresaPageContenido(): JSX.Element {
   const queryClient = useQueryClient()
 
   const { data: tenant, isLoading } = useQuery({

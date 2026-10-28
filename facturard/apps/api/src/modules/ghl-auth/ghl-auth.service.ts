@@ -13,6 +13,8 @@ export interface GhlInitResult {
   onboarding?: boolean
   /** La empresa tiene cuenta con 2FA: hay que entrar con correo + código (no basta el location_id). */
   requiereLogin?: boolean
+  /** Empresa sin 2FA (anterior al registro directo): la app debe pedir que lo active antes de usarla. */
+  configurar2fa?: boolean
   locationId?: string
 }
 
@@ -58,6 +60,7 @@ export class GhlAuthService {
     return {
       token: this.generateToken(tenant.id),
       tenant: { rnc: tenant.rnc, razonSocial: tenant.razonSocial, plan: tenant.plan },
+      configurar2fa: true,
     }
   }
 

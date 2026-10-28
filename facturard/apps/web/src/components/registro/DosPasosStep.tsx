@@ -9,30 +9,43 @@ import { Spinner } from '@/components/ui/spinner'
 import { registroApi } from '@/lib/registro'
 import { getErrorMessage } from '@/lib/api'
 
-interface Props {
-  onActivado: () => void
+interface QrDosPasos {
+  qrDataUrl: string
+  secreto: string
 }
 
+interface Props {
+  /** Se llama con el código ya validado por el servidor. */
+  onActivado: (codigo: string) => void
+  /** Por defecto usa la sesión de registro; desde la empresa se pasan las de /seguridad/2fa. */
+  configurar?: () => Promise<QrDosPasos>
+  activar?: (codigo: string) => Promise<unknown>
+}
+
+const configurarRegistro = async (): Promise<QrDosPasos> =>
+  (await registroApi.post<QrDosPasos>('/dos-pasos/configurar')).data
+const activarRegistro = (codigo: string) => registroApi.post('/dos-pasos/activar', { codigo })
+
 /** Activa Google Authenticator. Se exige antes de guardar datos sensibles. */
-export function DosPasosStep({ onActivado }: Props): JSX.Element {
-  const [qr, setQr] = useState<{ qrDataUrl: string; secreto: string } | null>(null)
+export function DosPasosStep({ onActivado, configurar = configurarRegistro, activar: activarCodigo = activarRegistro }: Props): JSX.Element {
+  const [qr, setQr] = useState<QrDosPasos | null>(null)
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
-    registroApi
-      .post<{ qrDataUrl: string; secreto: string }>('/dos-pasos/configurar')
-      .then((r) => setQr(r.data))
+    configurar()
+      .then(setQr)
       .catch((err) => setError(getErrorMessage(err, 'No pudimos generar el código QR.')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function activar(): Promise<void> {
     setError('')
     setEnviando(true)
     try {
-      await registroApi.post('/dos-pasos/activar', { codigo })
-      onActivado()
+      await activarCodigo(codigo)
+      onActivado(codigo)
     } catch (err) {
       setError(getErrorMessage(err, 'El código no es correcto.'))
       setEnviando(false)

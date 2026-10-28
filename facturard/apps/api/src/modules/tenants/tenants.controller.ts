@@ -22,6 +22,7 @@ import { CreateTenantDto } from './dto/create-tenant.dto'
 import { BrandingDto } from './dto/branding.dto'
 import { UpdateEmpresaDto } from './dto/update-empresa.dto'
 import { AmbienteDgiiDto } from './dto/ambiente-dgii.dto'
+import { Requiere2FAGuard } from '../../common/guards/requiere-2fa.guard'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { SameTenantGuard } from '../../common/guards/same-tenant.guard'
@@ -66,7 +67,7 @@ export class TenantsController {
 
   @Patch('branding')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, Requiere2FAGuard)
   @ApiOperation({ summary: 'Actualiza el branding (logo/colores) del tenant autenticado' })
   updateBranding(@CurrentTenant() tenantId: string, @Body() dto: BrandingDto) {
     return this.service.updateBranding(tenantId, dto)
@@ -74,7 +75,7 @@ export class TenantsController {
 
   @Patch('empresa')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, Requiere2FAGuard)
   @ApiOperation({
     summary:
       'Actualiza datos de contacto del emisor (dirección/teléfono/correo/logo). RNC y razón social no son editables.',
@@ -88,7 +89,7 @@ export class TenantsController {
   // Tipos: PNG/JPG/SVG (el SVG se rasteriza a PNG para el PDF vía f_png). Máx 2 MB.
   @Post('logo')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, Requiere2FAGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   @ApiOperation({ summary: 'Sube el archivo del logo del emisor (PNG/JPG/SVG, máx 2 MB) a Cloudinary' })
   @ApiConsumes('multipart/form-data')

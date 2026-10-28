@@ -8,7 +8,7 @@ import { SecuenciasModule } from '../secuencias/secuencias.module'
 import { CertificadosModule } from '../certificados/certificados.module'
 import { RegistroService } from './registro.service'
 import { RegistroJwtGuard } from './registro-jwt.guard'
-import { CatalogosController, RegistroController } from './registro.controller'
+import { CatalogosController, RegistroController, SeguridadController } from './registro.controller'
 
 @Module({
   imports: [
@@ -26,7 +26,7 @@ import { CatalogosController, RegistroController } from './registro.controller'
     SecuenciasModule,
     CertificadosModule,
   ],
-  controllers: [RegistroController, CatalogosController],
+  controllers: [RegistroController, CatalogosController, SeguridadController],
   providers: [RegistroService, RegistroJwtGuard, CryptoService],
   exports: [RegistroService],
 })

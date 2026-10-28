@@ -1,6 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { getToken, saveSession, clearSession, getLocationId, getRefreshToken, saveRefreshToken, getTenant } from './session'
 import type { TenantInfo } from './session'
+import { confirmacion2fa } from './confirmacion2fa'
 
 // Sin slash final: la llamada de reautenticación más abajo concatena
 // `${BASE_URL}/ghl/init` a mano (no usa el join de axios, que sí tolera
@@ -13,6 +14,9 @@ export const api = axios.create({ baseURL: BASE_URL })
 api.interceptors.request.use((config) => {
   const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // Confirmación 2FA vigente (secciones Empresa / Configuración)
+  const confirmado = confirmacion2fa()
+  if (confirmado) config.headers['x-2fa'] = confirmado
   return config
 })
 

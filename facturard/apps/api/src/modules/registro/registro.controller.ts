@@ -17,12 +17,15 @@ import { RegistroService } from './registro.service'
 import { RegistroJwtGuard, type RegistroRequest } from './registro-jwt.guard'
 import {
   CodigoDosPasosDto,
+  ConfigurarDosPasosEmpresaDto,
   DatosRegistroDto,
   IniciarRegistroDto,
   LoginRegistroDto,
   OfvDto,
 } from './dto/registro.dto'
 import { PROVINCIAS_DGII } from './geo-dgii'
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
 interface MulterFile {
   buffer: Buffer
@@ -48,7 +51,7 @@ export class RegistroController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Entra con correo + código de Google Authenticator' })
   login(@Body() dto: LoginRegistroDto) {
-    return this.service.login(dto.email, dto.codigo)
+    return this.service.login({ email: dto.email, locationId: dto.locationId }, dto.codigo)
   }
 
   @Get('estado')
@@ -129,6 +132,43 @@ export class RegistroController {
   @UseGuards(RegistroJwtGuard)
   completar(@Req() req: RegistroRequest) {
     return this.service.completar(cuentaDe(req))
+  }
+}
+
+/**
+ * Verificación en dos pasos desde la sesión de la EMPRESA: estado, activarla (empresas
+ * que aún no la tienen) y confirmar el código para entrar a Empresa / Configuración.
+ */
+@ApiTags('Seguridad')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('seguridad/2fa')
+export class SeguridadController {
+  constructor(private readonly service: RegistroService) {}
+
+  @Get()
+  estado(@CurrentTenant() tenantId: string) {
+    return this.service.estadoDosPasosTenant(tenantId)
+  }
+
+  @Post('configurar')
+  @HttpCode(200)
+  configurar(@CurrentTenant() tenantId: string, @Body() dto: ConfigurarDosPasosEmpresaDto) {
+    return this.service.configurarDosPasosTenant(tenantId, dto.email)
+  }
+
+  @Post('activar')
+  @HttpCode(200)
+  async activar(@CurrentTenant() tenantId: string, @Body() dto: CodigoDosPasosDto) {
+    await this.service.activarDosPasosTenant(tenantId, dto.codigo)
+    return { activo: true }
+  }
+
+  @Post('confirmar')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Confirma el código y devuelve el token (header x-2fa) para las operaciones sensibles' })
+  confirmar(@CurrentTenant() tenantId: string, @Body() dto: CodigoDosPasosDto) {
+    return this.service.confirmarTenant(tenantId, dto.codigo)
   }
 }
 

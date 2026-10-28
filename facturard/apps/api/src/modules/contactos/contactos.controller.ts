@@ -8,6 +8,7 @@ import { ListContactosDto } from './dto/list-contactos.dto'
 import { ConfigurarGhlDto } from './dto/configurar-ghl.dto'
 import { SincronizarGhlDto } from './dto/sincronizar-ghl.dto'
 import { BuscarGhlDto } from './dto/buscar-ghl.dto'
+import { Requiere2FAGuard } from '../../common/guards/requiere-2fa.guard'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
@@ -40,6 +41,7 @@ export class ContactosController {
   }
 
   @Patch('configurar-ghl')
+  @UseGuards(Requiere2FAGuard)
   @ApiOperation({ summary: 'Guarda el access token de GHL (cifrado) y el key del custom field de RNC' })
   configurarGhl(@CurrentTenant() tenantId: string, @Body() dto: ConfigurarGhlDto) {
     return this.ghl.configurar(tenantId, dto)

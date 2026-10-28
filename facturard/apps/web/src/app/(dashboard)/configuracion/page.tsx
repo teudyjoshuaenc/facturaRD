@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { JSX } from 'react'
+import { Requiere2FA } from '@/components/seguridad/Requiere2FA'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, RefreshCw, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -48,7 +49,16 @@ const ESTADO_LABEL: Record<TenantFull['estado'], string> = {
   CANCELADO: 'Cancelado',
 }
 
+// Sección sensible: pide el código de Google Authenticator al entrar.
 export default function ConfiguracionPage(): JSX.Element {
+  return (
+    <Requiere2FA seccion="Configuración">
+      <ConfiguracionPageContenido />
+    </Requiere2FA>
+  )
+}
+
+function ConfiguracionPageContenido(): JSX.Element {
   const queryClient = useQueryClient()
 
   const { data: tenant } = useQuery({

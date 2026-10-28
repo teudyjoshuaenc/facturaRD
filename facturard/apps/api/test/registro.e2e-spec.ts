@@ -48,7 +48,6 @@ describe('Registro directo (e2e)', () => {
 
   const datos = (rnc: string, extra: Record<string, unknown> = {}) => ({
     contribuyente: {
-      tipoRegistro: 'EMISOR_ELECTRONICO',
       tiposComprobante: ['E31', 'E32', 'E34'],
       tipoIdentificacion: 'RNC',
       rnc,
@@ -152,7 +151,7 @@ describe('Registro directo (e2e)', () => {
       expect(tenant.email).toBe('empresa@correo.do')
       expect(tenant.users).toHaveLength(1)
       expect(tenant.users[0]).toMatchObject({ email, role: 'ADMIN', nombre: 'Juana Pérez' })
-      expect(tenant.perfilFiscal).toMatchObject({ tiposComprobante: ['E31', 'E32', 'E34'], provincia: '010000', municipio: '010100' })
+      expect(tenant.perfilFiscal).toMatchObject({ tipoRegistro: 'EMISOR_ELECTRONICO', tiposComprobante: ['E31', 'E32', 'E34'], provincia: '010000', municipio: '010100' })
       expect(tenant.representante).toMatchObject({ identificacion: '00112345678', provincia: '250000', municipio: '250100' })
       expect(tenant.secuencias).toHaveLength(10)
 

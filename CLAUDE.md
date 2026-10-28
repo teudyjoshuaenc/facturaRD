@@ -466,7 +466,21 @@ APP_URL=http://localhost:3000
   - **⚠️ Padrón RNC:** `api-dgii.dominicantechnology.com` ahora limita a **5 consultas/día sin API key**
     (HTTP 429 → la API responde 503 "No se pudo validar el RNC"). Afecta registro, onboarding y contactos en
     producción. Hace falta su API key (plan) o otra fuente del padrón.
-  - **Tests:** `registro.e2e-spec.ts` (10). Probado de punta a punta en el navegador.
+  - **2FA en el uso diario (decisión DMAIA: "la app estaba muy insegura"):**
+    - **Cada vez** que se abre desde el CRM se pide el código: `/ghl/init` → `requiereLogin` → `/login?location_id`
+      pide SÓLO el código (`POST /registro/login {locationId, codigo}`; la subcuenta identifica la cuenta).
+    - **Empresa y Configuración** piden el código al entrar (`Requiere2FA` en la web) y el servidor lo exige:
+      `Requiere2FAGuard` (`common/guards/requiere-2fa.guard.ts`) en `PATCH /tenants/empresa|branding`,
+      `POST /tenants/logo`, `POST /certificados/upload`, `PATCH /contactos/configurar-ghl`,
+      `POST /webhooks/ghl/configurar` → sin header `x-2fa` válido (token de 10 min de
+      `POST /seguridad/2fa/confirmar`) responde 403 `REQUIERE_2FA`. El token vive sólo en memoria en la web.
+    - **Empresas anteriores sin 2FA:** `/ghl/init` devuelve token + `configurar2fa:true` y la web las manda a
+      `/seguridad/activar` (correo + QR) antes de usar la app; al activarlo se crea su `CuentaRegistro` y su User
+      ADMIN (no tenían). Mientras no lo activen, el guard las deja pasar (no se rompe a nadie al publicar).
+    - **Pendiente — saltar el código si es agency admin del CRM:** no se puede hacer seguro con parámetros de la
+      URL del menú (se falsifican). Requiere SSO de GHL (app de marketplace privada con shared secret: el iframe
+      pide `REQUEST_USER_DATA` y el servidor descifra el usuario y su rol).
+  - **Tests:** `registro.e2e-spec.ts` (10) + `seguridad-2fa.e2e-spec.ts` (5). Probado de punta a punta en el navegador.
 
 ### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
 Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.

@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import { ConfigService } from '@nestjs/config'
 import * as bcrypt from 'bcrypt'
 import { randomBytes } from 'crypto'
 import * as QRCode from 'qrcode'
@@ -16,6 +17,7 @@ import { prisma, UserRole } from '@facturard/database'
 import type { CuentaRegistro } from '@facturard/database'
 import { CryptoService } from '../../common/services/crypto.service'
 import { generarSecretoTotp, urlOtpauth, verificarTotp } from '../../common/services/totp'
+import { firmadorConfirmacion, MINUTOS_CONFIRMACION_2FA } from '../../common/guards/requiere-2fa.guard'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { CertificadosService } from '../certificados/certificados.service'
@@ -55,6 +57,7 @@ export class RegistroService {
 
   constructor(
     private readonly jwt: JwtService,
+    private readonly config: ConfigService,
     private readonly crypto: CryptoService,
     private readonly dgii: DgiiContribuyentesService,
     private readonly secuencias: SecuenciasService,
@@ -78,31 +81,79 @@ export class RegistroService {
     return { tokenRegistro: this.firmarRegistro(cuenta.id) }
   }
 
-  /** Entrar con correo + código de Google Authenticator (bloqueo tras 5 intentos fallidos). */
+  /**
+   * Entrar con código de Google Authenticator. Desde el CRM se identifica la
+   * cuenta por la subcuenta (location) y sólo se pide el código; fuera del CRM,
+   * por correo. Bloqueo de 15 min tras 5 códigos incorrectos.
+   */
   async login(
-    emailCrudo: string,
+    quien: { email?: string | undefined; locationId?: string | undefined },
     codigo: string,
   ): Promise<{ tokenRegistro: string; sesion: SesionTenant | null }> {
-    const cuenta = await prisma.cuentaRegistro.findUnique({ where: { email: normalizarEmail(emailCrudo) } })
-    if (!cuenta?.totpActivo || !cuenta.totpSecretCifrado) {
-      throw new UnauthorizedException('Correo o código incorrectos')
-    }
-    if (cuenta.bloqueadoHasta && cuenta.bloqueadoHasta > new Date()) {
-      throw new UnauthorizedException(`Demasiados intentos. Intenta de nuevo en ${BLOQUEO_MINUTOS} minutos.`)
-    }
-    if (!verificarTotp(this.crypto.decryptString(cuenta.totpSecretCifrado), codigo)) {
-      const intentos = cuenta.intentosFallidos + 1
-      await prisma.cuentaRegistro.update({
-        where: { id: cuenta.id },
-        data: intentos >= MAX_INTENTOS
-          ? { intentosFallidos: 0, bloqueadoHasta: new Date(Date.now() + BLOQUEO_MINUTOS * 60_000) }
-          : { intentosFallidos: intentos },
+    let cuenta: CuentaRegistro | null = null
+    if (quien.locationId) {
+      const loc = await prisma.ghlLocation.findUnique({
+        where: { locationId: quien.locationId },
+        include: { tenant: { include: { cuentaRegistro: true } } },
       })
-      throw new UnauthorizedException('Correo o código incorrectos')
+      cuenta = loc?.tenant.cuentaRegistro ?? null
+    } else if (quien.email) {
+      cuenta = await prisma.cuentaRegistro.findUnique({ where: { email: normalizarEmail(quien.email) } })
     }
-    await prisma.cuentaRegistro.update({ where: { id: cuenta.id }, data: { intentosFallidos: 0, bloqueadoHasta: null } })
+    if (!cuenta) throw new UnauthorizedException('Correo o código incorrectos')
+    await this.verificarCodigo(cuenta, codigo, 'Correo o código incorrectos')
     const sesion = cuenta.completadoEn && cuenta.tenantId ? await this.sesionTenant(cuenta) : null
     return { tokenRegistro: this.firmarRegistro(cuenta.id), sesion }
+  }
+
+  // ── 2FA desde la sesión de la empresa (secciones Empresa y Configuración) ──
+
+  async estadoDosPasosTenant(tenantId: string): Promise<{ activo: boolean; email: string | null }> {
+    const cuenta = await prisma.cuentaRegistro.findUnique({ where: { tenantId } })
+    return { activo: Boolean(cuenta?.totpActivo), email: cuenta?.email ?? null }
+  }
+
+  /**
+   * Empresas creadas antes del registro directo no tienen cuenta: se crea aquí
+   * (ya completa) con el correo que indiquen, y se genera su QR.
+   */
+  async configurarDosPasosTenant(tenantId: string, emailCrudo: string | undefined) {
+    let cuenta = await prisma.cuentaRegistro.findUnique({ where: { tenantId } })
+    if (!cuenta) {
+      if (!emailCrudo) throw new BadRequestException('Indica el correo de la cuenta')
+      const email = normalizarEmail(emailCrudo)
+      if (await prisma.cuentaRegistro.findUnique({ where: { email } })) {
+        throw new ConflictException('Ese correo ya está en uso por otra cuenta')
+      }
+      // Las empresas del onboarding por GHL no tienen User: se crea el ADMIN con ese
+      // correo para poder abrirle sesión al entrar con el código.
+      const passwordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12)
+      cuenta = await prisma.$transaction(async (tx) => {
+        const existente = await tx.user.findFirst({ where: { tenantId, email } })
+        if (!existente) {
+          await tx.user.create({ data: { tenantId, email, nombre: email, passwordHash, role: UserRole.ADMIN } })
+        }
+        return tx.cuentaRegistro.create({ data: { email, tenantId, completadoEn: new Date() } })
+      })
+    }
+    return this.configurarDosPasos(cuenta.id)
+  }
+
+  async activarDosPasosTenant(tenantId: string, codigo: string): Promise<void> {
+    const cuenta = await prisma.cuentaRegistro.findUnique({ where: { tenantId } })
+    if (!cuenta) throw new BadRequestException('Primero genera el código QR')
+    await this.activarDosPasos(cuenta.id, codigo)
+    await this.auditar(tenantId, 'DOS_PASOS_ACTIVADO')
+  }
+
+  /** Confirma el código y devuelve el token corto que piden las operaciones sensibles. */
+  async confirmarTenant(tenantId: string, codigo: string): Promise<{ token: string; minutos: number }> {
+    const cuenta = await prisma.cuentaRegistro.findUnique({ where: { tenantId } })
+    if (!cuenta?.totpActivo) throw new ForbiddenException('Activa primero la verificación en dos pasos')
+    // 403 (no 401): la sesión sigue siendo válida, sólo el código es incorrecto.
+    await this.verificarCodigo(cuenta, codigo, 'Código de verificación incorrecto', true)
+    const token = firmadorConfirmacion(this.config).sign({ tenantId, type: 'confirmacion-2fa' })
+    return { token, minutos: MINUTOS_CONFIRMACION_2FA }
   }
 
   // ── Verificación en dos pasos (Google Authenticator) ───────────────────────
@@ -212,7 +263,8 @@ export class RegistroService {
 
     const identidad = await this.resolverIdentidad(c)
     const perfil = {
-      tipoRegistro: c.tipoRegistro,
+      // Los clientes de FacturaRD siempre se certifican como emisor electrónico.
+      tipoRegistro: 'EMISOR_ELECTRONICO',
       tiposComprobante: c.tiposComprobante,
       actividadEconomica: c.actividadEconomica.trim(),
       provincia: c.provincia,
@@ -348,10 +400,30 @@ export class RegistroService {
     if (!cuenta.totpActivo || !cuenta.totpSecretCifrado) {
       throw new ForbiddenException('Activa primero la verificación en dos pasos')
     }
-    if (!verificarTotp(this.crypto.decryptString(cuenta.totpSecretCifrado), codigo)) {
-      throw new ForbiddenException('Código de verificación incorrecto')
-    }
+    await this.verificarCodigo(cuenta, codigo, 'Código de verificación incorrecto', true)
     return cuenta
+  }
+
+  /** Verifica un código TOTP con bloqueo de 15 min tras 5 fallos seguidos. */
+  private async verificarCodigo(cuenta: CuentaRegistro, codigo: string, mensaje: string, prohibido = false): Promise<void> {
+    const error = (m: string) => (prohibido ? new ForbiddenException(m) : new UnauthorizedException(m))
+    if (!cuenta.totpActivo || !cuenta.totpSecretCifrado) throw error(mensaje)
+    if (cuenta.bloqueadoHasta && cuenta.bloqueadoHasta > new Date()) {
+      throw error(`Demasiados intentos. Intenta de nuevo en ${BLOQUEO_MINUTOS} minutos.`)
+    }
+    if (!verificarTotp(this.crypto.decryptString(cuenta.totpSecretCifrado), codigo)) {
+      const intentos = cuenta.intentosFallidos + 1
+      await prisma.cuentaRegistro.update({
+        where: { id: cuenta.id },
+        data: intentos >= MAX_INTENTOS
+          ? { intentosFallidos: 0, bloqueadoHasta: new Date(Date.now() + BLOQUEO_MINUTOS * 60_000) }
+          : { intentosFallidos: intentos },
+      })
+      throw error(mensaje)
+    }
+    if (cuenta.intentosFallidos || cuenta.bloqueadoHasta) {
+      await prisma.cuentaRegistro.update({ where: { id: cuenta.id }, data: { intentosFallidos: 0, bloqueadoHasta: null } })
+    }
   }
 
   private async tenantDe(cuentaId: string): Promise<string> {

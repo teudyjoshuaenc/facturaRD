@@ -13,6 +13,7 @@ interface GhlInitResponse {
   tenant?: TenantInfo
   onboarding?: boolean
   requiereLogin?: boolean
+  configurar2fa?: boolean
   locationId?: string
 }
 
@@ -50,9 +51,16 @@ export function useGhlInit(): UseGhlInitResult {
           return
         }
 
-        // Empresa registrada con correo y contraseña: el location_id no basta.
+        // Empresa con 2FA: el código se pide CADA vez que se abre desde el CRM.
         if (data.requiereLogin) {
           router.replace(`/login?location_id=${encodeURIComponent(locationId)}`)
+          return
+        }
+
+        // Empresa sin 2FA (anterior al registro directo): debe activarlo antes de usar la app.
+        if (data.token && data.tenant && data.configurar2fa) {
+          setAuth(data.token, data.tenant)
+          router.replace('/seguridad/activar')
           return
         }
 

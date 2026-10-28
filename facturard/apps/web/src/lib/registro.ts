@@ -43,14 +43,8 @@ export const TIPOS_COMPROBANTE: { value: TipoEcf; label: string }[] = [
   { value: 'E47', label: 'Pagos al Exterior (47)' },
 ]
 
-export const TIPOS_REGISTRO = [
-  { value: 'EMISOR_ELECTRONICO', label: 'Emisor electrónico' },
-  { value: 'PROVEEDOR_SERVICIOS', label: 'Proveedor de servicios de facturación' },
-]
-
 export interface EstadoRegistro {
   email: string
-  emailVerificado: boolean
   dosPasosActivo: boolean
   datosCompletos: boolean
   certificadoCargado: boolean
@@ -69,7 +63,6 @@ interface Ubicacion {
 }
 
 export interface Contribuyente extends Ubicacion {
-  tipoRegistro: string
   tiposComprobante: TipoEcf[]
   tipoIdentificacion: 'RNC' | 'CEDULA'
   rnc: string

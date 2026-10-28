@@ -66,6 +66,7 @@ async function bootstrap(): Promise<void> {
       'Content-Type',
       'Authorization',
       'x-api-key',
+      'x-2fa', // confirmación 2FA de las secciones Empresa / Configuración
       'ngrok-skip-browser-warning',
       'Accept',
     ],

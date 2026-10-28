@@ -3,14 +3,12 @@
 import type { JSX } from 'react'
 import { Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
-import { TIPOS_COMPROBANTE, TIPOS_REGISTRO, type Contribuyente, type Provincia, type Representante, type TipoEcf } from '@/lib/registro'
+import { TIPOS_COMPROBANTE, type Contribuyente, type Provincia, type Representante, type TipoEcf } from '@/lib/registro'
 import { UbicacionCampos, ubicacionCompleta } from './UbicacionCampos'
 
 export const CONTRIBUYENTE_VACIO: Contribuyente = {
-  tipoRegistro: 'EMISOR_ELECTRONICO',
   tiposComprobante: ['E31', 'E32', 'E33', 'E34'],
   tipoIdentificacion: 'RNC',
   rnc: '',
@@ -67,10 +65,6 @@ export function ContribuyenteForm({ valor, onChange, provincias, rncBloqueado }:
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-ui-sm font-semibold text-text-secondary">Tipo de registro</span>
-          <Select value={valor.tipoRegistro} onChange={(v) => set('tipoRegistro', v)} options={TIPOS_REGISTRO} />
-        </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-ui-sm font-semibold text-text-secondary">Identificación</span>
           <ToggleGroup

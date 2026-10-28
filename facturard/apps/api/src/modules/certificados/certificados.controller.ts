@@ -16,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger'
 import { CertificadosService } from './certificados.service'
+import { Requiere2FAGuard } from '../../common/guards/requiere-2fa.guard'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -34,6 +35,7 @@ export class CertificadosController {
   constructor(private readonly service: CertificadosService) {}
 
   @Post('upload')
+  @UseGuards(Requiere2FAGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   @ApiOperation({ summary: 'Sube y almacena el certificado P12 del tenant (cifrado AES-256-GCM)' })

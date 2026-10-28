@@ -10,6 +10,7 @@ import {
   Length,
   Matches,
   MaxLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -20,8 +21,6 @@ const CODIGO_GEO = /^\d{6}$/
 const TELEFONO = /^[\d\s()+-]{7,20}$/
 const CODIGO_2FA = /^\d{6}$/
 
-export const TIPOS_REGISTRO = ['EMISOR_ELECTRONICO', 'PROVEEDOR_SERVICIOS'] as const
-
 export class IniciarRegistroDto {
   @ApiProperty()
   @IsEmail()
@@ -30,9 +29,16 @@ export class IniciarRegistroDto {
 }
 
 export class LoginRegistroDto {
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Fuera del CRM: correo de la cuenta' })
+  @ValidateIf((o: LoginRegistroDto) => !o.locationId)
   @IsEmail()
-  email!: string
+  email?: string
+
+  @ApiPropertyOptional({ description: 'Desde el CRM: la subcuenta identifica la cuenta (sólo se pide el código)' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  locationId?: string
 
   @ApiProperty({ description: 'Código de 6 dígitos de Google Authenticator' })
   @IsString()
@@ -76,10 +82,6 @@ class UbicacionDto {
 }
 
 export class ContribuyenteDto extends UbicacionDto {
-  @ApiProperty({ enum: TIPOS_REGISTRO })
-  @IsIn(TIPOS_REGISTRO)
-  tipoRegistro!: (typeof TIPOS_REGISTRO)[number]
-
   @ApiProperty({ enum: TipoECF, isArray: true })
   @IsArray()
   @ArrayMinSize(1)
@@ -157,4 +159,11 @@ export class OfvDto extends CodigoDosPasosDto {
   @IsString()
   @Length(4, 200)
   clave!: string
+}
+
+export class ConfigurarDosPasosEmpresaDto {
+  @ApiPropertyOptional({ description: 'Correo de la cuenta (sólo empresas que aún no tienen cuenta)' })
+  @IsOptional()
+  @IsEmail()
+  email?: string
 }

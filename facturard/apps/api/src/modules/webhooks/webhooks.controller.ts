@@ -2,6 +2,7 @@ import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/c
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger'
 import { WebhooksService } from './webhooks.service'
 import { CreateWebhookDto } from './dto/create-webhook.dto'
+import { Requiere2FAGuard } from '../../common/guards/requiere-2fa.guard'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 
@@ -61,6 +62,7 @@ export class WebhooksController {
    * NOTA: Esta ruta debe ir ANTES de ':id' para no ser capturada como un ID.
    */
   @Post('ghl/configurar')
+  @UseGuards(Requiere2FAGuard)
   @ApiOperation({
     summary: 'Configura el receiver de GoHighLevel',
     description:
