@@ -91,13 +91,16 @@ function requireFechaVenc(datos: CreateComprobanteDto): string {
   return datos.fechaVencimiento
 }
 
+// RNCOtroContribuyente NO es el comprador: según el formato e-CF de la DGII es el
+// RNC del emisor del NCF modificado cuando no es el mismo emisor de la nota
+// (p. ej. fusiones). Poner el RNC del comprador hace que la DGII busque el e-NCF
+// bajo ese RNC y rechace con [614] "El eNCF modificado no ha sido emitido".
 function buildReferencia(datos: CreateComprobanteDto): InformacionReferencia | undefined {
   if (!datos.ncfModificado || !datos.fechaNCFModificado || !datos.codigoModificacion) return undefined
   return {
     ncfModificado: datos.ncfModificado,
     fechaNCFModificado: datos.fechaNCFModificado,
     codigoModificacion: datos.codigoModificacion,
-    ...(datos.rncComprador !== undefined ? { rncOtroContribuyente: datos.rncComprador } : {}),
     ...(datos.razonModificacion !== undefined ? { razonModificacion: datos.razonModificacion } : {}),
   }
 }
@@ -108,7 +111,6 @@ function buildReferenciaOpcional(datos: CreateComprobanteDto): InformacionRefere
     ncfModificado: datos.ncfModificado,
     fechaNCFModificado: datos.fechaNCFModificado,
     codigoModificacion: datos.codigoModificacion,
-    ...(datos.rncComprador !== undefined ? { rncOtroContribuyente: datos.rncComprador } : {}),
     ...(datos.razonModificacion !== undefined ? { razonModificacion: datos.razonModificacion } : {}),
   }
 }
