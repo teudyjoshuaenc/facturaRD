@@ -21,7 +21,7 @@ interface Props {
  * activa aquí mismo. El servidor exige la misma confirmación (header x-2fa).
  */
 export function Requiere2FA({ seccion, children }: Props): JSX.Element {
-  const [estado, setEstado] = useState<{ activo: boolean; email: string | null } | null>(null)
+  const [estado, setEstado] = useState<{ activo: boolean; email: string | null; exigido: boolean } | null>(null)
   const [confirmado, setConfirmado] = useState(false)
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
@@ -30,7 +30,7 @@ export function Requiere2FA({ seccion, children }: Props): JSX.Element {
   useEffect(() => {
     borrarConfirmacion2fa()
     api
-      .get<{ activo: boolean; email: string | null }>('/seguridad/2fa')
+      .get<{ activo: boolean; email: string | null; exigido: boolean }>('/seguridad/2fa')
       .then((r) => setEstado(r.data))
       .catch((err) => setError(getErrorMessage(err, 'No pudimos verificar la seguridad de la cuenta.')))
     // Al salir de la sección se olvida la confirmación.
@@ -52,6 +52,10 @@ export function Requiere2FA({ seccion, children }: Props): JSX.Element {
   }
 
   if (confirmado && confirmacion2fa()) return <>{children}</>
+  // Interruptor EXIGIR_2FA apagado: el código es opcional (se activa desde Configuración).
+  if (estado && !estado.exigido) return <>{children}</>
+  // Si el servidor no respondió, la sección sigue disponible: el propio servidor decide qué exige.
+  if (error && !estado) return <>{children}</>
 
   return (
     <div className="mx-auto mt-6 w-full max-w-lg rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">

@@ -9,15 +9,22 @@ import { codigoTotp } from '../src/common/services/totp'
 // código: la subcuenta identifica la cuenta) y otra vez para las operaciones de
 // Empresa y Configuración (token x-2fa de 10 min). Las empresas anteriores al
 // registro directo activan su 2FA desde la app; mientras no lo tengan, siguen
-// funcionando como antes.
+// funcionando como antes. Todo esto con el interruptor EXIGIR_2FA=true; apagado
+// (por defecto) se entra directo y el código es opcional.
 
 describe('2FA en el uso diario (e2e)', () => {
   let app: INestApplication
   const http = () => request(app.getHttpServer())
   const bearer = (t: string) => ({ Authorization: `Bearer ${t}` })
 
-  beforeAll(async () => { app = (await createTestApp()).app })
-  afterAll(async () => { await app.close() })
+  beforeAll(async () => {
+    process.env['EXIGIR_2FA'] = 'true'
+    app = (await createTestApp()).app
+  })
+  afterAll(async () => {
+    delete process.env['EXIGIR_2FA']
+    await app.close()
+  })
 
   async function empresaAntigua(locationId: string): Promise<TestTenant> {
     const t = await createTenant()
@@ -38,7 +45,7 @@ describe('2FA en el uso diario (e2e)', () => {
 
     await http().patch('/api/v1/tenants/empresa').set(bearer(t.token)).send({ telefono: '809-555-1111' }).expect(200)
     const est = await http().get('/api/v1/seguridad/2fa').set(bearer(t.token)).expect(200)
-    expect(est.body).toEqual({ activo: false, email: null })
+    expect(est.body).toEqual({ activo: false, email: null, exigido: true })
     await http().post('/api/v1/seguridad/2fa/configurar').set(bearer(t.token)).send({}).expect(400)
   })
 
@@ -88,6 +95,23 @@ describe('2FA en el uso diario (e2e)', () => {
     const b = await empresaAntigua('loc-d2')
     await activar(a, 'repetido@d.do')
     await http().post('/api/v1/seguridad/2fa/configurar').set(bearer(b.token)).send({ email: 'Repetido@d.do' }).expect(409)
+  })
+
+  it('interruptor apagado: se entra directo desde el CRM y Empresa no pide el código, aunque tenga 2FA', async () => {
+    const t = await empresaAntigua('loc-e')
+    await activar(t, 'e@e.do')
+    process.env['EXIGIR_2FA'] = 'false'
+    try {
+      const init = await http().get('/api/v1/ghl/init').query({ location_id: 'loc-e' }).expect(200)
+      expect(init.body.token).toEqual(expect.any(String))
+      expect(init.body.requiereLogin).toBeUndefined()
+      expect(init.body.configurar2fa).toBeUndefined()
+      await http().patch('/api/v1/tenants/empresa').set(bearer(init.body.token)).send({ telefono: '809-555-4444' }).expect(200)
+      const est = await http().get('/api/v1/seguridad/2fa').set(bearer(init.body.token)).expect(200)
+      expect(est.body).toMatchObject({ activo: true, exigido: false })
+    } finally {
+      process.env['EXIGIR_2FA'] = 'true'
+    }
   })
 
   it('subcuenta desconocida en el login → 401', async () => {

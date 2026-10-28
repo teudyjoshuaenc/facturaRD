@@ -9,6 +9,15 @@ import type { JwtPayload } from '../../modules/auth/strategies/jwt.strategy'
 export const MINUTOS_CONFIRMACION_2FA = 10
 export const HEADER_CONFIRMACION_2FA = 'x-2fa'
 
+/**
+ * Interruptor del 2FA en el uso diario (entrada desde el CRM y secciones Empresa /
+ * Configuración). Apagado por defecto hasta tener el SSO de GHL que permita saltarlo
+ * a los agency admin. Se enciende con EXIGIR_2FA=true. El registro nuevo lo usa siempre.
+ */
+export function exigir2fa(config: ConfigService): boolean {
+  return config.get<string>('EXIGIR_2FA') === 'true'
+}
+
 interface PayloadConfirmacion {
   tenantId: string
   type: 'confirmacion-2fa'
@@ -32,12 +41,13 @@ export function firmadorConfirmacion(config: ConfigService): JwtService {
 export class Requiere2FAGuard implements CanActivate {
   private readonly jwt: JwtService
 
-  constructor(config: ConfigService) {
+  constructor(private readonly config: ConfigService) {
     this.jwt = firmadorConfirmacion(config)
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request & { user?: JwtPayload }>()
+    if (!exigir2fa(this.config)) return true
     const tenantId = req.user?.tenantId
     if (!tenantId) throw new ForbiddenException('Sesión sin empresa')
 

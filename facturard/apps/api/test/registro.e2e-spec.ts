@@ -198,10 +198,15 @@ describe('Registro directo (e2e)', () => {
       await http().get('/api/v1/cumplimiento').set(bearer(t)).expect(401)
       await http().get('/api/v1/registro/estado').set(bearer(fin.body.accessToken)).expect(401)
 
-      // /ghl/init ya no entrega token sólo con el location_id para esta empresa
+      // Con EXIGIR_2FA=true, /ghl/init no entrega token sólo con el location_id
       await prisma.ghlLocation.create({ data: { locationId: 'loc-registrada', tenantId: tenant.id } })
-      const init = await http().get('/api/v1/ghl/init').query({ location_id: 'loc-registrada' }).expect(200)
-      expect(init.body).toEqual({ requiereLogin: true, locationId: 'loc-registrada' })
+      process.env['EXIGIR_2FA'] = 'true'
+      try {
+        const init = await http().get('/api/v1/ghl/init').query({ location_id: 'loc-registrada' }).expect(200)
+        expect(init.body).toEqual({ requiereLogin: true, locationId: 'loc-registrada' })
+      } finally {
+        delete process.env['EXIGIR_2FA']
+      }
     })
 
     it('empresa antigua sin cuenta sigue entrando por /ghl/init (sin romper a los clientes actuales)', async () => {

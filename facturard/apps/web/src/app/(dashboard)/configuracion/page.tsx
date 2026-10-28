@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { GhlContactosCard } from '@/components/configuracion/GhlContactosCard'
 import { CertificacionFiscalCard } from '@/components/configuracion/CertificacionFiscalCard'
+import { DosPasosCard } from '@/components/configuracion/DosPasosCard'
 import { ActivarFinanzasCard } from '@/components/configuracion/ActivarFinanzasCard'
 import { api } from '@/lib/api'
 
@@ -138,6 +139,7 @@ function ConfiguracionPageContenido(): JSX.Element {
 
       {/* 2. Certificación fiscal (certificado + secuencias) */}
       <CertificacionFiscalCard />
+      <DosPasosCard />
 
       {/* 2b. Activar Finanzas (flujo de caja + presupuesto) */}
       <ActivarFinanzasCard />

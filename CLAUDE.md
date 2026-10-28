@@ -466,7 +466,11 @@ APP_URL=http://localhost:3000
   - **⚠️ Padrón RNC:** `api-dgii.dominicantechnology.com` ahora limita a **5 consultas/día sin API key**
     (HTTP 429 → la API responde 503 "No se pudo validar el RNC"). Afecta registro, onboarding y contactos en
     producción. Hace falta su API key (plan) o otra fuente del padrón.
-  - **2FA en el uso diario (decisión DMAIA: "la app estaba muy insegura"):**
+  - **2FA en el uso diario — INTERRUPTOR `EXIGIR_2FA` (apagado por defecto).** Decisión DMAIA: no exigirlo
+    hasta tener el SSO de GHL que permita saltarlo a los agency admin. Apagado: se entra directo desde el CRM,
+    Empresa/Configuración no piden código y el 2FA es opcional (tarjeta "Verificación en dos pasos" en
+    Configuración). Encendido (`EXIGIR_2FA=true`, añadirlo también al `environment:` del compose): todo lo de
+    abajo. El registro nuevo usa el código SIEMPRE (es la llave de la cuenta: no hay contraseñas).
     - **Cada vez** que se abre desde el CRM se pide el código: `/ghl/init` → `requiereLogin` → `/login?location_id`
       pide SÓLO el código (`POST /registro/login {locationId, codigo}`; la subcuenta identifica la cuenta).
     - **Empresa y Configuración** piden el código al entrar (`Requiere2FA` en la web) y el servidor lo exige:

@@ -17,7 +17,7 @@ import { prisma, UserRole } from '@facturard/database'
 import type { CuentaRegistro } from '@facturard/database'
 import { CryptoService } from '../../common/services/crypto.service'
 import { generarSecretoTotp, urlOtpauth, verificarTotp } from '../../common/services/totp'
-import { firmadorConfirmacion, MINUTOS_CONFIRMACION_2FA } from '../../common/guards/requiere-2fa.guard'
+import { exigir2fa, firmadorConfirmacion, MINUTOS_CONFIRMACION_2FA } from '../../common/guards/requiere-2fa.guard'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { CertificadosService } from '../certificados/certificados.service'
@@ -108,9 +108,10 @@ export class RegistroService {
 
   // ── 2FA desde la sesión de la empresa (secciones Empresa y Configuración) ──
 
-  async estadoDosPasosTenant(tenantId: string): Promise<{ activo: boolean; email: string | null }> {
+  /** `exigido`: si la app debe pedir el código para Empresa / Configuración (interruptor EXIGIR_2FA). */
+  async estadoDosPasosTenant(tenantId: string): Promise<{ activo: boolean; email: string | null; exigido: boolean }> {
     const cuenta = await prisma.cuentaRegistro.findUnique({ where: { tenantId } })
-    return { activo: Boolean(cuenta?.totpActivo), email: cuenta?.email ?? null }
+    return { activo: Boolean(cuenta?.totpActivo), email: cuenta?.email ?? null, exigido: exigir2fa(this.config) }
   }
 
   /**

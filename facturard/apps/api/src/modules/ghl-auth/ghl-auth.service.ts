@@ -1,6 +1,8 @@
 import { Injectable, ForbiddenException, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { prisma } from '@facturard/database'
+import { ConfigService } from '@nestjs/config'
+import { exigir2fa } from '../../common/guards/requiere-2fa.guard'
 import type { Tenant } from '@facturard/database'
 import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.service'
 import { SecuenciasService } from '../secuencias/secuencias.service'
@@ -32,6 +34,7 @@ export class GhlAuthService {
     private readonly dgiiService: DgiiContribuyentesService,
     private readonly secuenciasService: SecuenciasService,
     private readonly certificadosService: CertificadosService,
+    private readonly config: ConfigService,
   ) {}
 
   async init(locationId?: string): Promise<GhlInitResult> {
@@ -53,14 +56,15 @@ export class GhlAuthService {
     // Empresas registradas directamente (correo + 2FA): el location_id solo NO
     // basta para entrar (cualquiera que lo conozca obtendría un token ADMIN). Las
     // empresas antiguas, sin cuenta, siguen entrando como antes hasta migrarlas.
-    if (tenant.cuentaRegistro?.totpActivo) {
+    const exigir = exigir2fa(this.config)
+    if (exigir && tenant.cuentaRegistro?.totpActivo) {
       return { requiereLogin: true, locationId }
     }
 
     return {
       token: this.generateToken(tenant.id),
       tenant: { rnc: tenant.rnc, razonSocial: tenant.razonSocial, plan: tenant.plan },
-      configurar2fa: true,
+      ...(exigir && !tenant.cuentaRegistro?.totpActivo ? { configurar2fa: true } : {}),
     }
   }
 
