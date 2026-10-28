@@ -1,6 +1,9 @@
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional } from 'class-validator'
+import { IsEmail, IsString, MinLength, IsIn, IsOptional } from 'class-validator'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { UserRole } from '@facturard/database'
+
+/** Roles que un ADMIN de un tenant puede asignar a sus usuarios. */
+export const ROLES_ASIGNABLES: UserRole[] = [UserRole.ADMIN, UserRole.USUARIO, UserRole.CONTADOR]
 
 export class CreateUserDto {
   @ApiProperty()
@@ -16,8 +19,9 @@ export class CreateUserDto {
   @IsString()
   nombre!: string
 
-  @ApiPropertyOptional({ enum: UserRole })
-  @IsEnum(UserRole)
+  // SUPER_ADMIN nunca se asigna por la API: sólo existe por seed/operación interna.
+  @ApiPropertyOptional({ enum: ROLES_ASIGNABLES })
+  @IsIn(ROLES_ASIGNABLES)
   @IsOptional()
   role?: UserRole
 }

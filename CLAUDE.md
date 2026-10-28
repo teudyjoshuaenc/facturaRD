@@ -406,6 +406,34 @@ APP_URL=http://localhost:3000
   Variables no reemplazadas (`{{…}}` literal) se descartan (`lib/ghl-prefill.ts`). Sin token de GHL: no hay
   llamada a la API de GHL.
 
+- ✅ **🔒 Fase 0 — seguridad de usuarios y receptor DGII (2026-10-28, rama `fix/seguridad-receptor`).**
+  Fallas encontradas en producción y corregidas:
+  - **`POST /users` permitía escalar a SUPER_ADMIN:** bastaba cualquier JWT de tenant (incluido el de
+    `/ghl/init`) y el DTO aceptaba cualquier `UserRole`. Ahora: `@Roles(ADMIN, SUPER_ADMIN)` +
+    `ROLES_ASIGNABLES = ADMIN|USUARIO|CONTADOR` (`@IsIn`); el servicio ya no esparce el DTO.
+    **Pendiente (Fase 1):** `/ghl/init` sigue entregando un token ADMIN sólo con el `location_id`; se cierra
+    cuando exista el login con correo.
+  - **`validacioncertificado` entregaba token a una semilla SIN firmar.** Ahora verifica la firma XMLDSig
+    (`verificarFirmaEcf`) antes de consumir la semilla; el `sub` cae al RNC/cédula del certificado.
+  - **Tenant "de respaldo":** un e-CF o aprobación para un RNC que no es cliente se guardaba en el PRIMER
+    tenant activo. Eliminado: e-CF → **404** sin guardar; aprobación → **400**.
+  - **Acuses según el XSD ARECF:** firma inválida → `Estado 1` + `CodigoMotivoNoRecibido 2` (antes 400);
+    mismo e-NCF+emisor con OTRO contenido → motivo **3** (se conserva el original); reintento idéntico →
+    mismo acuse sin duplicar. El acuse **siempre va firmado**: sin certificado del receptor → **503** y no se
+    guarda nada (antes devolvía el ARECF sin firmar). `FechaHoraAcuseRecibo` en hora de RD (antes hora del
+    contenedor, UTC).
+  - **🐞 Verificador del ecf-engine:** fallaba con documentos firmados sin espacios y entregados
+    INDENTADOS, que es como los entrega la DGII → habría rechazado e-CF legítimos en las pruebas de
+    comunicación. `verificarXmlDsig` ahora reintenta sobre el XML sin nodos de texto vacíos (mismo criterio
+    que `normalizeXml` del firmador). Test: `ecf-engine/test/verifier.test.ts` (5).
+  - **Mayúsculas:** nginx enrutaba sólo `/fe/` en minúscula → `/FE/Recepcion/...` caía en la web (404).
+    `facturard-single.conf` usa `location ~* ^/fe/`. **Aplicar a mano en el VPS** (setup.sh no reescribe un
+    sitio ya instalado). Express ya era insensible a mayúsculas.
+  - **Logs:** `main.ts` imprimía encabezados completos (token Bearer) y el cuerpo XML de cada `/fe/*`;
+    ahora una línea sin secretos. Las rutas sin prefijo viven en `receptor.rutas.ts`, compartido con el
+    harness e2e (antes los tests veían `/api/v1/fe/...`, distinto de producción).
+  - **Tests:** `seguridad-receptor.e2e-spec.ts` (18). **323 e2e (34 suites) + 160 ecf-engine, build API en 0.**
+
 ### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
 Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.
 - **Causa:** `packages/ecf-engine/src/xml/calculator.ts` calcula el ITBIS sobre el monto YA redondeado:
@@ -645,14 +673,15 @@ flujo de principio a fin y protege la emisión en el backend (no basta con ocult
 
 ## 12. RECEPTOR DGII — URLs para registrar (Paso 7)
 
-Con ngrok corriendo (`ngrok http 3000`), registrar en el portal DGII:
+El receptor es multi-tenant (resuelve el cliente por `RNCComprador`), así que TODOS los clientes registran
+el mismo host. En el portal de la DGII los campos ya traen `https://` y el final de cada ruta; se escribe:
 
 ```
-GET  https://{ngrok}.ngrok-free.app/fe/autenticacion/api/semilla
-POST https://{ngrok}.ngrok-free.app/fe/autenticacion/api/validacioncertificado
-POST https://{ngrok}.ngrok-free.app/fe/recepcion/api/ecf
-POST https://{ngrok}.ngrok-free.app/fe/aprobacioncomercial/api/ecf
+facturard.dmaia.io
 ```
+
+→ `https://facturard.dmaia.io/fe/recepcion/api/ecf`, `/fe/aprobacioncomercial/api/ecf`,
+`/fe/autenticacion/api/semilla` y `/fe/autenticacion/api/validacioncertificado`. Sin ngrok ni túneles.
 
 ---
 
@@ -789,5 +818,7 @@ NOTAS TÉCNICAS DEL RECEPTOR:
 - Redis almacena semillas con TTL 5 min (key: `semilla:{UUID}`)
 - Semillas son de UN SOLO USO (se eliminan tras validar — anti-replay)
 - JWT de receptor: secret=`JWT_SECRET:receptor-ecf`, issuer=`facturard-receptor-ecf`, TTL=1h
-- Validación XMLDSig de la firma del emisor: PENDIENTE para producción (en cert sólo se valida la semilla)
-- `comprobanteRecibido.tenantId` → se resuelve por RNCComprador del e-CF vs Tenant.rnc
+- Validación XMLDSig: se verifica la firma de la semilla (validacioncertificado), de cada e-CF y de cada
+  ACECF; tolera documentos indentados después de firmados (como los entrega la DGII)
+- `comprobanteRecibido.tenantId` → se resuelve por RNCComprador del e-CF vs Tenant.rnc (sin tenant de
+  respaldo: si no es cliente → 404). Una sola URL sirve a todos los tenants.

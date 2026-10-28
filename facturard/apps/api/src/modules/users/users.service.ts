@@ -11,7 +11,10 @@ export class UsersService {
     if (existing) throw new ConflictException('Email ya registrado en este tenant')
 
     const passwordHash = await bcrypt.hash(dto.password, 12)
-    const user = await prisma.user.create({ data: { tenantId, ...dto, passwordHash } })
+    // Campos explícitos: nunca se esparce el DTO (evita colar role/tenantId/activo).
+    const user = await prisma.user.create({
+      data: { tenantId, email: dto.email, nombre: dto.nombre, passwordHash, ...(dto.role ? { role: dto.role } : {}) },
+    })
     const { passwordHash: _hash, ...rest } = user
     return rest
   }

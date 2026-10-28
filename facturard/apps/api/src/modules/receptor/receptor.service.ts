@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { Inject, OnModuleDestroy } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
@@ -36,17 +37,22 @@ export interface RecepcionResult {
   xml: string
   rncEmisor: string
   eNCF: string
+  estado: '0' | '1'
+  motivo?: MotivoNoRecibido
 }
 
 // ─── Helpers XML ─────────────────────────────────────────────────────────────
 
-/** Formatea fecha en DD-MM-YYYY HH:MM:SS (formato DGII) */
+/** Formatea fecha en DD-MM-YYYY HH:MM:SS (formato DGII), en hora de República Dominicana. */
 function formatDGIIDateTime(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return (
-    `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  )
+  const p: Record<string, string> = {}
+  for (const part of new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Santo_Domingo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).formatToParts(d)) p[part.type] = part.value
+  const hora = p['hour'] === '24' ? '00' : p['hour']
+  return `${p['day']}-${p['month']}-${p['year']} ${hora}:${p['minute']}:${p['second']}`
 }
 
 /** Extrae el contenido de una etiqueta XML (primera ocurrencia) */
@@ -68,12 +74,20 @@ function buildSemillaXml(valor: string, fecha: string): string {
   ].join('\n')
 }
 
+/**
+ * Estado del acuse según el XSD ARECF: 0 = e-CF Recibido, 1 = e-CF No Recibido.
+ * Motivo (sólo con estado 1): 1 Error de especificación, 2 Error de firma digital,
+ * 3 Envío duplicado, 4 RNC comprador no corresponde.
+ */
+export type MotivoNoRecibido = 1 | 2 | 3 | 4
+
 /** Construye el XML de Acuse de Recibo (ARECF) */
 function buildArecfXml(
   rncEmisor: string,
   rncComprador: string,
   eNCF: string,
-  estado: string,
+  estado: '0' | '1',
+  motivo?: MotivoNoRecibido,
 ): string {
   const ahora = formatDGIIDateTime(new Date())
   return [
@@ -87,6 +101,7 @@ function buildArecfXml(
     `    <RNCComprador>${rncComprador}</RNCComprador>`,
     `    <eNCF>${eNCF}</eNCF>`,
     `    <Estado>${estado}</Estado>`,
+    ...(estado === '1' && motivo ? [`    <CodigoMotivoNoRecibido>${motivo}</CodigoMotivoNoRecibido>`] : []),
     `    <FechaHoraAcuseRecibo>${ahora}</FechaHoraAcuseRecibo>`,
     '  </DetalleAcusedeRecibo>',
     '</ARECF>',
@@ -160,7 +175,15 @@ export class ReceptorService implements OnModuleDestroy {
       )
     }
 
-    // 2. Verificar que la semilla existe en Redis (no expirada)
+    // 2. Verificar la firma XMLDSig de la semilla ANTES de consumirla.
+    //    Sin esto cualquiera obtenía un token enviando la semilla sin firmar.
+    const firma = verificarFirmaEcf(xmlRaw)
+    if (!firma.valida) {
+      this.logger.warn(`[Receptor][Auth] Semilla con firma inválida: ${firma.error ?? 'sin detalle'}`)
+      throw new UnauthorizedException(`La semilla no está firmada correctamente: ${firma.error ?? 'firma inválida'}`)
+    }
+
+    // 3. Verificar que la semilla existe en Redis (no expirada)
     const redisKey = `semilla:${semilla}`
     const stored = await this.redis.get(redisKey)
     if (!stored) {
@@ -169,20 +192,18 @@ export class ReceptorService implements OnModuleDestroy {
       )
     }
 
-    // 3. Consumir la semilla (evitar replay attacks — una semilla = un uso)
+    // 4. Consumir la semilla (evitar replay attacks — una semilla = un uso)
     await this.redis.del(redisKey)
 
-    // 4. Extraer RNC del emisor del XML (si está disponible)
+    // 5. Identidad del emisor: del XML si viene, si no del certificado que firmó
     const rncEmisor =
       extractXmlTag(xmlRaw, 'RNCEmisor') ??
       extractXmlTag(xmlRaw, 'rncEmisor') ??
       extractXmlTag(xmlRaw, 'RNC') ??
+      firma.infoCert?.rncEmisor ??
       'DESCONOCIDO'
 
-    // 5. Emitir JWT de sesión receptor (1 hora)
-    //    NOTA: Para producción se debe verificar la firma XMLDSig del emisor
-    //    contra su certificado registrado en la DGII. Esto está fuera del scope
-    //    del ambiente de certificación.
+    // 6. Emitir JWT de sesión receptor (1 hora)
     const expedido = new Date()
     const expira = new Date(expedido.getTime() + 60 * 60 * 1000)
 
@@ -257,92 +278,72 @@ export class ReceptorService implements OnModuleDestroy {
       `| xmlLength=${xmlRaw.length}`,
     )
 
-    // 3. Verificar firma XMLDSig + cadena de certificados (Paso 8)
+    // 3. Tenant receptor: SÓLO por el RNC del comprador. Nunca se guarda en otro
+    //    cliente: un e-CF que no es para nadie aquí no se almacena.
+    const tenant = rncComprador
+      ? await prisma.tenant.findFirst({ where: { rnc: rncComprador, estado: 'ACTIVO' }, select: { id: true } })
+      : null
+    if (!tenant) {
+      this.logger.warn(`[Receptor] rncComprador="${rncComprador}" no es cliente activo; e-CF ${eNCF} no se almacena`)
+      throw new NotFoundException(`El RNC comprador ${rncComprador || '(vacío)'} no es un receptor registrado en FacturaRD`)
+    }
+    const tenantId = tenant.id
+
+    // 4. Certificado para firmar el acuse. Sin él no se responde (ni se guarda nada):
+    //    un ARECF sin firmar no es válido para la DGII; con 503 el emisor reintenta.
+    let certTenant: { p12Buffer: Buffer; passphrase: string }
+    try {
+      certTenant = await this.certificadosService.getCertificadoParaFirmar(tenantId)
+    } catch (err) {
+      this.logger.error(`[Receptor] Tenant ${tenantId} sin certificado para firmar el ARECF: ${String(err)}`)
+      throw new ServiceUnavailableException('El receptor no tiene un certificado activo para firmar el acuse de recibo')
+    }
+    const responder = (estado: '0' | '1', motivo?: MotivoNoRecibido): RecepcionResult => {
+      const xml = firmarDocumento({
+        p12: certTenant.p12Buffer,
+        passphrase: certTenant.passphrase,
+        xml: buildArecfXml(rncEmisor, rncComprador, eNCF, estado, motivo),
+        signOptions: { referenceXPath: "//*[local-name(.)='ARECF']" },
+      })
+      return { xml, rncEmisor, eNCF, estado, ...(motivo ? { motivo } : {}) }
+    }
+
+    // 5. Firma XMLDSig del e-CF. Inválida → acuse "No recibido" motivo 2 (no se guarda).
     const verificacion = verificarFirmaEcf(xmlRaw)
     this.logger.log(
       `[Receptor][Firma] eNCF=${eNCF} | firmaValida=${verificacion.valida} ` +
-      `| cert.rncEmisor=${verificacion.infoCert?.rncEmisor ?? 'N/A'} ` +
-      `| cert.nombreEmisor=${verificacion.infoCert?.nombreEmisor ?? 'N/A'} ` +
-      `| cert.issuer=${verificacion.infoCert?.issuer ?? 'N/A'} ` +
-      `| cert.validoHasta=${verificacion.infoCert?.validoHasta?.toISOString() ?? 'N/A'}`,
+      `| cert.rncEmisor=${verificacion.infoCert?.rncEmisor ?? 'N/A'} | cert.issuer=${verificacion.infoCert?.issuer ?? 'N/A'}`,
     )
-
     if (!verificacion.valida) {
-      this.logger.warn(
-        `[Receptor][Firma] Firma inválida para eNCF=${eNCF}: ${verificacion.error ?? 'error desconocido'} ` +
-        `| erroresXmlDsig=${JSON.stringify(verificacion.erroresXmlDsig ?? [])}`,
-      )
-      throw new BadRequestException(
-        `Firma XMLDSig no válida: ${verificacion.error ?? 'error desconocido'}`,
-      )
+      this.logger.warn(`[Receptor][Firma] Firma inválida para eNCF=${eNCF}: ${verificacion.error ?? 'error desconocido'}`)
+      await this.auditar(tenantId, 'ECF_NO_RECIBIDO', { rncEmisor, eNCF, rncComprador, motivo: 2 })
+      return responder('1', 2)
     }
-
-    // Si hay advertencia de CA (VIAFIRMA u otra CA sin PEM embebido), loguear pero continuar
     if (verificacion.error?.startsWith('ADVERTENCIA:')) {
       this.logger.warn(`[Receptor][Firma] ${verificacion.error} | eNCF=${eNCF}`)
     }
 
-    // 4. Buscar el tenant receptor (por RNC del comprador)
-    this.logger.log(`[Receptor][Paso4] Buscando tenant para rncComprador="${rncComprador}"`)
-    let tenantId: string | null = null
-    if (rncComprador) {
-      const tenant = await prisma.tenant.findFirst({
-        where: { rnc: rncComprador, estado: 'ACTIVO' },
-        select: { id: true, rnc: true },
-      })
-      if (tenant) {
-        tenantId = tenant.id
-        this.logger.log(`[Receptor][Paso4] Tenant encontrado por RNC: ${tenantId}`)
+    // 6. Duplicados: el mismo documento otra vez (reintento) recibe la misma respuesta;
+    //    OTRO documento con el mismo e-NCF y emisor es un envío duplicado (motivo 3).
+    const existente = await prisma.comprobanteRecibido.findUnique({
+      where: { tenantId_eNCF_rncEmisor: { tenantId, eNCF, rncEmisor } },
+      select: { xmlFirmado: true },
+    })
+    if (existente) {
+      if (existente.xmlFirmado === xmlRaw) {
+        this.logger.log(`[Receptor] Reintento del mismo e-CF ${eNCF}; se repite el acuse`)
+        return responder('0')
       }
+      this.logger.warn(`[Receptor] e-NCF ${eNCF} de ${rncEmisor} ya recibido con otro contenido → duplicado`)
+      await this.auditar(tenantId, 'ECF_NO_RECIBIDO', { rncEmisor, eNCF, rncComprador, motivo: 3 })
+      return responder('1', 3)
     }
 
-    // Si no encontramos tenant por RNC, buscamos el primer tenant activo
-    if (!tenantId) {
-      this.logger.log(`[Receptor][Paso4] RNC no coincide, buscando tenant fallback`)
-      const fallback = await prisma.tenant.findFirst({
-        where: { estado: 'ACTIVO' },
-        select: { id: true, rnc: true },
-      })
-      if (!fallback) {
-        this.logger.error(`[Receptor][Paso4] No hay tenants activos — lanzando NotFoundException`)
-        throw new NotFoundException('No hay tenants activos para recibir e-CFs')
-      }
-      tenantId = fallback.id
-      this.logger.warn(
-        `[Receptor] rncComprador="${rncComprador}" no coincide con ningún tenant. ` +
-        `Usando tenant de fallback ${tenantId}`,
-      )
-    }
-
-    // 5. Guardar el e-CF recibido en DB (upsert por clave única)
+    // 7. Guardar el e-CF recibido
     const tipoECF = tipoECFRaw ? tipoECFRaw.replace(/\D/g, '').padStart(2, '0') : '31'
-    this.logger.log(
-      `[Receptor][Paso5] Guardando en DB: eNCF=${eNCF} | tipoECF=${tipoECF} | tenantId=${tenantId}`,
-    )
-    try {
-      await prisma.comprobanteRecibido.upsert({
-        where: {
-          tenantId_eNCF_rncEmisor: { tenantId, eNCF, rncEmisor },
-        },
-        create: {
-          tenantId,
-          rncEmisor,
-          eNCF,
-          tipoECF,
-          xmlFirmado: xmlRaw,
-          estado: 'RECIBIDO',
-        },
-        update: {
-          xmlFirmado: xmlRaw,
-          estado: 'RECIBIDO',
-          fechaRecepcion: new Date(),
-        },
-      })
-      this.logger.log(`[Receptor][Paso5] DB upsert OK: ${eNCF}`)
-    } catch (dbErr) {
-      this.logger.error(`[Receptor][Paso5] ERROR en DB upsert: ${String(dbErr)}`)
-      throw dbErr
-    }
+    await prisma.comprobanteRecibido.create({
+      data: { tenantId, rncEmisor, eNCF, tipoECF, xmlFirmado: xmlRaw, estado: 'RECIBIDO' },
+    })
 
     // Bridge Sprint 7: además del comprobante_recibido, se persiste una
     // CompraRecibida (feed 606) para que el tenant la vea en su módulo de compras.
@@ -358,48 +359,11 @@ export class ReceptorService implements OnModuleDestroy {
       fechaEmision: this.parseFechaDGII(fechaEmisionXml),
     }).catch((e) => this.logger.warn(`[Receptor][Bridge] CompraRecibida no persistida: ${String(e)}`))
 
-    this.logger.log(
-      `[Receptor] e-CF recibido: ${eNCF} de RNC ${rncEmisor} → tenant ${tenantId}`,
-    )
+    await this.auditar(tenantId, 'ECF_RECIBIDO', { rncEmisor, eNCF, tipoECF, rncComprador })
+    this.logger.log(`[Receptor] e-CF recibido: ${eNCF} de RNC ${rncEmisor} → tenant ${tenantId}`)
 
-    // 6. Audit log
-    this.logger.log(`[Receptor][Paso6] Creando audit log`)
-    await prisma.auditLog
-      .create({
-        data: {
-          tenantId,
-          accion: 'ECF_RECIBIDO',
-          entidad: 'comprobante_recibido',
-          detalle: { rncEmisor, eNCF, tipoECF, rncComprador },
-        },
-      })
-      .catch((e) => this.logger.warn(`[Receptor] Audit log error: ${String(e)}`))
-
-    // 7. Generar XML de acuse de recibo (ARECF) y firmarlo con el P12 del tenant
-    this.logger.log(`[Receptor][Paso7] Generando ARECF para eNCF=${eNCF}`)
-    const nuestroRnc = rncComprador || (await this.obtenerNuestroRnc(tenantId))
-    const arecfXml = buildArecfXml(rncEmisor, nuestroRnc, eNCF, '0')
-
-    let xmlFinal = arecfXml
-    try {
-      const { p12Buffer, passphrase } = await this.certificadosService.getCertificadoParaFirmar(tenantId)
-      xmlFinal = firmarDocumento({
-        p12: p12Buffer,
-        passphrase,
-        xml: arecfXml,
-        signOptions: { referenceXPath: "//*[local-name(.)='ARECF']" },
-      })
-      this.logger.log(`[Receptor][Paso7] ARECF firmado con certificado del tenant ${tenantId}`)
-    } catch (err) {
-      this.logger.warn(
-        `[Receptor][Paso7] No se pudo firmar el ARECF (sin certificado activo): ${String(err)} — retornando sin firma`,
-      )
-    }
-
-    this.logger.log(
-      `[Receptor][Paso7] ARECF listo — retornando respuesta: eNCF=${eNCF} | rncEmisor=${rncEmisor} | xmlLength=${xmlFinal.length}`,
-    )
-    return { xml: xmlFinal, rncEmisor, eNCF }
+    // 8. Acuse de recibo firmado con el P12 del tenant
+    return responder('0')
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -419,16 +383,33 @@ export class ReceptorService implements OnModuleDestroy {
       extractXmlTag(xmlRaw, 'RNCEmisor') ??
       extractXmlTag(xmlRaw, 'rncEmisor') ??
       rncEmisorToken
+    const rncComprador = extractXmlTag(xmlRaw, 'RNCComprador') ?? ''
 
     if (!eNCF) {
       throw new BadRequestException('No se encontró eNCF en el XML de aprobación')
     }
 
-    // Buscar el comprobante recibido y actualizar con la aprobación
-    const comprobante = await prisma.comprobanteRecibido.findFirst({
-      where: { eNCF, rncEmisor },
-    })
+    // La DGII define HTTP 400 como respuesta "insatisfactoria".
+    const firma = verificarFirmaEcf(xmlRaw)
+    if (!firma.valida) {
+      throw new BadRequestException(`Firma de la aprobación comercial inválida: ${firma.error ?? 'firma inválida'}`)
+    }
 
+    // Tenant: el comprador (aprobación de un e-CF que recibimos) o el emisor
+    // (aprobación de un e-CF que emitimos). Nunca un tenant "de respaldo".
+    const rncs = [rncComprador, rncEmisor].filter(Boolean)
+    const tenants = await prisma.tenant.findMany({
+      where: { rnc: { in: rncs }, estado: 'ACTIVO' },
+      select: { id: true, rnc: true },
+    })
+    const tenant = tenants.find((t) => t.rnc === rncComprador) ?? tenants.find((t) => t.rnc === rncEmisor)
+    if (!tenant) {
+      throw new BadRequestException('Ni el RNC comprador ni el emisor de la aprobación son clientes de FacturaRD')
+    }
+
+    const comprobante = await prisma.comprobanteRecibido.findFirst({
+      where: { tenantId: tenant.id, eNCF, rncEmisor },
+    })
     if (comprobante) {
       await prisma.comprobanteRecibido.update({
         where: { id: comprobante.id },
@@ -436,26 +417,15 @@ export class ReceptorService implements OnModuleDestroy {
       })
       this.logger.log(`[Receptor] Aprobación comercial registrada para ${eNCF}`)
     } else {
-      // Si no existe el comprobante recibido, puede que llegó la aprobación antes
-      // En ese caso la guardamos de todas formas en audit log
-      this.logger.warn(
-        `[Receptor] Aprobación para eNCF ${eNCF} sin comprobante previo. RNC: ${rncEmisor}`,
-      )
+      this.logger.log(`[Receptor] Aprobación para eNCF ${eNCF} sin comprobante recibido previo (tenant ${tenant.id})`)
     }
 
-    // Audit log
-    await prisma.auditLog
-      .create({
-        data: {
-          tenantId: comprobante?.tenantId ?? (await this.obtenerTenantFallback()),
-          accion: 'APROBACION_COMERCIAL_RECIBIDA',
-          entidad: 'comprobante_recibido',
-          // exactOptionalPropertyTypes: usar null en lugar de undefined para campos opcionales de Prisma
-          ...(comprobante?.id !== undefined ? { entidadId: comprobante.id } : {}),
-          detalle: { rncEmisor, eNCF },
-        },
-      })
-      .catch((e) => this.logger.warn(`[Receptor] Audit log error: ${String(e)}`))
+    await this.auditar(
+      tenant.id,
+      'APROBACION_COMERCIAL_RECIBIDA',
+      { rncEmisor, rncComprador, eNCF, estado: extractXmlTag(xmlRaw, 'Estado') ?? null },
+      comprobante?.id,
+    )
   }
 
   // ── Helpers privados ──────────────────────────────────────────────────────
@@ -513,19 +483,22 @@ export class ReceptorService implements OnModuleDestroy {
     return Number.isNaN(d.getTime()) ? undefined : d
   }
 
-  private async obtenerNuestroRnc(tenantId: string): Promise<string> {
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { rnc: true },
-    })
-    return tenant?.rnc ?? '000000000'
-  }
-
-  private async obtenerTenantFallback(): Promise<string> {
-    const t = await prisma.tenant.findFirst({
-      where: { estado: 'ACTIVO' },
-      select: { id: true },
-    })
-    return t?.id ?? 'unknown'
+  private async auditar(
+    tenantId: string,
+    accion: string,
+    detalle: Record<string, string | number | null>,
+    entidadId?: string,
+  ): Promise<void> {
+    await prisma.auditLog
+      .create({
+        data: {
+          tenantId,
+          accion,
+          entidad: 'comprobante_recibido',
+          ...(entidadId !== undefined ? { entidadId } : {}),
+          detalle,
+        },
+      })
+      .catch((e) => this.logger.warn(`[Receptor] Audit log error: ${String(e)}`))
   }
 }

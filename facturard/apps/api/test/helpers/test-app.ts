@@ -6,6 +6,7 @@ import { AppModule } from '../../src/app.module'
 import { EcfEmissionProcessor } from '../../src/modules/comprobantes/ecf-emission.processor'
 import { DgiiTrackIdsClient } from '../../src/modules/secuencias/dgii-trackids.client'
 import { resetDatabase } from './reset-db'
+import { RUTAS_RECEPTOR_SIN_PREFIJO } from '../../src/modules/receptor/receptor.rutas'
 
 export interface TestContext {
   app: INestApplication
@@ -56,7 +57,7 @@ export async function createTestApp(overrides: ProviderOverride[] = []): Promise
       transformOptions: { enableImplicitConversion: false },
     }),
   )
-  app.setGlobalPrefix('api/v1')
+  app.setGlobalPrefix('api/v1', { exclude: RUTAS_RECEPTOR_SIN_PREFIJO })
   await app.init()
 
   return { app, queueAdd }

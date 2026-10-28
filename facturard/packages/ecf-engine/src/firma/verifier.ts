@@ -16,7 +16,7 @@
 
 import * as forge from 'node-forge';
 import { SignedXml } from 'xml-crypto';
-import { DOMParser } from '@xmldom/xmldom';
+import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
 // ─── CAs aceptadas ───────────────────────────────────────────────────────────
 // Issuers cuyo CN (o O) reconocemos como autoridades de certificación
@@ -198,6 +198,39 @@ function verificarCadena(
  * @returns { ok, errors } donde errors son los mensajes de xml-crypto
  */
 function verificarXmlDsig(
+  xml: string,
+  certPem: string,
+): { ok: boolean; errors: string[] } {
+  const tal = verificarXmlDsigExacto(xml, certPem);
+  if (tal.ok) return tal;
+  // La DGII firma con PreserveWhitespace=false y entrega el documento indentado:
+  // se verifica también sobre la versión sin nodos de texto vacíos, igual que su
+  // verificador .NET (mismo criterio que `normalizeXml` del firmador).
+  const sinEspacios = verificarXmlDsigExacto(quitarEspacios(xml), certPem);
+  return sinEspacios.ok ? sinEspacios : tal;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function quitarNodosVacios(node: any): void {
+  let child = node.firstChild;
+  while (child) {
+    const next = child.nextSibling;
+    if (child.nodeType === 3 /* TEXT_NODE */ && !/\S/.test(child.nodeValue ?? '')) {
+      node.removeChild(child);
+    } else {
+      quitarNodosVacios(child);
+    }
+    child = next;
+  }
+}
+
+function quitarEspacios(xml: string): string {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  quitarNodosVacios(doc);
+  return new XMLSerializer().serializeToString(doc);
+}
+
+function verificarXmlDsigExacto(
   xml: string,
   certPem: string,
 ): { ok: boolean; errors: string[] } {

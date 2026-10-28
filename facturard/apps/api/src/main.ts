@@ -1,40 +1,26 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe, RequestMethod } from '@nestjs/common'
+import { ValidationPipe } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import helmet from 'helmet'
 import { writeFileSync } from 'fs'
 import type { Request, Response, NextFunction } from 'express'
 import { AppModule } from './app.module'
+import { RUTAS_RECEPTOR_SIN_PREFIJO } from './modules/receptor/receptor.rutas'
 
 async function bootstrap(): Promise<void> {
   // rawBody: true — necesario para validar firmas HMAC del body crudo (webhooks GHL)
   const app = await NestFactory.create(AppModule, { rawBody: true })
 
-  // ── TAREA 1: Logging máximo — captura TODO lo que llega al servidor ────────
-  // Este middleware corre ANTES de helmet, cors y cualquier guard.
-  // Sirve para debugging de la DGII: ver exactamente qué envían sus servidores.
+  // ── Registro de peticiones al receptor DGII (/fe/*) ──────────────────────
+  // Una línea por petición. NO se registran encabezados (llevan el token Bearer)
+  // ni el cuerpo (lleva XML fiscal de terceros).
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    // Solo loguear endpoints /fe/* para no inundar los logs con rutas normales
-    if (req.url.startsWith('/fe/')) {
-      console.log('\n╔══════════════════════════════════════════════════════════╗')
-      console.log('║             REQUEST ENTRANTE — RECEPTOR DGII             ║')
-      console.log('╚══════════════════════════════════════════════════════════╝')
-      console.log('Timestamp   :', new Date().toISOString())
-      console.log('Method      :', req.method)
-      console.log('URL         :', req.url)
-      console.log('IP          :', req.ip ?? req.socket.remoteAddress ?? 'desconocida')
-      console.log('User-Agent  :', req.headers['user-agent'] ?? '(sin user-agent)')
-      console.log('Content-Type:', req.headers['content-type'] ?? '(sin content-type)')
-      console.log('Headers completos:')
-      console.log(JSON.stringify(req.headers, null, 2))
-      // Mostrar body raw si existe (solo para POST, ya que GET no tiene body)
-      if (req.method !== 'GET' && (req as Request & { rawBody?: Buffer }).rawBody) {
-        const raw = (req as Request & { rawBody?: Buffer }).rawBody
-        console.log('Body raw (primeros 800 chars):')
-        console.log(raw?.toString('utf-8').substring(0, 800))
-      }
-      console.log('═══════════════════════════════════════════════════════════\n')
+    if (req.url.toLowerCase().startsWith('/fe/')) {
+      console.log(
+        `[Receptor DGII] ${req.method} ${req.url} | ip=${req.ip ?? req.socket.remoteAddress ?? '?'} ` +
+          `| content-type=${req.headers['content-type'] ?? '-'} | length=${req.headers['content-length'] ?? '-'}`,
+      )
     }
     next()
   })
@@ -103,16 +89,7 @@ async function bootstrap(): Promise<void> {
 
   // Excluir los endpoints del receptor DGII (Paso 7) del prefijo global.
   // Estos viven en /fe/* siguiendo el estándar técnico de la DGII.
-  app.setGlobalPrefix('api/v1', {
-    exclude: [
-      { path: 'fe/autenticacion/api/semilla',               method: RequestMethod.GET },
-      { path: 'fe/autenticacion/api/validacioncertificado', method: RequestMethod.POST },
-      { path: 'fe/recepcion/api/ecf',                       method: RequestMethod.GET },
-      { path: 'fe/recepcion/api/ecf',                       method: RequestMethod.POST },
-      { path: 'fe/aprobacioncomercial/api/ecf',             method: RequestMethod.GET },
-      { path: 'fe/aprobacioncomercial/api/ecf',             method: RequestMethod.POST },
-    ],
-  })
+  app.setGlobalPrefix('api/v1', { exclude: RUTAS_RECEPTOR_SIN_PREFIJO })
 
   // Swagger
   const config = new DocumentBuilder()
