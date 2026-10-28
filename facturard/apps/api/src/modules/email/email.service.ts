@@ -18,6 +18,34 @@ export class EmailService {
     }
   }
 
+  /** Enlace para confirmar el correo y crear la contraseña (registro directo). */
+  async sendVerificacionRegistro(email: string, link: string): Promise<void> {
+    const subject = 'Confirma tu correo — FacturaRD'
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto">
+        <h2>Bienvenido a FacturaRD</h2>
+        <p>Confirma tu correo y crea tu contraseña para continuar con el registro de tu empresa.</p>
+        <p>El enlace es válido por <strong>24 horas</strong>.</p>
+        <p style="text-align:center;margin:32px 0">
+          <a href="${link}"
+             style="background:#0379D5;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold">
+            Confirmar correo
+          </a>
+        </p>
+        <p style="color:#6B7280;font-size:13px">
+          Si no te registraste en FacturaRD, ignora este correo.<br><br>
+          <code style="word-break:break-all">${link}</code>
+        </p>
+      </div>
+    `
+    if (!this.enabled) {
+      this.logger.warn(`[DEV] SendGrid desactivado — enlace de verificación para ${email}:\n${link}`)
+      return
+    }
+    await sgMail.send({ to: email, from: this.from, subject, html })
+    this.logger.log(`Email de verificación enviado a ${email}`)
+  }
+
   async sendResetPassword(email: string, nombre: string, resetLink: string): Promise<void> {
     const subject = 'Restablecer contraseña — FacturaRD'
     const html = `

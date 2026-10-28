@@ -20,6 +20,10 @@ export {
 export type {
   Tenant,
   User,
+  CuentaRegistro,
+  PerfilFiscal,
+  Representante,
+  CredencialOfv,
   Certificado,
   Comprobante,
   ApiKey,

@@ -11,7 +11,7 @@ import { DgiiContribuyentesService } from '../tenants/dgii-contribuyentes.servic
 import { SecuenciasService } from '../secuencias/secuencias.service'
 import { EmailService } from '../email/email.service'
 
-interface AuthTokens {
+export interface AuthTokens {
   accessToken: string
   refreshToken: string
 }
@@ -103,13 +103,19 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas')
     }
 
-    const tokens = await this.generateTokens(user.id, user.tenantId, user.role)
+    return this.emitirSesion(user)
+  }
 
+  /**
+   * Emite access + refresh para un usuario ya autenticado por otro medio (login o
+   * registro directo) y guarda el hash del refresh para la rotación.
+   */
+  async emitirSesion(user: Pick<User, 'id' | 'tenantId' | 'role'>): Promise<AuthTokens> {
+    const tokens = await this.generateTokens(user.id, user.tenantId, user.role)
     await prisma.user.update({
       where: { id: user.id },
       data: { refreshTokenHash: hashRefreshToken(tokens.refreshToken) },
     })
-
     return tokens
   }
 

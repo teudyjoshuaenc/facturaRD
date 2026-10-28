@@ -434,6 +434,34 @@ APP_URL=http://localhost:3000
     harness e2e (antes los tests veían `/api/v1/fe/...`, distinto de producción).
   - **Tests:** `seguridad-receptor.e2e-spec.ts` (18). **323 e2e (34 suites) + 160 ecf-engine, build API en 0.**
 
+- ✅ **Fase 1 — Registro directo en FacturaRD (2026-10-28, rama `feat/registro-cuentas`).** El cliente se
+  registra en FacturaRD ANTES del CRM: correo → contraseña → 2FA → contribuyente + representante → P12 →
+  acceso OFV → completar. Migración aditiva `20261028194809_registro_cuentas` (sólo tablas nuevas:
+  `cuentas_registro`, `perfiles_fiscales`, `representantes`, `credenciales_ofv`; cero `ALTER` de columnas).
+  - **Cuenta con permisos básicos:** `CuentaRegistro` existe sin empresa; su JWT (`type:'registro'`, secreto
+    `JWT_SECRET:registro`, 2 h) sólo sirve para `/api/v1/registro/*` — no se cruza con el JWT de empresa.
+  - **Endpoints** (`/api/v1/registro`): `iniciar` (correo con enlace 24 h, respuesta siempre genérica),
+    `verificar` (crea la contraseña: 10+ con mayúscula, minúscula y número), `login`, `estado`,
+    `dos-pasos/configurar|activar`, `datos` (GET/PUT), `certificado` (multipart, reusa
+    `CertificadosService.upload`), `ofv` (PUT, exige código 2FA), `sensibles` (muestra la OFV, exige código y
+    queda en AuditLog `OFV_CONSULTADA`), `completar` (devuelve la sesión normal de empresa). Catálogo público
+    `GET /api/v1/catalogos/provincias` = Tabla III de la DGII (32 provincias, 156 municipios, códigos de 6 dígitos).
+  - **Al guardar los datos la primera vez** se crea en una transacción: Tenant + User ADMIN (mismo correo y
+    hash de la cuenta) + secuencias base + PerfilFiscal + Representante. Razón social desde el padrón (cédula
+    fuera del padrón → nombre escrito). RNC ya registrado → 409; el RNC no cambia después.
+  - **2FA (Google Authenticator):** TOTP RFC 6238 propio (`common/services/totp.ts`, sin dependencias; validado
+    con los vectores del RFC). Secreto cifrado AES-256-GCM; se reutiliza mientras no se active (recargar no
+    invalida el QR). Obligatorio antes de guardar datos, y para guardar/ver la OFV. OFV cifrada igual que el P12.
+  - **`/ghl/init`:** si la empresa tiene cuenta con contraseña responde `{ requiereLogin:true }` (no entrega
+    token sólo con el location_id). Empresas antiguas sin cuenta siguen igual hasta migrarlas (Fase 2).
+  - **Web:** `/registro`, `/registro/verificar`, `/registro/configurar` (asistente de 6 pasos, reusa
+    `CertificadoStep`), `/login`; la pantalla de entrada ofrece "Crear cuenta / Iniciar sesión". Sesiones con
+    correo guardan el refresh token y rotan por `/auth/refresh` (antes sólo existía la re-autenticación por GHL).
+  - **⚠️ Padrón RNC:** `api-dgii.dominicantechnology.com` ahora limita a **5 consultas/día sin API key**
+    (HTTP 429 → la API responde 503 "No se pudo validar el RNC"). Afecta registro, onboarding y contactos en
+    producción. Hace falta su API key (plan) o otra fuente del padrón.
+  - **Tests:** `registro.e2e-spec.ts` (10). Probado de punta a punta en el navegador.
+
 ### ⚠️ EL CENTAVO — investigado, documentado, NO arreglado (decisión fiscal pendiente)
 Capturar **15,000 con ITBIS incluido** produce un comprobante con **montoTotal 14,999.99**, no 15,000.
 - **Causa:** `packages/ecf-engine/src/xml/calculator.ts` calcula el ITBIS sobre el monto YA redondeado:

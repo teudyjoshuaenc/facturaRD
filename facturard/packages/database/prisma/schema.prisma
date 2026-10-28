@@ -167,6 +167,10 @@ model Tenant {
   presupuestoConfig    PresupuestoConfig?
   cajaDiaria           CajaDiaria[]
   enviosComprobante    EnvioComprobante[]
+  cuentaRegistro       CuentaRegistro?
+  perfilFiscal         PerfilFiscal?
+  representante        Representante?
+  credencialOfv        CredencialOfv?
 
   @@map("tenants")
 }
@@ -684,4 +688,79 @@ model EnvioComprobante {
   @@index([comprobanteId, createdAt])
   @@index([tenantId, loteId])
   @@map("envios_comprobante")
+}
+
+// ─── Registro directo en FacturaRD (Fase 1) ────────────────────────────────────
+// La persona se registra con su correo ANTES de tener empresa: la cuenta existe
+// sola (permisos básicos: sólo completar su registro). Al guardar los datos del
+// contribuyente se crea el Tenant + User ADMIN con el mismo correo y contraseña.
+
+model CuentaRegistro {
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  passwordHash            String?
+  emailVerificado         Boolean   @default(false)
+  tokenVerificacionHash   String?   @unique
+  tokenVerificacionExpira DateTime?
+  /// Secreto TOTP (Google Authenticator) cifrado AES-256-GCM (iv:tag:data).
+  totpSecretCifrado       String?
+  totpActivo              Boolean   @default(false)
+  tenantId                String?   @unique
+  tenant                  Tenant?   @relation(fields: [tenantId], references: [id])
+  completadoEn            DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("cuentas_registro")
+}
+
+/// Datos del contribuyente que no viven en Tenant (rnc, razón social, nombre
+/// comercial, dirección, teléfono y correo siguen en Tenant).
+model PerfilFiscal {
+  tenantId           String    @id
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tipoRegistro       String
+  tiposComprobante   TipoECF[]
+  actividadEconomica String
+  /// Códigos de la Tabla III de la DGII (Codificación Provincias y Municipios).
+  provincia          String
+  municipio          String
+  sector             String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("perfiles_fiscales")
+}
+
+/// Representante del contribuyente ante la DGII (usuario administrador e-CF).
+model Representante {
+  tenantId           String   @id
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identificacion     String
+  pasaporte          String?
+  nombreCompleto     String
+  telefono           String
+  celular            String?
+  email              String
+  direccion          String
+  provincia          String
+  municipio          String
+  sector             String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("representantes")
+}
+
+/// Acceso a la Oficina Virtual (OFV) de la DGII. Cifrado AES-256-GCM; sólo se
+/// muestra con un código 2FA válido.
+model CredencialOfv {
+  tenantId       String   @id
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuarioCifrado String
+  claveCifrada   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("credenciales_ofv")
 }

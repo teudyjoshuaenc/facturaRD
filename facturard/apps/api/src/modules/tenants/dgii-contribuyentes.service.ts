@@ -6,6 +6,8 @@ export interface ContribuyenteDGII {
   nombreComercial: string | undefined
   estado: string
   categoria: string | undefined
+  /** Actividad económica registrada en el padrón (sirve para prellenar el registro). */
+  actividadEconomica?: string | undefined
 }
 
 // La DGII no tiene API pública oficial — se usa Dominican Technology como proxy
@@ -70,6 +72,7 @@ export class DgiiContribuyentesService {
       nombreComercial: body.data.nombre_comercial?.trim(),
       estado: body.data.estado,
       categoria: body.data.regimen_pago,
+      actividadEconomica: body.data.actividad_economica?.trim(),
     }
   }
 }

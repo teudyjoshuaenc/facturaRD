@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
-import { getToken, saveSession, clearSession, getLocationId } from './session'
+import { getToken, saveSession, clearSession, getLocationId, getRefreshToken, saveRefreshToken, getTenant } from './session'
 import type { TenantInfo } from './session'
 
 // Sin slash final: la llamada de reautenticación más abajo concatena
@@ -31,6 +31,32 @@ interface GhlInitResponse {
   token?: string
   tenant?: TenantInfo
   onboarding?: boolean
+  requiereLogin?: boolean
+}
+
+/** Renueva la sesión: con refresh token (login con correo) o, si no hay, vía GHL init. */
+async function renovarSesion(): Promise<string> {
+  const refreshToken = getRefreshToken()
+  const tenantActual = getTenant()
+  if (refreshToken && tenantActual) {
+    const res = await axios.post<{ accessToken: string; refreshToken: string }>(`${BASE_URL}/auth/refresh`, {
+      refreshToken,
+    })
+    saveSession(res.data.accessToken, tenantActual)
+    saveRefreshToken(res.data.refreshToken)
+    return res.data.accessToken
+  }
+
+  const locationId = getLocationId()
+  if (!locationId) throw new Error('No location_id stored — cannot re-authenticate')
+  // Re-authenticate via GHL init (bypasses api interceptors to avoid loop)
+  const res = await axios.get<GhlInitResponse>(`${BASE_URL}/ghl/init`, {
+    params: { location_id: locationId },
+  })
+  const { token, tenant } = res.data
+  if (!token || !tenant) throw new Error('GHL init did not return a token')
+  saveSession(token, tenant)
+  return token
 }
 
 api.interceptors.response.use(
@@ -42,7 +68,7 @@ api.interceptors.response.use(
 
     const is401 = error.response?.status === 401
     const alreadyRetried = original._retry === true
-    const isInitCall = original.url?.includes('/ghl/init') ?? false
+    const isInitCall = (original.url?.includes('/ghl/init') || original.url?.includes('/auth/refresh')) ?? false
 
     if (!is401 || alreadyRetried || isInitCall) {
       return Promise.reject(error)
@@ -62,26 +88,16 @@ api.interceptors.response.use(
     refreshing = true
 
     try {
-      const locationId = getLocationId()
-      if (!locationId) throw new Error('No location_id stored — cannot re-authenticate')
-
-      // Re-authenticate via GHL init (bypasses api interceptors to avoid loop)
-      const res = await axios.get<GhlInitResponse>(`${BASE_URL}/ghl/init`, {
-        params: { location_id: locationId },
-      })
-
-      const { token, tenant } = res.data
-      if (!token || !tenant) throw new Error('GHL init did not return a token')
-
-      saveSession(token, tenant)
+      const token = await renovarSesion()
       flushQueue(null, token)
 
       original.headers.Authorization = `Bearer ${token}`
       return api(original)
     } catch (refreshError) {
       flushQueue(refreshError, null)
+      const conCorreo = getRefreshToken() !== null
       clearSession()
-      if (typeof window !== 'undefined') window.location.href = '/'
+      if (typeof window !== 'undefined') window.location.href = conCorreo ? '/login' : '/'
       return Promise.reject(refreshError)
     } finally {
       refreshing = false

@@ -12,6 +12,7 @@ import { HealthModule } from './modules/health/health.module'
 import { SecuenciasModule } from './modules/secuencias/secuencias.module'
 import { ReceptorModule } from './modules/receptor/receptor.module'
 import { GhlAuthModule } from './modules/ghl-auth/ghl-auth.module'
+import { RegistroModule } from './modules/registro/registro.module'
 import { ProductosModule } from './modules/productos/productos.module'
 import { ContactosModule } from './modules/contactos/contactos.module'
 import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module'
@@ -56,6 +57,7 @@ import jwtConfig from './config/jwt.config'
     SecuenciasModule,
     ReceptorModule,  // Paso 7 certificación DGII — /fe/* sin prefijo api/v1
     GhlAuthModule,
+    RegistroModule,
     ProductosModule,
     ContactosModule,
     CotizacionesModule,

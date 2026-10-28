@@ -12,6 +12,7 @@ interface GhlInitResponse {
   token?: string
   tenant?: TenantInfo
   onboarding?: boolean
+  requiereLogin?: boolean
   locationId?: string
 }
 
@@ -46,6 +47,12 @@ export function useGhlInit(): UseGhlInitResult {
           const qs = new URLSearchParams({ location_id: locationId })
           reenviarGhlPrefill(searchParams, qs)
           router.replace(`/onboarding?${qs.toString()}`)
+          return
+        }
+
+        // Empresa registrada con correo y contraseña: el location_id no basta.
+        if (data.requiereLogin) {
+          router.replace(`/login?location_id=${encodeURIComponent(locationId)}`)
           return
         }
 
